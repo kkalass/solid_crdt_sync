@@ -33,13 +33,13 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 * **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
 
 **Example: A resource at `/data/recipes/123`**
-This file's main job is to describe the recipe. The crucial `idx:belongsToIndex` now points to a specific shard.
+This file lives in the users job and its main job is to describe the recipe. The crucial `idx:belongsToIndex` now points to a specific shard.
 
 ```turtle
-@prefix schema: [https://schema.org/](https://schema.org/) .
-@prefix sync: [https://kkalass.github.io/solid_crdt_sync/sync#](https://kkalass.github.io/solid_crdt_sync/sync#) .
-@prefix idx: [https://kkalass.github.io/solid_crdt_sync/idx#](https://kkalass.github.io/solid_crdt_sync/idx#) .
-@prefix foaf: [http://xmlns.com/foaf/0.1/](http://xmlns.com/foaf/0.1/) .
+@prefix schema: <https://schema.org/> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix : <#> .
 
 # -- The "Thing" Itself (The Payload) --
@@ -51,7 +51,7 @@ This file's main job is to describe the recipe. The crucial `idx:belongsToIndex`
 <> a foaf:Document;
    foaf:primaryTopic :it;
    # Pointer to the Merge Contract (Layer 2)
-   sync:isGovernedBy [https://example.com/crdt-mappings/recipe-v1](https://example.com/crdt-mappings/recipe-v1) ;
+   sync:isGovernedBy <https://kkalass.github.io/recipe-manager/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to.
    idx:belongsToIndex </indices/recipes/shard-0> .
 ```
@@ -68,9 +68,9 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 This file, published at a public URL, defines how to merge a `schema:Recipe`.
 
 ```turtle
-@prefix schema: [https://schema.org/](https://schema.org/) .
-@prefix crdt: [https://kkalass.github.io/solid_crdt_sync/crdt#](https://kkalass.github.io/solid_crdt_sync/crdt#) .
-@prefix sync: [https://kkalass.github.io/solid_crdt_sync/sync#](https://kkalass.github.io/solid_crdt_sync/sync#) .
+@prefix schema: <https://schema.org/> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
 
 <> a sync:ClassMapping;
    sync:appliesToClass schema:Recipe;
@@ -90,11 +90,11 @@ This shows the full data resource with the CRDT mechanics included.
    # The full, structured Vector Clock
    crdt:hasClockEntry
     [
-        crdt:clientId [https://example.com/clients/A](https://example.com/clients/A);
+        crdt:clientId <https://example.com/clients/A>;
         crdt:clockValue "15"^^xsd:integer
     ],
     [
-        crdt:clientId [https://example.com/clients/B](https://example.com/clients/B);
+        crdt:clientId <https://example.com/clients/B>;
         crdt:clockValue "8"^^xsd:integer
     ];
    # A pre-calculated hash of the clock for efficient index updates
@@ -123,16 +123,16 @@ This is an optional but powerful performance and discovery layer. It defines a c
 This file is the "rulebook" for all shopping entry partitions.
 
 ```turtle
-@prefix sync: [https://kkalass.github.io/solid_crdt_sync/sync#](https://kkalass.github.io/solid_crdt_sync/sync#) .
-@prefix idx: [https://kkalass.github.io/solid_crdt_sync/idx#](https://kkalass.github.io/solid_crdt_sync/idx#) .
-@prefix schema: [https://schema.org/](https://schema.org/) .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/idx#> .
+@prefix schema: <https://schema.org/> .
 
 <> a idx:PartitionedIndex;
    idx:indexesClass schema:ListItem;
    idx:indexedProperty schema:name;
    # A default sharding algorithm for all partitions created under this rule.
    idx:shardingAlgorithm "modulo-hash(xxhash64, 4)" ;
-   sync:isGovernedBy [https://example.com/crdt-mappings/partitioned-index-v1](https://example.com/crdt-mappings/partitioned-index-v1) ;
+   sync:isGovernedBy <https://kkalass.github.io/recipe-manager/crdt-mappings/partitioned-index-v1>;
 
    # The declarative rule for how to assign items to partitions.
    idx:partitionedBy [
@@ -147,8 +147,8 @@ This file is the "rulebook" for all shopping entry partitions.
 This is a concrete index for a single month, containing data entries.
 
 ```turtle
-@prefix sync: [https://kkalass.github.io/solid_crdt_sync/sync#](https://kkalass.github.io/solid_crdt_sync/sync#) .
-@prefix idx: [https://kkalass.github.io/solid_crdt_sync/idx#](https://kkalass.github.io/solid_crdt_sync/idx#) .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/idx#> .
 
 <> a idx:Partition;
    # Back-link to the rulebook.
