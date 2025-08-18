@@ -1,0 +1,32 @@
+# This is an example of a Public Type Index file.
+# Its purpose is to tell applications where the user prefers to store
+# specific types of data.
+
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
+@prefix schema: <https://schema.org/> .
+
+# The document itself is the subject for these registrations.
+<>
+    # This entry tells any app that the user stores their recipes
+    # in the /data/recipes/ container.
+    a solid:TypeIndex;
+    solid:hasRegistration [
+        a solid:TypeRegistration;
+        solid:forClass schema:Recipe;
+        solid:instanceContainer </data/recipes/>
+    ],
+    # This entry registers the location for shopping list items.
+    [
+        a solid:TypeRegistration;
+        solid:forClass schema:ListItem;
+        solid:instanceContainer </data/shopping-entries/>
+    ],
+    # This entry could register the location for our sync indices themselves,
+    # making them discoverable as well.
+    [
+        a solid:TypeRegistration;
+        solid:forClass <https://kkalass.github.io/solid_crdt_sync/sync#RootIndex>;
+        solid:instanceContainer </indices/>
+    ].
+

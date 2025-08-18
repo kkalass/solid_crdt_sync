@@ -1,0 +1,103 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/idx#> .
+
+# --- Ontology Definition ---
+
+<https://kkalass.github.io/solid_crdt_sync/idx> a owl:Ontology;
+    rdfs:label "Indexing Vocabulary for CRDT Sync";
+    rdfs:comment "A vocabulary to describe the structure, configuration, and conventions of indices used for performance and discovery in a local-first, CRDT-based synchronization system." .
+
+# --- Class Definitions ---
+
+idx:Index a rdfs:Class;
+    rdfs:label "Index";
+    rdfs:comment "An abstract base class for any sharded index that directly contains entries pointing to data resources." .
+
+idx:RootIndex a rdfs:Class;
+    rdfs:label "Root Index";
+    rdfs:comment "A concrete index for a FullSync or OnDemandSync strategy. It represents a single, self-contained index for a whole class of data.";
+    rdfs:subClassOf idx:Index .
+
+idx:PartitionedIndex a rdfs:Class;
+    rdfs:label "Partitioned Index";
+    rdfs:comment "A 'rulebook' resource that defines how a data type is partitioned. It does not contain data entries itself, but points to the Partitions that do." .
+
+idx:Partition a rdfs:Class;
+    rdfs:label "Partition";
+    rdfs:comment "A concrete index representing a single, logical subset of data (e.g., 'August 2025'). It functions like a RootIndex but for a partition.";
+    rdfs:subClassOf idx:Index .
+
+idx:PartitionRule a rdfs:Class;
+    rdfs:label "Partition Rule";
+    rdfs:comment "A declarative rule that describes how a data resource should be assigned to a specific partition based on its properties." .
+
+# --- Property Definitions ---
+
+idx:belongsToIndex a rdf:Property;
+    rdfs:label "belongs to index";
+    rdfs:comment "Links a data resource to the specific index shard it is a member of.";
+    rdfs:domain rdfs:Resource; # Any resource can belong to an index
+    rdfs:range rdfs:Resource . # The value is the IRI of the shard
+
+idx:indexesClass a rdf:Property;
+    rdfs:label "indexes class";
+    rdfs:comment "States which class of resource an index is for (e.g., schema:Recipe).";
+    rdfs:domain [ a owl:Class; owl:unionOf (idx:RootIndex idx:PartitionedIndex) ];
+    rdfs:range rdfs:Class .
+
+idx:indexedProperty a rdf:Property;
+    rdfs:label "indexed property";
+    rdfs:comment "Specifies a property from the data resource that should be included in the index entries.";
+    rdfs:domain [ a owl:Class; owl:unionOf (idx:RootIndex idx:PartitionedIndex) ];
+    rdfs:range rdf:Property .
+
+idx:hasShard a rdf:Property;
+    rdfs:label "has shard";
+    rdfs:comment "Links an Index to its shard files. This provides the canonical list of active shards.";
+    rdfs:domain idx:Index;
+    rdfs:range rdfs:Resource .
+
+idx:shardingAlgorithm a rdf:Property;
+    rdfs:label "sharding algorithm";
+    rdfs:comment "Defines the algorithm used to place new items into shards.";
+    rdfs:domain [ a owl:Class; owl:unionOf (idx:Index idx:PartitionedIndex) ];
+    rdfs:range xsd:string .
+
+idx:isShardOf a rdf:Property;
+    rdfs:label "is shard of";
+    rdfs:comment "A back-link from a shard to the root index or partition it belongs to.";
+    rdfs:domain rdfs:Resource;
+    rdfs:range idx:Index .
+
+idx:partitionedBy a rdf:Property;
+    rdfs:label "partitioned by";
+    rdfs:comment "Links a PartitionedIndex to its declarative PartitionRule.";
+    rdfs:domain idx:PartitionedIndex;
+    rdfs:range idx:PartitionRule .
+
+idx:sourceProperty a rdf:Property;
+    rdfs:label "source property";
+    rdfs:comment "The property in the data resource that the partition rule is based on.";
+    rdfs:domain idx:PartitionRule;
+    rdfs:range rdf:Property .
+
+idx:format a rdf:Property;
+    rdfs:label "format";
+    rdfs:comment "The format string to apply to the sourceProperty's value to generate the partition key.";
+    rdfs:domain idx:PartitionRule;
+    rdfs:range xsd:string .
+
+idx:partitionTemplate a rdf:Property;
+    rdfs:label "partition template";
+    rdfs:comment "The template for constructing the partition IRI from the formatted value.";
+    rdfs:domain idx:PartitionRule;
+    rdfs:range xsd:string .
+
+idx:isPartitionOf a rdf:Property;
+    rdfs:label "is partition of";
+    rdfs:comment "A back-link from a Partition to the PartitionedIndex rulebook that defines it.";
+    rdfs:domain idx:Partition;
+    rdfs:range idx:PartitionedIndex .

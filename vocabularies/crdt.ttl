@@ -1,0 +1,80 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+
+# --- Ontology Definition ---
+
+<https://kkalass.github.io/solid_crdt_sync/crdt> a owl:Ontology;
+    rdfs:label "CRDT Mechanics Vocabulary";
+    rdfs:comment "A vocabulary to describe the low-level, generic mechanics and data structures required for state-based CRDTs on RDF data." .
+
+# --- Class Definitions ---
+
+crdt:Algorithm a rdfs:Class;
+    rdfs:label "CRDT Algorithm";
+    rdfs:comment "An abstract base class for a specific CRDT merge algorithm." .
+
+crdt:LWW_Register a rdfs:Class;
+    rdfs:label "LWW-Register";
+    rdfs:comment "A Last-Writer-Wins Register CRDT, for single-value properties.";
+    rdfs:subClassOf crdt:Algorithm .
+
+crdt:OR_Set a rdfs:Class;
+    rdfs:label "OR-Set";
+    rdfs:comment "An Observed-Remove Set CRDT, for multi-value properties that allows items to be re-added after deletion.";
+    rdfs:subClassOf crdt:Algorithm .
+
+crdt:2P_Set a rdfs:Class;
+    rdfs:label "2P-Set";
+    rdfs:comment "A Two-Phase Set CRDT, for multi-value properties where removal is permanent.";
+    rdfs:subClassOf crdt:Algorithm .
+
+crdt:Sequence a rdfs:Class;
+    rdfs:label "Sequence";
+    rdfs:comment "A Sequence CRDT for maintaining an ordered list of items.";
+    rdfs:subClassOf crdt:Algorithm .
+
+crdt:ClockEntry a rdfs:Class;
+    rdfs:label "Clock Entry";
+    rdfs:comment "A single entry in a Vector Clock, mapping a client ID to its version number." .
+
+# --- Property Definitions ---
+
+crdt:mergeWith a rdf:Property;
+    rdfs:label "merge with";
+    rdfs:comment "Links a sync:PropertyMapping to the specific CRDT Algorithm to be used for merging.";
+    rdfs:domain sync:PropertyMapping;
+    rdfs:range crdt:Algorithm .
+
+crdt:hasClockEntry a rdf:Property;
+    rdfs:label "has clock entry";
+    rdfs:comment "Links a resource to a blank node representing a single entry in its Vector Clock.";
+    rdfs:domain rdfs:Resource;
+    rdfs:range crdt:ClockEntry .
+
+crdt:clientId a rdf:Property;
+    rdfs:label "client ID";
+    rdfs:comment "The unique identifier for a client within a Vector Clock entry.";
+    rdfs:domain crdt:ClockEntry;
+    rdfs:range rdfs:Resource . # Should be an IRI
+
+crdt:clockValue a rdf:Property;
+    rdfs:label "clock value";
+    rdfs:comment "The version number (counter) for a client within a Vector Clock entry.";
+    rdfs:domain crdt:ClockEntry;
+    rdfs:range xsd:integer .
+
+crdt:vectorClockHash a rdf:Property;
+    rdfs:label "vector clock hash";
+    rdfs:comment "A pre-calculated, lightweight hash of the resource's full vector clock, used for efficient change detection in indices.";
+    rdfs:domain rdfs:Resource;
+    rdfs:range xsd:string .
+
+crdt:isDeleted a rdf:Property;
+    rdfs:label "is deleted";
+    rdfs:comment "An RDF-Star property used as a tombstone to mark a triple as deleted, for use in set-based CRDTs.";
+    rdfs:domain rdf:Statement; # This property can only be attached to a triple
+    rdfs:range xsd:boolean .

@@ -1,0 +1,57 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+
+# --- Ontology Definition ---
+
+<https://kkalass.github.io/solid_crdt_sync/sync> a owl:Ontology;
+    rdfs:label "Synchronization Vocabulary for CRDT Sync";
+    rdfs:comment "A vocabulary to describe the high-level, application-agnostic merge contract for a resource." .
+
+# --- Class Definitions ---
+
+sync:Mapping a rdfs:Class;
+    rdfs:label "Mapping";
+    rdfs:comment "An abstract base class for a resource that defines a set of merge rules." .
+
+sync:ClassMapping a rdfs:Class;
+    rdfs:label "Class Mapping";
+    rdfs:comment "A resource that defines the merge behavior for a specific class of data (e.g., schema:Recipe).";
+    rdfs:subClassOf sync:Mapping .
+
+sync:IndexMapping a rdfs:Class;
+    rdfs:label "Index Mapping";
+    rdfs:comment "A resource that defines the merge behavior for a specific class of index (e.g., idx:RootIndex).";
+    rdfs:subClassOf sync:Mapping .
+
+sync:PropertyMapping a rdfs:Class;
+    rdfs:label "Property Mapping";
+    rdfs:comment "A declarative rule that links a specific property to a CRDT merge algorithm." .
+
+# --- Property Definitions ---
+
+sync:isGovernedBy a rdf:Property;
+    rdfs:label "is governed by";
+    rdfs:comment "Links a data or index resource to the public rules file that defines its merge behavior.";
+    rdfs:domain rdfs:Resource;
+    rdfs:range rdfs:Resource . # The IRI of the mapping file
+
+sync:appliesToClass a rdf:Property;
+    rdfs:label "applies to class";
+    rdfs:comment "Links a Mapping to the class of resource it defines rules for.";
+    rdfs:domain sync:Mapping;
+    rdfs:range rdfs:Class .
+
+sync:propertyMapping a rdf:Property;
+    rdfs:label "property mapping";
+    rdfs:comment "Links a Mapping to a specific rule for one of its properties.";
+    rdfs:domain sync:Mapping;
+    rdfs:range sync:PropertyMapping .
+
+sync:property a rdf:Property;
+    rdfs:label "property";
+    rdfs:comment "Specifies the RDF property that a PropertyMapping applies to.";
+    rdfs:domain sync:PropertyMapping;
+    rdfs:range rdf:Property .
