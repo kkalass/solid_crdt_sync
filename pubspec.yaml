@@ -1,0 +1,31 @@
+name: solid_crdt_sync 
+description: A Dart library for syncing RDF data to Solid Pods using CRDT datatypes
+version: 0.9.15-dev
+homepage: https://kkalass.github.io/solid_crdt_sync/
+repository: https://github.com/kkalass/solid_crdt_sync
+issue_tracker: https://github.com/kkalass/solid_crdt_sync/issues
+documentation: https://kkalass.github.io/solid_crdt_sync/
+topics:
+  - rdf
+  - linked-data
+  - semantic-web
+  - graph
+  - serialization
+readme: README.md
+changelog: CHANGELOG.md
+license: LICENSE
+maintainers:
+  - "Klas Kalaß <habbatical@gmail.com>"
+
+environment:
+  sdk: ^3.6.0
+
+# Add regular dependencies here.
+dependencies:
+  logging: ^1.2.0
+
+dev_dependencies:
+  test: ^1.24.0
+  yaml: ^3.1.0
+  path: ^1.8.0
+  lints: ">=5.1.1 <7.0.0"

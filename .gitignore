@@ -1,0 +1,20 @@
+# Dart/Pub related
+.dart_tool/
+.packages
+.pub/
+build/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test output
+coverage/
+
+# Misc
+*.log

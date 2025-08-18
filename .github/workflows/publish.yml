@@ -1,0 +1,29 @@
+name: Publish to pub.dev
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Install dependencies
+        run: dart pub get
+      - name: Publish dry run
+        run: dart pub publish --dry-run
+      - name: Publish (manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "To publish, run 'dart pub publish' manually with credentials."
+      # To enable auto-publishing, uncomment below and add PUB_CREDENTIALS secret
+      # - name: Publish
+      #   if: github.event_name == 'release'
+      #   env:
+      #     PUB_CREDENTIALS: ${{ secrets.PUB_CREDENTIALS }}
+      #   run: echo "$PUB_CREDENTIALS" > ~/.pub-cache/credentials.json && dart pub publish -f
