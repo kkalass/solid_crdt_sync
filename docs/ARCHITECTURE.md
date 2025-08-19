@@ -18,11 +18,62 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **Decentralized & Server-Agnostic:** The Solid Pod acts as a simple, passive storage bucket. All synchronization logic resides within the client-side library.
 
-## 3. Architectural Layers
+## 3. Discovery Protocol
+
+Applications discover data locations through the standard Solid discovery mechanism, extended with index-specific resolution:
+
+1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index:
+
+```turtle
+# In Profile Document at https://alice.example.org/profile/card#me
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
+
+<#me> solid:publicTypeIndex </settings/publicTypeIndex.ttl> .
+```
+
+2. **Index Resolution:** From the Type Index, resolve data type registrations to data containers:
+
+```turtle
+# In Public Type Index at https://alice.example.org/settings/publicTypeIndex.ttl
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
+@prefix schema: <https://schema.org/> .
+@prefix meal: <https://example.org/vocab/meal#> .
+
+<#recipes> a solid:TypeRegistration;
+   solid:forClass schema:Recipe;
+   solid:instanceContainer <../data/recipes/> .
+
+<#shopping-entries> a solid:TypeRegistration;
+   solid:forClass meal:ShoppingListEntry;
+   solid:instanceContainer <../data/shopping-entries/> .
+```
+
+3. **Index Resolution:** Applications also register index types in the Type Index using the same mechanism:
+
+```turtle
+# Also in Public Type Index at https://alice.example.org/settings/publicTypeIndex.ttl
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+
+<#recipe-index> a solid:TypeRegistration;
+   solid:forClass idx:RootIndex;
+   solid:instance <../indices/recipes/index> ;
+   idx:indexesClass schema:Recipe .
+
+<#shopping-entries-index> a solid:TypeRegistration;
+   solid:forClass idx:PartitionedIndex;
+   solid:instance <../indices/shopping-entries/index> ;
+   idx:indexesClass meal:ShoppingListEntry .
+```
+
+4. **Index Type Detection:** Applications query the Type Index for both data types (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:RootIndex`), enabling automatic discovery of the complete synchronization setup.
+
+**Advantages:** Using TypeRegistration for indices enables full discoverability - applications can find both data and indices through standard Solid mechanisms, making the architecture truly self-describing.
+
+## 4. Architectural Layers
 
 The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
 
-### 3.1. Layer 1: The Data Resource
+### 4.1. Layer 1: The Data Resource
 
 This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" using standard vocabularies.
 
@@ -62,7 +113,7 @@ This resource lives in Alice's Pod and describes a recipe. It contains metadata 
    idx:belongsToIndexShard <../../indices/recipes/shard-0> .
 ```
 
-### 3.2. Layer 2: The Merge Contract
+### 4.2. Layer 2: The Merge Contract
 
 This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
 
@@ -141,7 +192,7 @@ This resource shows how shopping list entries are derived from recipes in the me
    idx:belongsToIndexShard <../../indices/shopping-entries/partitions/2025-08/shard-0> .
 ```
 
-### 3.3. Layer 3: The Indexing Layer
+### 4.3. Layer 3: The Indexing Layer
 
 This is an optional but powerful performance and discovery layer. It defines a convention for how data can be indexed for fast access.
 
@@ -156,7 +207,7 @@ This is an optional but powerful performance and discovery layer. It defines a c
 * **`idx:PartitionedIndex`:** A "rulebook" resource that defines *how* a data type is partitioned. It does **not** contain data entries itself.
 * **`idx:Partition`:** A concrete index representing a single partition (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `PartitionedIndex` rulebook.
 
-### 3.3.1. Indexing Conventions and Best Practices
+### 4.3.1. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
  *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `RootIndex` but the app needs a `PartitionedIndex`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
@@ -237,25 +288,25 @@ This document contains entries pointing to shopping list data resources from Aug
    ].
 ```
 
-### 3.4. Layer 4: The Sync Strategy
+### 4.4. Layer 4: The Sync Strategy
 
 This is the client-side layer where the application developer makes choices about how to synchronize data. The architecture provides flexibility by separating two key decisions: the **Indexing Strategy** (how data is organized on the Pod) and the **Sync Behavior** (what the app syncs by default).
 
-#### 3.4.1. Decision 1: Indexing Strategy
+#### 4.4.1. Decision 1: Indexing Strategy
 
 This decision depends on the expected size and structure of the dataset.
 
 *   **Monolithic Index (`idx:RootIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's recipe collection).
 *   **Partitioned Index (`idx:PartitionedIndex`):** The index is broken into smaller, logical chunks, or partitions (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., shopping list entries partitioned by meal plan date).
 
-#### 3.4.2. Decision 2: Sync Behavior
+#### 4.4.2. Decision 2: Sync Behavior
 
 This decision depends on the application's use case and performance requirements.
 
 *   **Full Data Sync:** The application downloads the relevant index (or index partition) and then immediately fetches the full data for all resources listed in it. This is useful when the application needs the complete data to function.
 *   **On-Demand Sync (Index-Only):** The application *only* downloads the index by default. This provides the app with a lightweight list of "headers" (e.g., IRI, title). The full data for a specific resource is only fetched when the application explicitly requests it (e.g., when a user clicks on an item). This is ideal for improving initial load times and reducing bandwidth usage.
 
-#### 3.4.3. Common Strategies
+#### 4.4.3. Common Strategies
 
 The named sync strategies are simply convenient bundles of these two decisions:
 
@@ -265,7 +316,7 @@ The named sync strategies are simply convenient bundles of these two decisions:
 
 It's also possible to perform an On-Demand sync on a partitioned index, giving the developer fine-grained control over performance for massive, partitioned datasets.
 
-## 4. Synchronization Workflow
+## 5. Synchronization Workflow
 
 The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
@@ -277,28 +328,28 @@ The synchronization process is governed by the **Sync Strategy** that the develo
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the appropriate **Merge Contract** (e.g., the shopping-entry-v1 rules), performs the property-by-property merge, and returns the final, merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged shopping list entry object, which the developer can then save to their own local database.
 
-## 5. Benefits of this Architecture
+## 6. Benefits of this Architecture
 
 * **True Interoperability:** By publishing the merge rules and linking to them from the data, any application can learn how to correctly and safely collaborate.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Discoverability and Resilience:** The system is highly discoverable and resilient to changes in the indexing strategy over time.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 6. Alignment with Standardization Efforts
+## 7. Alignment with Standardization Efforts
 
-### 6.1. Community Alignment
+### 7.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 6.2. Architectural Differentiators
+### 7.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This framework is designed as an "add-on" library. The developer retains control over their local storage and querying logic.
 * **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 7. Outlook: Future Enhancements
+## 8. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
