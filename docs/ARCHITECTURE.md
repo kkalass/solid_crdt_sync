@@ -14,7 +14,7 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **Declarative Merge Behavior:** Developers define the merge behavior for each piece of data by declaratively linking its properties to well-defined **state-based** CRDT types (e.g., `LWW-Register`, `OR-Set`). This is done in a **public, discoverable rules file**, abstracting away the complexity of the underlying algorithms. This state-based approach is fundamental to the architecture's design as it works seamlessly with passive storage backends.
 
-* **Discoverability:** The system is designed to be self-describing. Applications can discover the location of data through the user's Solid Type Index. From a single data resource, a client can then discover its merge rules (`sync:isGovernedBy`) and the specific index shard it belongs to (`idx:belongsToIndex`), enabling any application to learn how to correctly and safely collaborate on the data without prior knowledge.
+* **Discoverability:** The system is designed to be self-describing. Applications can discover the location of data through the user's Solid Type Index. From a single data resource, a client can then discover its merge rules (`sync:isGovernedBy`) and the specific index shard it belongs to (`idx:belongsToIndexShard`), enabling any application to learn how to correctly and safely collaborate on the data without prior knowledge.
 
 * **Decentralized & Server-Agnostic:** The Solid Pod acts as a simple, passive storage bucket. All synchronization logic resides within the client-side library.
 
@@ -24,7 +24,7 @@ The architecture is composed of four distinct layers, moving from the fundamenta
 
 ### 3.1. Layer 1: The Data Resource
 
-This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" (like a recipe) using standard vocabularies.
+This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" using standard vocabularies.
 
 * **Format:** Data is stored as a single RDF resource. It uses a fragment identifier (e.g., `#it`) to distinguish the "thing" being described from the document that describes it.
 
@@ -32,8 +32,12 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 
 * **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
 
-**Example: A resource at `/data/recipes/123`**
-This file lives in the users pod and its main job is to describe the recipe. It also contains metadata that links it to other architectural layers, such as its index shard and merge contract, enabling its use within the synchronization framework.
+#### Example Application Context
+
+The following examples demonstrate the architecture using a **meal planning application** that manages recipes, meal plans, and automatically generates shopping lists from planned meals. This integrated workflow shows how different data types can reference each other while maintaining clean separation of concerns.
+
+**Example: A recipe resource at `https://alice.example.org/data/recipes/123`**
+This resource lives in Alice's Pod and describes a recipe. It contains metadata that links it to other architectural layers, enabling its use within the synchronization framework.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -45,13 +49,15 @@ This file lives in the users pod and its main job is to describe the recipe. It 
 # -- The "Thing" Itself (The Payload) --
 :it a schema:Recipe;
    schema:name "Tomato Soup" ;
-   schema:keywords "vegan" .
+   schema:keywords "vegan", "soup" ;
+   schema:recipeIngredient "2 lbs fresh tomatoes", "1 cup fresh basil" ;
+   schema:totalTime "PT30M" .
 
 # -- Pointers to Other Layers --
 <> a foaf:Document;
    foaf:primaryTopic :it;
    # Pointer to the Merge Contract (Layer 2)
-   sync:isGovernedBy <https://kkalass.github.io/recipe-manager/crdt-mappings/recipe-v1> ;
+   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to.
    idx:belongsToIndexShard <../../indices/recipes/shard-0> .
 ```
@@ -76,11 +82,13 @@ This file, published at a public URL, defines how to merge a `schema:Recipe`.
    sync:appliesToClass schema:Recipe;
    sync:propertyMapping
      [ sync:property schema:name; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property schema:keywords; crdt:mergeWith crdt:OR_Set ].
+     [ sync:property schema:keywords; crdt:mergeWith crdt:OR_Set ],
+     [ sync:property schema:recipeIngredient; crdt:mergeWith crdt:OR_Set ],
+     [ sync:property schema:totalTime; crdt:mergeWith crdt:LWW_Register ].
 ```
 
-**Example: The Mechanics embedded in `/data/recipes/123`**
-This shows the full data resource with the CRDT mechanics included.
+**Example: The Mechanics embedded in `https://alice.example.org/data/recipes/123`**
+This shows the full recipe resource with the CRDT mechanics included.
 
 ```turtle
 # ... prefixes and primary data from Layer 1 ...
@@ -104,6 +112,35 @@ This shows the full data resource with the CRDT mechanics included.
 << :it schema:keywords "quick" >> crdt:isDeleted true .
 ```
 
+**Example: A shopping list entry at `https://alice.example.org/data/shopping-entries/item-001`**
+This resource shows how shopping list entries are derived from recipes in the meal planning workflow.
+
+```turtle
+@prefix schema: <https://schema.org/> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix meal: <https://example.org/vocab/meal#> .
+@prefix : <#> .
+
+# -- The Shopping List Entry (The Payload) --
+:it a meal:ShoppingListEntry;
+   schema:name "2 lbs fresh tomatoes" ;
+   meal:quantity "2" ;
+   meal:unit "lbs" ;
+   # Links to the source recipe that generated this shopping item
+   meal:derivedFrom <../recipes/123> ;
+   # Links to the meal plan that requires this ingredient
+   meal:requiredFor <../meal-plans/2025-08-15> .
+
+# -- Pointers to Other Layers --
+<> a foaf:Document;
+   foaf:primaryTopic :it;
+   # Uses a different merge contract for shopping list entries
+   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
+   idx:belongsToIndexShard <../../indices/shopping-entries/partitions/2025-08/shard-0> .
+```
+
 ### 3.3. Layer 3: The Indexing Layer
 
 This is an optional but powerful performance and discovery layer. It defines a convention for how data can be indexed for fast access.
@@ -124,22 +161,23 @@ To ensure interoperability, performance, and good citizenship within the Solid e
 
  *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `RootIndex` but the app needs a `PartitionedIndex`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
  
- *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of data resources. They should typically include only essential fields necessary for broad interoperability, such as `foaf:name` or `schema:name`, and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all applications that interact with that data type.
+ *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of data resources. They should typically include only essential fields necessary for broad interoperability, such as `foaf:name` or `schema:name` (if at all), and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all applications that interact with that data type.
 
  *   **Application-Specific Indices and "Good Citizenship":** Applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on *all* applications that interact with that data type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the entire ecosystem. 
 
-**Example 1: A `PartitionedIndex` at `/indices/shopping-entries/index`**
-This file is the "rulebook" for all shopping entry partitions.
+**Example 1: A `PartitionedIndex` at `https://alice.example.org/indices/shopping-entries/index`**
+This resource is the "rulebook" for all shopping list entry partitions in our meal planning application.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix schema: <https://schema.org/> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix meal: <https://example.org/vocab/meal#> .
 
 <> a idx:PartitionedIndex;
-   idx:indexesClass schema:ListItem;
-   idx:indexedProperty schema:name;
+   idx:indexesClass meal:ShoppingListEntry;
+   idx:indexedProperty schema:name, meal:requiredFor;
    # A default sharding algorithm for all partitions created under this rule.
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
@@ -151,14 +189,14 @@ This file is the "rulebook" for all shopping entry partitions.
    # The declarative rule for how to assign items to partitions.
    idx:partitionedBy [
      a idx:PartitionRule;
-     idx:sourceProperty schema:dateCreated;
+     idx:sourceProperty meal:requiredFor;  # Partition by meal plan date
      idx:format "YYYY-MM";
      idx:partitionTemplate "partitions/{value}/index"
    ].
 ```
 
-**Example 2: A `Partition` document at `/indices/shopping-entries/partitions/2025-08/index`**
-This is a concrete index for a single month, containing data entries.
+**Example 2: A `Partition` document at `https://alice.example.org/indices/shopping-entries/partitions/2025-08/index`**
+This is a concrete index for shopping list entries from August 2025 meal plans.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -173,8 +211,8 @@ This is a concrete index for a single month, containing data entries.
    idx:hasShard <shard-0>, <shard-1>, ... .
 ```
 
-**Example: A Shard Document at `/indices/shopping-entries/partitions/2025-08/shard-0`**
-This document contains entries pointing to data resources.
+**Example: A Shard Document at `https://alice.example.org/indices/shopping-entries/partitions/2025-08/shard-0`**
+This document contains entries pointing to shopping list data resources from August 2025.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -186,11 +224,15 @@ This document contains entries pointing to data resources.
    sync:isGovernedBy mappings:shard-v1;
    idx:isShardOf <index>; # Back-link to its Partition document
    idx:containsEntry [
-     idx:resource <../../../../data/recipes/123>; # Relative path to data resource
+     idx:resource <../../../../data/shopping-entries/item-001>; # Relative path to shopping list entry
+     idx:name "2 lbs tomatoes";
+     meal:requiredFor <../../../../data/meal-plans/2025-08-15>;
      crdt:vectorClockHash "xxh64:abcdef1234567890"
    ],
    [
-     idx:resource <../../../../data/recipes/456>;
+     idx:resource <../../../../data/shopping-entries/item-002>;
+     idx:name "Fresh basil";
+     meal:requiredFor <../../../../data/meal-plans/2025-08-17>;
      crdt:vectorClockHash "xxh64:fedcba9876543210"
    ].
 ```
@@ -203,8 +245,8 @@ This is the client-side layer where the application developer makes choices abou
 
 This decision depends on the expected size and structure of the dataset.
 
-*   **Monolithic Index (`idx:RootIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's contacts).
-*   **Partitioned Index (`idx:PartitionedIndex`):** The index is broken into smaller, logical chunks, or partitions (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., chat messages, sensor data).
+*   **Monolithic Index (`idx:RootIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's recipe collection).
+*   **Partitioned Index (`idx:PartitionedIndex`):** The index is broken into smaller, logical chunks, or partitions (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., shopping list entries partitioned by meal plan date).
 
 #### 3.4.2. Decision 2: Sync Behavior
 
@@ -227,13 +269,13 @@ It's also possible to perform an On-Demand sync on a partitioned index, giving t
 
 The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
-1.  **Subscription:** The application explicitly tells the library what to sync (e.g., `subscribeToIndex("/indices/shopping-entries/partitions/2025-08")`).
-2.  **Efficient Index Discovery:** The library fetches the appropriate root index, reads its `idx:hasShard` list, and then synchronizes only the active shards.
+1.  **Subscription:** The application explicitly tells the library what to sync (e.g., `subscribeToPartition("https://alice.example.org/indices/shopping-entries/partitions/2025-08")`).
+2.  **Efficient Index Discovery:** The library fetches the appropriate partition index, reads its `idx:hasShard` list, and then synchronizes only the active shards.
 3.  **App Notification (`onIndexUpdate`):** The library notifies the application with the list of headers from the synchronized shards.
-4.  **Developer Control:** The developer uses the header list to populate a UI and decide when to fetch full data.
-5.  **On-Demand Fetch (`fetchFromRemote`):** When the app needs the full data for an item, it calls `fetchFromRemote(iri)`.
-6.  **State-based Merge:** The library downloads the full RDF resource, consults the appropriate **Merge Contract**, performs the property-by-property merge, and returns the final, merged Dart object.
-7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged object, which the developer can then save to their own local database.
+4.  **Developer Control:** The developer uses the header list to populate a UI (e.g., showing "2 lbs fresh tomatoes" for meal plan on "Aug 15") and decides when to fetch full data.
+5.  **On-Demand Fetch (`fetchFromRemote`):** When the app needs the full data for an item, it calls `fetchFromRemote("https://alice.example.org/data/shopping-entries/item-001")`.
+6.  **State-based Merge:** The library downloads the full RDF resource, consults the appropriate **Merge Contract** (e.g., the shopping-entry-v1 rules), performs the property-by-property merge, and returns the final, merged object.
+7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged shopping list entry object, which the developer can then save to their own local database.
 
 ## 5. Benefits of this Architecture
 
