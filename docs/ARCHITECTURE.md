@@ -4,7 +4,7 @@
 
 This document outlines an architecture for building **local-first, collaborative, and truly interoperable applications** using Solid Pods as a synchronization backend. The core challenge is twofold: first, to enable robust, conflict-free data merging without sacrificing semantic interoperability; and second, to provide a scalable solution for building performant applications, regardless of dataset size.
 
-The proposed solution addresses both challenges through a declarative, developer-centric framework. Unlike operation-based approaches (such as SU-Set) that synchronize individual change events, our architecture uses a **state-based CRDT model**. This means the entire state of a resource is synchronized, a choice that works seamlessly with passive storage backends like Solid Pods. To ensure data integrity, developers declaratively **link data properties to CRDT merge strategies**. To manage performance, they define a high-level **Sync Strategy** per type (full, partitioned, or on-demand). This approach allows the library to act as a flexible "add-on" to an existing application, rather than a monolithic database, while ensuring all data at rest on the Solid Pod is clean, standard RDF.
+The proposed solution addresses both challenges through a declarative, developer-centric framework. Unlike operation-based approaches (such as SU-Set) that synchronize individual change events, our architecture uses a **state-based CRDT model**. This means the entire state of a resource is synchronized, a choice that works seamlessly with passive storage backends like Solid Pods. To ensure data integrity, developers declaratively **link data properties to CRDT merge strategies**. To manage performance, they define a high-level **Sync Strategy** per type (full, groups, or on-demand). This approach allows the library to act as a flexible "add-on" to an existing application, rather than a monolithic database, while ensuring all data at rest on the Solid Pod is clean, standard RDF.
 
 ## 2. Core Principles
 
@@ -56,12 +56,12 @@ Applications discover data locations through the standard Solid discovery mechan
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
 
 <#recipe-index> a solid:TypeRegistration;
-   solid:forClass idx:RootIndex;
+   solid:forClass idx:FullIndex;
    solid:instance <../indices/recipes/index> ;
    idx:indexesClass schema:Recipe .
 
 <#shopping-entries-index> a solid:TypeRegistration;
-   solid:forClass idx:PartitionedIndex;
+   solid:forClass idx:GroupIndexTemplate;
    solid:instance <../indices/shopping-entries/index> ;
    idx:indexesClass meal:ShoppingListEntry .
 
@@ -70,7 +70,7 @@ Applications discover data locations through the standard Solid discovery mechan
    solid:instanceContainer <../installations/> .
 ```
 
-4. **Index Type Detection:** Applications query the Type Index for both data types (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:RootIndex`), enabling automatic discovery of the complete synchronization setup.
+4. **Index Type Detection:** Applications query the Type Index for both data types (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:FullIndex`), enabling automatic discovery of the complete synchronization setup.
 
 **Advantages:** Using TypeRegistration for indices enables full discoverability - applications can find both data and indices through standard Solid mechanisms, making the architecture truly self-describing.
 
@@ -186,20 +186,20 @@ This resource shows how shopping list entries are derived from recipes in the me
    meal:unit "lbs" ;
    # Links to the source recipe that generated this shopping item
    meal:derivedFrom <../recipes/123> ;
-   # Links to the meal plan that requires this ingredient
-   meal:requiredFor <../meal-plans/2025-08-15> .
+   # Links to the meal plan date that requires this ingredient
+   meal:requiredForDate "2025-08-15"^^xsd:date .
 
 # -- Pointers to Other Layers --
 <> a foaf:Document;
    foaf:primaryTopic :it;
    # Uses a different merge contract for shopping list entries
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
-   idx:belongsToIndexShard <../../indices/shopping-entries/partitions/2025-08/shard-0> .
+   idx:belongsToIndexShard <../../indices/shopping-entries/groups/2025-08/shard-0> .
 ```
 
 #### 4.2.1. CRDT Merge Mechanics
 
-The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using vector clocks for causality determination.
+The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using vector clocks on document level (e.g. Recipe or Shopping List Entry) for causality determination.
 
 **Client Installation Documents**
 
@@ -224,18 +224,18 @@ Applications discover the installations container through the Type Index, then g
 
 ### 4.3. Layer 3: The Indexing Layer
 
-This is an optional but powerful performance and discovery layer. It defines a convention for how data can be indexed for fast access.
+This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only vector clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
-* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that contain "header" information and a **lightweight hash of each resource's vector clock**. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
+* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that **minimally contain a lightweight hash of each resource's vector clock** for change detection. Indices may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
 
-* **Structure:** The index is a two-level hierarchy of **Partitions** (logical groups) and **Shards** (technical splits). Each index is self-describing.
+* **Structure:** The index is a two-level hierarchy of **Groups** (logical groups) and **Shards** (technical splits). Each index is self-describing.
 
 **Index Naming Hierarchy:**
 
 * **`idx:Index`:** The abstract base class for any sharded index that directly contains data entries.
-* **`idx:RootIndex`:** A concrete, monolithic index for a dataset. It is used when a `PartitionedIndex` is not required. It inherits from `idx:Index`.
-* **`idx:PartitionedIndex`:** A "rulebook" resource that defines *how* a data type is partitioned. It does **not** contain data entries itself.
-* **`idx:Partition`:** A concrete index representing a single partition (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `PartitionedIndex` rulebook.
+* **`idx:FullIndex`:** A concrete, monolithic index for a dataset. It is used when a `GroupIndexTemplate` is not required. It inherits from `idx:Index`.
+* **`idx:GroupIndexTemplate`:** A "rulebook" resource that defines *how* a data type is grouped. It does **not** contain data entries itself.
+* **`idx:GroupIndex`:** A concrete index representing a single group (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `GroupIndexTemplate` rulebook.
 
 ### 4.3.1. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
@@ -246,8 +246,8 @@ To ensure interoperability, performance, and good citizenship within the Solid e
 
  *   **Application-Specific Indices and "Good Citizenship":** Applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on *all* applications that interact with that data type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the entire ecosystem. 
 
-**Example 1: A `PartitionedIndex` at `https://alice.podprovider.org/indices/shopping-entries/index`**
-This resource is the "rulebook" for all shopping list entry partitions in our meal planning application.
+**Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index`**
+This resource is the "rulebook" for all shopping list entry groups in our meal planning application.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -256,44 +256,43 @@ This resource is the "rulebook" for all shopping list entry partitions in our me
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
-<> a idx:PartitionedIndex;
+<> a idx:GroupIndexTemplate;
    idx:indexesClass meal:ShoppingListEntry;
-   idx:indexedProperty schema:name, meal:requiredFor;
-   # A default sharding algorithm for all partitions created under this rule.
+   # A default sharding algorithm for all group indices created under this rule.
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
      idx:hashAlgorithm "xxhash64";
      idx:numberOfShards 4
    ] ;
-   sync:isGovernedBy mappings:partitioned-index-v1;
+   sync:isGovernedBy mappings:group-index-template-v1;
 
-   # The declarative rule for how to assign items to partitions.
-   idx:partitionedBy [
-     a idx:PartitionRule;
-     idx:sourceProperty meal:requiredFor;  # Partition by meal plan date
+   # The declarative rule for how to assign items to group indices.
+   idx:groupedBy [
+     a idx:GroupingRule;
+     idx:sourceProperty meal:requiredForDate;  # Group by meal plan date
      idx:format "YYYY-MM";
-     idx:partitionTemplate "partitions/{value}/index"
+     idx:groupTemplate "groups/{value}/index"
    ].
 ```
 
-**Example 2: A `Partition` document at `https://alice.podprovider.org/indices/shopping-entries/partitions/2025-08/index`**
+**Example 2: A `GroupIndex` document at `https://alice.podprovider.org/indices/shopping-entries/groups/2025-08/index`**
 This is a concrete index for shopping list entries from August 2025 meal plans.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 
-<> a idx:Partition;
-   sync:isGovernedBy mappings:partition-v1;
+<> a idx:GroupIndex;
+   sync:isGovernedBy mappings:group-index-v1;
    # Back-link to the rulebook.
-   idx:isPartitionOf <../../index>;
+   idx:basedOn <../../index>;
    # It inherits its configuration (indexed properties, etc.) from the rulebook.
    # It has its own list of active shards, which are sibling documents.
    idx:hasShard <shard-0>, <shard-1>, ... .
 ```
 
-**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/partitions/2025-08/shard-0`**
-This document contains entries pointing to shopping list data resources from August 2025.
+**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/groups/2025-08/shard-0`**
+This document contains entries pointing to shopping list data resources from August 2025. Since shopping entries are typically loaded in full groups, this index contains minimal header information.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -303,17 +302,66 @@ This document contains entries pointing to shopping list data resources from Aug
 
 <> a idx:Shard;
    sync:isGovernedBy mappings:shard-v1;
-   idx:isShardOf <index>; # Back-link to its Partition document
+   idx:isShardOf <index>; # Back-link to its GroupIndex document
    idx:containsEntry [
-     idx:resource <../../../../data/shopping-entries/item-001>; # Relative path to shopping list entry
-     idx:name "2 lbs tomatoes";
-     meal:requiredFor <../../../../data/meal-plans/2025-08-15>;
+     idx:resource <../../../../data/shopping-entries/item-001>;
      crdt:vectorClockHash "xxh64:abcdef1234567890"
    ],
    [
      idx:resource <../../../../data/shopping-entries/item-002>;
-     idx:name "Fresh basil";
-     meal:requiredFor <../../../../data/meal-plans/2025-08-17>;
+     crdt:vectorClockHash "xxh64:fedcba9876543210"
+   ].
+```
+
+**Example: A Recipe Index for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index`**
+This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing.
+
+```turtle
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix schema: <https://schema.org/> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+<> a idx:FullIndex;
+   idx:indexesClass schema:Recipe;
+   # Include properties needed for recipe browsing UI
+   idx:indexedProperty schema:name, schema:keywords, schema:totalTime;
+   # Default sharding for the recipe collection
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 2
+   ];
+   sync:isGovernedBy mappings:full-index-v1;
+   # List of active shards containing recipe entries
+   idx:hasShard <shard-0>, <shard-1> .
+```
+
+**Example: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/shard-0`**
+This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header information to support browsing without loading full recipe data.
+
+```turtle
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix schema: <https://schema.org/> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+<> a idx:Shard;
+   sync:isGovernedBy mappings:shard-v1;
+   idx:isShardOf <index>;
+   idx:containsEntry [
+     idx:resource <../../data/recipes/tomato-soup>;
+     schema:name "Tomato Basil Soup";
+     schema:keywords "vegan", "soup";
+     schema:totalTime "PT30M";
+     crdt:vectorClockHash "xxh64:abcdef1234567890"
+   ],
+   [
+     idx:resource <../../data/recipes/pasta-carbonara>;
+     schema:name "Pasta Carbonara";
+     schema:keywords "pasta", "italian";
+     schema:totalTime "PT20M";
      crdt:vectorClockHash "xxh64:fedcba9876543210"
    ].
 ```
@@ -326,8 +374,8 @@ This is the client-side layer where the application developer makes choices abou
 
 This decision depends on the expected size and structure of the dataset.
 
-*   **Monolithic Index (`idx:RootIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's recipe collection).
-*   **Partitioned Index (`idx:PartitionedIndex`):** The index is broken into smaller, logical chunks, or partitions (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., shopping list entries partitioned by meal plan date).
+*   **Monolithic Index (`idx:FullIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's recipe collection).
+*   **Grouped Index (`idx:GroupIndexTemplate`):** The index is broken into smaller, logical chunks, or groups (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., shopping list entries grouped by meal plan date, or recipes grouped by cuisine type).
 
 #### 4.4.2. Decision 2: Sync Behavior
 
@@ -341,10 +389,10 @@ This decision depends on the application's use case and performance requirements
 The named sync strategies are simply convenient bundles of these two decisions:
 
 *   **`FullSync`:** A **Full Data Sync** using a **Monolithic Index**.
-*   **`PartitionedSync`:** A **Full Data Sync** using a **Partitioned Index**. The application subscribes to specific partitions.
+*   **`GroupedSync`:** A **Full Data Sync** using a **Grouped Index**. The application subscribes to specific groups.
 *   **`OnDemandSync`:** An **On-Demand (Index-Only) Sync** using a **Monolithic Index**.
 
-It's also possible to perform an On-Demand sync on a partitioned index, giving the developer fine-grained control over performance for massive, partitioned datasets.
+It's also possible to perform an On-Demand sync on a grouped index, giving the developer fine-grained control over performance for massive, grouped datasets.
 
 ## 5. Synchronization Workflow
 
@@ -396,9 +444,9 @@ During extended network unavailability:
 ### 6.2. Resource Discovery Failures
 
 **Comprehensive Setup Process:**
-```
+
 1. Check WebID Profile Document for solid:publicTypeIndex
-2. If found, query Type Index for required data types (schema:Recipe, idx:RootIndex, crdt:ClientInstallation, etc.)
+2. If found, query Type Index for required data types (schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
 3. Collect all missing/required configuration:
    - Missing Type Index entirely
    - Missing Type Registrations for data types
@@ -406,10 +454,10 @@ During extended network unavailability:
    - Missing Type Registrations for client installations
 4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
 5. User chooses approach:
-   a. "Automatic Setup" - Configure Pod with standard paths automatically
-   b. "Custom Setup" - Review and modify proposed Profile/Type Index changes before applying
+   1. "Automatic Setup" - Configure Pod with standard paths automatically
+   2. "Custom Setup" - Review and modify proposed Profile/Type Index changes before applying
 6. If user cancels: Run with hardcoded default paths, warn about reduced interoperability
-```
+
 
 **Setup Dialog Design Principles:**
 
@@ -436,6 +484,7 @@ During extended network unavailability:
 │                                  │
 │ [ Continue ]  [ Cancel ]         │
 └──────────────────────────────────┘
+```
 
 Custom Setup shows editable configuration:
 - Type Index Location: /settings/publicTypeIndex.ttl
@@ -446,7 +495,6 @@ Custom Setup shows editable configuration:
 
 If user cancels entirely: App runs with /solid-crdt-sync/recipes/ etc., 
 warns about reduced interoperability with other Solid apps.
-```
 
 **Inaccessible Resources:**
 When discovery finds IRIs that can't be fetched:
@@ -495,8 +543,8 @@ When index shards contain conflicting information:
 ```
 
 **Missing Index Shards:**
-When partition index references non-existent shards:
-- **Remove stale shard references** from partition index
+When group index references non-existent shards:
+- **Remove stale shard references** from group index
 - **Create empty replacement shards** if write access available
 - **Continue with available shards** to maintain partial functionality
 
@@ -512,7 +560,7 @@ When index entries point to non-existent or modified data:
 **Authentication Failures:**
 - **Expired Tokens:** Attempt token refresh through authentication provider
 - **Invalid Credentials:** Prompt user to re-authenticate
-- **Provider Unavailable:** Use cached credentials where possible, degrade to read-only mode
+- **Provider Unavailable:** Skip sync operations, continue working with local data and incrementing vector clocks for offline changes
 
 **Access Control Changes:**
 When resource permissions change between syncs:
@@ -557,7 +605,7 @@ When merge operations become expensive:
 **Recovery Procedures:**
 - **Sync State Reset:** Clear local cache and re-sync from Pod (last resort)
 - **Selective Recovery:** Rebuild specific indices or resource caches
-- **Conflict Resolution UI:** Present unresolved conflicts to users when automatic merge fails
+- **Error Resolution UI:** Present merge contract failures or data corruption issues requiring user intervention (CRDT merges themselves never fail)
 
 ### 6.9. Sync Blocking Granularities
 

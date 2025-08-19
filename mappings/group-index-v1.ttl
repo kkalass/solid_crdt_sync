@@ -3,8 +3,8 @@
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
-mappings:partition-v1 a sync:ClassMapping;
-   sync:appliesToClass idx:Partition;
+mappings:group-index-v1 a sync:ClassMapping;
+   sync:appliesToClass idx:GroupIndex;
    sync:propertyMapping
-     [ sync:property idx:isPartitionOf; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:property idx:basedOn; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:hasShard; crdt:mergeWith crdt:OR_Set ].

@@ -3,9 +3,10 @@
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
-mappings:root-index-v1 a sync:ClassMapping;
-   sync:appliesToClass idx:RootIndex;
+mappings:group-index-template-v1 a sync:ClassMapping;
+   sync:appliesToClass idx:GroupIndexTemplate;
    sync:propertyMapping
      [ sync:property idx:indexesClass; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:indexedProperty; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:hasShard; crdt:mergeWith crdt:OR_Set ].
+     [ sync:property idx:shardingAlgorithm; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:property idx:groupedBy; crdt:mergeWith crdt:LWW_Register ].

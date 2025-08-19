@@ -213,6 +213,7 @@ propertyLevelMerge(local, remote, contract):
 2. **Schema Evolution**: How to handle changes in merge contracts over time?
 3. **Performance Boundaries**: At what resource size/complexity should we recommend different approaches?
 4. **Security Implications**: How to prevent malicious vector clock manipulation?
+5. **Blank Nodes** Do the algorithms break for Blank Nodes? rdf:List? rdf:Seq? etc.
 
 ---
 
