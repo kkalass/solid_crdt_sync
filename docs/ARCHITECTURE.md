@@ -33,7 +33,7 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 * **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
 
 **Example: A resource at `/data/recipes/123`**
-This file lives in the users job and its main job is to describe the recipe. The crucial `idx:belongsToIndex` now points to a specific shard.
+This file lives in the users pod and its main job is to describe the recipe. The crucial `idx:belongsToIndex` now points to a specific shard.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -115,7 +115,7 @@ This is an optional but powerful performance and discovery layer. It defines a c
 **Index Naming Hierarchy:**
 
 * **`idx:Index`:** The abstract base class for any sharded index that directly contains data entries.
-* **`idx:RootIndex`:** A concrete index for a `FullSync` or `OnDemandSync` strategy. It inherits from `idx:Index`.
+* **`idx:RootIndex`:** A concrete, monolithic index for a dataset. It is used when a `PartitionedIndex` is not required. It inherits from `idx:Index`.
 * **`idx:PartitionedIndex`:** A "rulebook" resource that defines *how* a data type is partitioned. It does **not** contain data entries itself.
 * **`idx:Partition`:** A concrete index representing a single partition (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `PartitionedIndex` rulebook.
 
@@ -160,12 +160,31 @@ This is a concrete index for a single month, containing data entries.
 
 ### 3.4. Layer 4: The Sync Strategy
 
-This is the client-side layer where the application developer makes choices.
+This is the client-side layer where the application developer makes choices about how to synchronize data. The architecture provides flexibility by separating two key decisions: the **Indexing Strategy** (how data is organized on the Pod) and the **Sync Behavior** (what the app syncs by default).
 
-* **Developer Configuration:** The developer configures the library by providing a strategy for each data type:
-    * **`FullSync`:** For small datasets. The app subscribes to the single, global `idx:RootIndex`.
-    * **`PartitionedSync`:** For large, time-series datasets. The app discovers the `idx:PartitionedIndex` and subscribes to the specific `idx:Partition` resources it needs.
-    * **`OnDemandSync`:** For very large datasets. The app subscribes to a global `idx:RootIndex` of headers but only fetches full data when a user requests it.
+#### 3.4.1. Decision 1: Indexing Strategy
+
+This decision depends on the expected size and structure of the dataset.
+
+*   **Monolithic Index (`idx:RootIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's contacts).
+*   **Partitioned Index (`idx:PartitionedIndex`):** The index is broken into smaller, logical chunks, or partitions (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., chat messages, sensor data).
+
+#### 3.4.2. Decision 2: Sync Behavior
+
+This decision depends on the application's use case and performance requirements.
+
+*   **Full Data Sync:** The application downloads the relevant index (or index partition) and then immediately fetches the full data for all resources listed in it. This is useful when the application needs the complete data to function.
+*   **On-Demand Sync (Index-Only):** The application *only* downloads the index by default. This provides the app with a lightweight list of "headers" (e.g., IRI, title). The full data for a specific resource is only fetched when the application explicitly requests it (e.g., when a user clicks on an item). This is ideal for improving initial load times and reducing bandwidth usage.
+
+#### 3.4.3. Common Strategies
+
+The named sync strategies are simply convenient bundles of these two decisions:
+
+*   **`FullSync`:** A **Full Data Sync** using a **Monolithic Index**.
+*   **`PartitionedSync`:** A **Full Data Sync** using a **Partitioned Index**. The application subscribes to specific partitions.
+*   **`OnDemandSync`:** An **On-Demand (Index-Only) Sync** using a **Monolithic Index**.
+
+It's also possible to perform an On-Demand sync on a partitioned index, giving the developer fine-grained control over performance for massive, partitioned datasets.
 
 ## 4. Synchronization Workflow
 
