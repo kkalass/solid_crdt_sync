@@ -126,13 +126,14 @@ This file is the "rulebook" for all shopping entry partitions.
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix schema: <https://schema.org/> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
 <> a idx:PartitionedIndex;
    idx:indexesClass schema:ListItem;
    idx:indexedProperty schema:name;
    # A default sharding algorithm for all partitions created under this rule.
    idx:shardingAlgorithm "modulo-hash(xxhash64, 4)" ;
-   sync:isGovernedBy <https://kkalass.github.io/recipe-manager/crdt-mappings/partitioned-index-v1>;
+   sync:isGovernedBy mappings:partitioned-index-v1;
 
    # The declarative rule for how to assign items to partitions.
    idx:partitionedBy [
