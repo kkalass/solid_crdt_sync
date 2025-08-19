@@ -6,8 +6,10 @@
 ///
 /// The developer declares a SyncStrategy for each data type, choosing between:
 /// 1. `FullSync`: For small to medium datasets using a single idx:FullIndex
-/// 2. `GroupedSync`: For large datasets broken into logical groups using idx:GroupIndexTemplate  
+/// 2. `GroupedSync`: For large datasets with RDF-defined grouping rules via idx:GroupIndexTemplate  
 /// 3. `OnDemandSync`: For very large datasets where only indices are synced initially
+
+library solid_crdt_sync_interface;
 
 import 'dart:async';
 
@@ -15,7 +17,7 @@ import 'dart:async';
 
 /// Base class defining synchronization strategy for a data type.
 /// 
-/// Strategies are discovered through the Solid Type Index rather than hardcoded paths.
+/// All configuration is discovered through the Solid Type Index - no hardcoded paths.
 /// The framework uses Type Index entries to find both data containers and corresponding indices.
 abstract class SyncStrategy {
   /// The Dart [Type] this configuration applies to.
@@ -33,10 +35,13 @@ abstract class SyncStrategy {
 
 /// Strategy for small to medium datasets using a single idx:FullIndex.
 /// 
+/// The framework discovers the FullIndex via Type Index and syncs according to 
+/// the index's own configuration (sharding algorithm, indexed properties, etc.)
+/// 
 /// Suitable when:
 /// - Dataset is small enough to sync completely (~1000s of items)
 /// - Application needs all data available locally
-/// - No logical partitioning is needed
+/// - No logical grouping is needed
 /// 
 /// Example: Personal recipe collection, contact lists, bookmarks
 class FullSync extends SyncStrategy {
@@ -50,32 +55,33 @@ class FullSync extends SyncStrategy {
   });
 }
 
-/// Strategy for large datasets broken into logical groups using idx:GroupIndexTemplate.
+/// Strategy for large datasets with RDF-defined grouping via idx:GroupIndexTemplate.
+/// 
+/// The framework discovers the GroupIndexTemplate via Type Index and reads the
+/// GroupingRule (idx:groupedBy) to understand how data should be grouped.
+/// The grouping logic is entirely defined in RDF, not in client code.
 /// 
 /// Suitable when:
 /// - Dataset is very large (10,000s+ items)  
-/// - Data has natural grouping (by date, category, etc.)
+/// - Data has natural grouping defined in the GroupIndexTemplate
 /// - Application typically works with subsets
 /// 
-/// Example: Shopping list entries by month, photos by year, messages by conversation
+/// Example: Shopping list entries grouped by month, photos by year, messages by conversation
 class GroupedSync extends SyncStrategy {
-  /// Function that determines which group(s) an object belongs to.
-  /// Objects can belong to multiple groups.
-  /// Returns group identifiers that match the GroupIndexTemplate's grouping rules.
-  final List<String> Function(Object object) grouper;
-
   /// Whether to immediately load full data for subscribed groups
   final bool loadDataImmediately;
 
   GroupedSync({
     required super.type, 
     required super.rdfClass,
-    required this.grouper,
     this.loadDataImmediately = true,
   });
 }
 
 /// Strategy for very large datasets where only indices are synced by default.
+/// 
+/// Uses idx:FullIndex but only syncs the index entries (with header properties)
+/// until explicit fetchFromRemote() calls are made.
 /// 
 /// Suitable when:
 /// - Individual resources are large (documents, images, etc.)
@@ -117,7 +123,7 @@ abstract interface class IndexChangeListener {
   /// Called when the library has synchronized an index and discovered changes.
   ///
   /// - For `FullSync`: [sourceId] is the data type's RDF class
-  /// - For `GroupedSync`: [sourceId] is the specific group identifier  
+  /// - For `GroupedSync`: [sourceId] is the specific group identifier determined by GroupingRule  
   /// - For `OnDemandSync`: [sourceId] is the data type's RDF class
   /// 
   /// [headers] contains the current set of resources in this index/group.
@@ -172,6 +178,7 @@ abstract interface class DiscoveryConfiguration {
 /// The service automatically:
 /// - Discovers data and index locations via Type Index
 /// - Handles first-time Pod setup with user consent
+/// - Reads GroupingRules from RDF to understand data organization
 /// - Synchronizes indices and data according to strategies
 /// - Performs CRDT merging using published merge contracts
 abstract interface class SolidCrdtSyncService {
@@ -190,11 +197,12 @@ abstract interface class SolidCrdtSyncService {
   /// 
   /// The service:
   /// 1. Determines storage location using Type Index discovery
-  /// 2. Fetches current remote version (if exists)
-  /// 3. Performs CRDT merge with local changes
-  /// 4. Updates all relevant index shards
-  /// 5. Uploads merged resource and updated indices
-  /// 6. Notifies DataChangeListeners
+  /// 2. For GroupedSync: Applies discovered GroupingRule to determine which group(s)
+  /// 3. Fetches current remote version (if exists)
+  /// 4. Performs CRDT merge with local changes
+  /// 5. Updates all relevant index shards
+  /// 6. Uploads merged resource and updated indices
+  /// 7. Notifies DataChangeListeners
   Future<void> store(Object object);
 
   /// Deletes an object by ID and type.
@@ -202,17 +210,21 @@ abstract interface class SolidCrdtSyncService {
   /// Creates tombstone entries in CRDT metadata and updates indices.
   Future<void> delete(String id, Type type);
 
-  // --- Subscription Management ---
+  // --- Group Subscription Management (for GroupedSync) ---
 
   /// Subscribes to a specific group for a type configured with [GroupedSync].
   /// 
-  /// [groupId] should match the grouping logic defined in the GroupIndexTemplate.
-  /// For example, if grouping by date with format "YYYY-MM", use "2025-08".
+  /// [groupId] should match the group identifier format defined in the 
+  /// GroupIndexTemplate's GroupingRule. The service discovers the rule and
+  /// validates the groupId format.
+  /// 
+  /// For example, if GroupingRule has format "YYYY-MM", use "2025-08".
   /// 
   /// The service will:
   /// 1. Discover the GroupIndexTemplate via Type Index
-  /// 2. Resolve the specific GroupIndex for [groupId]  
-  /// 3. Begin synchronizing that group's index and data
+  /// 2. Validate [groupId] against the GroupingRule format
+  /// 3. Resolve the specific GroupIndex for [groupId]  
+  /// 4. Begin synchronizing that group's index and data
   Future<void> subscribeToGroup(Type type, String groupId);
 
   /// Unsubscribes from a specific group.
@@ -220,7 +232,14 @@ abstract interface class SolidCrdtSyncService {
   Future<void> unsubscribeFromGroup(Type type, String groupId);
 
   /// Lists currently subscribed groups for a type.
+  /// Returns group IDs in the format defined by the GroupingRule.
   List<String> getSubscribedGroups(Type type);
+
+  /// Gets available groups for a type by examining the GroupIndexTemplate.
+  /// Useful for UI to show available time periods, categories, etc.
+  /// 
+  /// Note: This requires fetching the GroupIndexTemplate to discover existing GroupIndex instances.
+  Future<List<String>> getAvailableGroups(Type type);
 
   // --- On-Demand Operations ---
 
@@ -239,6 +258,7 @@ abstract interface class SolidCrdtSyncService {
   /// Gets currently cached headers for a type (without triggering network requests).
   /// 
   /// Useful for OnDemandSync to display available resources before loading data.
+  /// For GroupedSync, optionally filter by groupId.
   List<ResourceHeader> getCachedHeaders(Type type, {String? groupId});
 
   // --- Service Lifecycle ---
@@ -293,7 +313,7 @@ enum SyncStatus {
 /// 
 /// This demonstrates the three different sync strategies:
 /// - Recipes: OnDemandSync (browse titles, load on-demand)
-/// - Shopping entries: GroupedSync by month (large dataset, group by date)  
+/// - Shopping entries: GroupedSync (framework reads RDF GroupingRule automatically)
 /// - Meal plans: FullSync (small dataset, always needed)
 /*
 
@@ -305,14 +325,17 @@ void setupMealPlanningSync() {
       rdfClass: 'schema:Recipe',
     ),
     
-    // Shopping list entries - group by month
+    // Shopping list entries - grouping defined in RDF
+    // The framework will discover the GroupIndexTemplate and read:
+    // idx:groupedBy [
+    //   a idx:GroupingRule;
+    //   idx:sourceProperty meal:requiredForDate;
+    //   idx:format "YYYY-MM";
+    //   idx:groupTemplate "groups/{value}/index"
+    // ]
     GroupedSync(
       type: ShoppingListEntry, 
       rdfClass: 'meal:ShoppingListEntry',
-      grouper: (entry) => [
-        // Group by required date in YYYY-MM format to match GroupIndexTemplate
-        (entry as ShoppingListEntry).requiredForDate.toIso8601String().substring(0, 7)
-      ],
       loadDataImmediately: true,
     ),
     
@@ -331,12 +354,17 @@ void setupMealPlanningSync() {
   service.registerIndexChangeListener(MyIndexListener());
   service.registerDataChangeListener(MyDataListener());
   
-  // Start the service
-  service.start();
+  // Start the service (triggers discovery and setup if needed)
+  await service.start();
   
   // Subscribe to current month's shopping entries
-  final currentMonth = DateTime.now().toIso8601String().substring(0, 7);
-  service.subscribeToGroup(ShoppingListEntry, currentMonth);
+  // Framework applies the discovered GroupingRule to validate this format
+  final currentMonth = DateTime.now().toIso8601String().substring(0, 7); // "2025-08"
+  await service.subscribeToGroup(ShoppingListEntry, currentMonth);
+  
+  // Get available groups (months with shopping entries)
+  final availableMonths = await service.getAvailableGroups(ShoppingListEntry);
+  print('Available months: $availableMonths'); // ["2025-07", "2025-08", "2025-09"]
 }
 
 */
