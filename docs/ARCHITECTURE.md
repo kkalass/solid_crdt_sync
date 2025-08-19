@@ -53,7 +53,7 @@ This file lives in the users pod and its main job is to describe the recipe. The
    # Pointer to the Merge Contract (Layer 2)
    sync:isGovernedBy <https://kkalass.github.io/recipe-manager/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to.
-   idx:belongsToIndex </indices/recipes/shard-0> .
+   idx:belongsToIndex <../../indices/recipes/shard-0> .
 ```
 
 ### 3.2. Layer 2: The Merge Contract
@@ -144,11 +144,11 @@ This file is the "rulebook" for all shopping entry partitions.
      a idx:PartitionRule;
      idx:sourceProperty schema:dateCreated;
      idx:format "YYYY/MM";
-     idx:partitionTemplate "/indices/shopping-entries/partitions/{value}"
+     idx:partitionTemplate "partitions/{value}/index"
    ].
 ```
 
-**Example 2: A `Partition` at `/indices/shopping-entries/partitions/2025-08`**
+**Example 2: A `Partition` document at `/indices/shopping-entries/partitions/2025-08/index`**
 This is a concrete index for a single month, containing data entries.
 
 ```turtle
@@ -157,10 +157,10 @@ This is a concrete index for a single month, containing data entries.
 
 <> a idx:Partition;
    # Back-link to the rulebook.
-   idx:isPartitionOf </indices/shopping-entries/index>;
+   idx:isPartitionOf <../../index>;
    # It inherits its configuration (indexed properties, etc.) from the rulebook.
-   # It has its own list of active shards.
-   idx:hasShard </indices/shopping-entries/partitions/2025-08/shard-0>, ... .
+   # It has its own list of active shards, which are sibling documents.
+   idx:hasShard <shard-0>, <shard-1>, ... .
 ```
 
 ### 3.4. Layer 4: The Sync Strategy
