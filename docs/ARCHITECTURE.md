@@ -119,6 +119,15 @@ This is an optional but powerful performance and discovery layer. It defines a c
 * **`idx:PartitionedIndex`:** A "rulebook" resource that defines *how* a data type is partitioned. It does **not** contain data entries itself.
 * **`idx:Partition`:** A concrete index representing a single partition (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `PartitionedIndex` rulebook.
 
+### 3.3.1. Indexing Conventions and Best Practices
+To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
+
+ *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `RootIndex` but the app needs a `PartitionedIndex`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
+ 
+ *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of data resources. They should typically include only essential fields necessary for broad interoperability, such as `foaf:name` or `schema:name`, and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all applications that interact with that data type.
+
+ *   **Application-Specific Indices and "Good Citizenship":** Applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on *all* applications that interact with that data type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the entire ecosystem. 
+
 **Example 1: A `PartitionedIndex` at `/indices/shopping-entries/index`**
 This file is the "rulebook" for all shopping entry partitions.
 
@@ -143,7 +152,7 @@ This file is the "rulebook" for all shopping entry partitions.
    idx:partitionedBy [
      a idx:PartitionRule;
      idx:sourceProperty schema:dateCreated;
-     idx:format "YYYY/MM";
+     idx:format "YYYY-MM";
      idx:partitionTemplate "partitions/{value}/index"
    ].
 ```
