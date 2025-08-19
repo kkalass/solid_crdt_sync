@@ -1,12 +1,11 @@
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix : <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
-:partitioned-index-v1 a sync:ClassMapping;
-   sync:appliesToClass idx:PartitionedIndex;
+mappings:root-index-v1 a sync:ClassMapping;
+   sync:appliesToClass idx:RootIndex;
    sync:propertyMapping
      [ sync:property idx:indexesClass; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:indexedProperty; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:shardingAlgorithm; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:partitionedBy; crdt:mergeWith crdt:LWW_Register ].
+     [ sync:property idx:hasShard; crdt:mergeWith crdt:OR_Set ].

@@ -33,7 +33,7 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 * **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
 
 **Example: A resource at `/data/recipes/123`**
-This file lives in the users pod and its main job is to describe the recipe. The crucial `idx:belongsToIndex` now points to a specific shard.
+This file lives in the users pod and its main job is to describe the recipe. It also contains metadata that links it to other architectural layers, such as its index shard and merge contract, enabling its use within the synchronization framework.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -53,7 +53,7 @@ This file lives in the users pod and its main job is to describe the recipe. The
    # Pointer to the Merge Contract (Layer 2)
    sync:isGovernedBy <https://kkalass.github.io/recipe-manager/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to.
-   idx:belongsToIndex <../../indices/recipes/shard-0> .
+   idx:belongsToIndexShard <../../indices/recipes/shard-0> .
 ```
 
 ### 3.2. Layer 2: The Merge Contract
@@ -156,11 +156,34 @@ This is a concrete index for a single month, containing data entries.
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 
 <> a idx:Partition;
+   sync:isGovernedBy mappings:partition-v1;
    # Back-link to the rulebook.
    idx:isPartitionOf <../../index>;
    # It inherits its configuration (indexed properties, etc.) from the rulebook.
    # It has its own list of active shards, which are sibling documents.
    idx:hasShard <shard-0>, <shard-1>, ... .
+```
+
+**Example: A Shard Document at `/indices/shopping-entries/partitions/2025-08/shard-0`**
+This document contains entries pointing to data resources.
+
+```turtle
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+<> a idx:Shard;
+   sync:isGovernedBy mappings:shard-v1;
+   idx:isShardOf <index>; # Back-link to its Partition document
+   idx:containsEntry [
+     idx:resource <../../../../data/recipes/123>; # Relative path to data resource
+     crdt:vectorClockHash "xxh64:abcdef1234567890"
+   ],
+   [
+     idx:resource <../../../../data/recipes/456>;
+     crdt:vectorClockHash "xxh64:fedcba9876543210"
+   ].
 ```
 
 ### 3.4. Layer 4: The Sync Strategy
