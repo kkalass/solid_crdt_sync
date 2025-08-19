@@ -2,12 +2,12 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/crdt#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 
 # --- Ontology Definition ---
 
-<https://kkalass.github.io/solid_crdt_sync/crdt> a owl:Ontology;
+<https://kkalass.github.io/solid_crdt_sync/vocab/crdt> a owl:Ontology;
     rdfs:label "CRDT Mechanics Vocabulary";
     rdfs:comment "A vocabulary to describe the low-level, generic mechanics and data structures required for state-based CRDTs on RDF data." .
 

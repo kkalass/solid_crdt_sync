@@ -69,8 +69,8 @@ This file, published at a public URL, defines how to merge a `schema:Recipe`.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/crdt#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 
 <> a sync:ClassMapping;
    sync:appliesToClass schema:Recipe;
@@ -123,8 +123,8 @@ This is an optional but powerful performance and discovery layer. It defines a c
 This file is the "rulebook" for all shopping entry partitions.
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/idx#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix schema: <https://schema.org/> .
 
 <> a idx:PartitionedIndex;
@@ -147,8 +147,8 @@ This file is the "rulebook" for all shopping entry partitions.
 This is a concrete index for a single month, containing data entries.
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/idx#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 
 <> a idx:Partition;
    # Back-link to the rulebook.

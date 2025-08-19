@@ -2,11 +2,11 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/sync#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 
 # --- Ontology Definition ---
 
-<https://kkalass.github.io/solid_crdt_sync/sync> a owl:Ontology;
+<https://kkalass.github.io/solid_crdt_sync/vocab/sync> a owl:Ontology;
     rdfs:label "Synchronization Vocabulary for CRDT Sync";
     rdfs:comment "A vocabulary to describe the high-level, application-agnostic merge contract for a resource." .
 

@@ -26,7 +26,7 @@
     # making them discoverable as well.
     [
         a solid:TypeRegistration;
-        solid:forClass <https://kkalass.github.io/solid_crdt_sync/sync#RootIndex>;
+        solid:forClass <https://kkalass.github.io/solid_crdt_sync/vocab/sync#RootIndex>;
         solid:instanceContainer </indices/>
     ].
 
