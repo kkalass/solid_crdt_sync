@@ -25,7 +25,7 @@ Applications discover data locations through the standard Solid discovery mechan
 1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index:
 
 ```turtle
-# In Profile Document at https://alice.example.org/profile/card#me
+# In Profile Document at https://alice.podprovider.org/profile/card#me
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
 
 <#me> solid:publicTypeIndex </settings/publicTypeIndex.ttl> .
@@ -34,7 +34,7 @@ Applications discover data locations through the standard Solid discovery mechan
 2. **Index Resolution:** From the Type Index, resolve data type registrations to data containers:
 
 ```turtle
-# In Public Type Index at https://alice.example.org/settings/publicTypeIndex.ttl
+# In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
 @prefix schema: <https://schema.org/> .
 @prefix meal: <https://example.org/vocab/meal#> .
@@ -48,11 +48,12 @@ Applications discover data locations through the standard Solid discovery mechan
    solid:instanceContainer <../data/shopping-entries/> .
 ```
 
-3. **Index Resolution:** Applications also register index types in the Type Index using the same mechanism:
+3. **Framework Type Resolution:** Applications also register framework-specific types (indices and client installations) in the Type Index using the same mechanism:
 
 ```turtle
-# Also in Public Type Index at https://alice.example.org/settings/publicTypeIndex.ttl
+# Also in Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
 
 <#recipe-index> a solid:TypeRegistration;
    solid:forClass idx:RootIndex;
@@ -63,6 +64,10 @@ Applications discover data locations through the standard Solid discovery mechan
    solid:forClass idx:PartitionedIndex;
    solid:instance <../indices/shopping-entries/index> ;
    idx:indexesClass meal:ShoppingListEntry .
+
+<#client-installations> a solid:TypeRegistration;
+   solid:forClass crdt:ClientInstallation;
+   solid:instanceContainer <../installations/> .
 ```
 
 4. **Index Type Detection:** Applications query the Type Index for both data types (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:RootIndex`), enabling automatic discovery of the complete synchronization setup.
@@ -87,7 +92,7 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 
 The following examples demonstrate the architecture using a **meal planning application** that manages recipes, meal plans, and automatically generates shopping lists from planned meals. This integrated workflow shows how different data types can reference each other while maintaining clean separation of concerns.
 
-**Example: A recipe resource at `https://alice.example.org/data/recipes/123`**
+**Example: A recipe resource at `https://alice.podprovider.org/data/recipes/123`**
 This resource lives in Alice's Pod and describes a recipe. It contains metadata that links it to other architectural layers, enabling its use within the synchronization framework.
 
 ```turtle
@@ -138,7 +143,7 @@ This file, published at a public URL, defines how to merge a `schema:Recipe`.
      [ sync:property schema:totalTime; crdt:mergeWith crdt:LWW_Register ].
 ```
 
-**Example: The Mechanics embedded in `https://alice.example.org/data/recipes/123`**
+**Example: The Mechanics embedded in `https://alice.podprovider.org/data/recipes/123`**
 This shows the full recipe resource with the CRDT mechanics included.
 
 ```turtle
@@ -163,7 +168,7 @@ This shows the full recipe resource with the CRDT mechanics included.
 << :it schema:keywords "quick" >> crdt:isDeleted true .
 ```
 
-**Example: A shopping list entry at `https://alice.example.org/data/shopping-entries/item-001`**
+**Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/item-001`**
 This resource shows how shopping list entries are derived from recipes in the meal planning workflow.
 
 ```turtle
@@ -192,6 +197,31 @@ This resource shows how shopping list entries are derived from recipes in the me
    idx:belongsToIndexShard <../../indices/shopping-entries/partitions/2025-08/shard-0> .
 ```
 
+#### 4.2.1. CRDT Merge Mechanics
+
+The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using vector clocks for causality determination.
+
+**Client Installation Documents**
+
+Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These documents are stored in containers found via the Type Index and provide traceability for vector clock entries.
+
+**Example client installation at `https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz`:**
+
+```turtle
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<> a crdt:ClientInstallation;
+   crdt:belongsToWebID <../profile/card#me>;
+   crdt:applicationId <https://meal-planning-app.example.org/id>;
+   crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime .
+```
+
+Applications discover the installations container through the Type Index, then generate unique installation IDs using implementation-specific methods (UUIDs, timestamps, etc.).
+
+**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see the [CRDT Specification Document](CRDT-SPECIFICATION.md).
+
 ### 4.3. Layer 3: The Indexing Layer
 
 This is an optional but powerful performance and discovery layer. It defines a convention for how data can be indexed for fast access.
@@ -216,7 +246,7 @@ To ensure interoperability, performance, and good citizenship within the Solid e
 
  *   **Application-Specific Indices and "Good Citizenship":** Applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on *all* applications that interact with that data type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the entire ecosystem. 
 
-**Example 1: A `PartitionedIndex` at `https://alice.example.org/indices/shopping-entries/index`**
+**Example 1: A `PartitionedIndex` at `https://alice.podprovider.org/indices/shopping-entries/index`**
 This resource is the "rulebook" for all shopping list entry partitions in our meal planning application.
 
 ```turtle
@@ -246,7 +276,7 @@ This resource is the "rulebook" for all shopping list entry partitions in our me
    ].
 ```
 
-**Example 2: A `Partition` document at `https://alice.example.org/indices/shopping-entries/partitions/2025-08/index`**
+**Example 2: A `Partition` document at `https://alice.podprovider.org/indices/shopping-entries/partitions/2025-08/index`**
 This is a concrete index for shopping list entries from August 2025 meal plans.
 
 ```turtle
@@ -262,7 +292,7 @@ This is a concrete index for shopping list entries from August 2025 meal plans.
    idx:hasShard <shard-0>, <shard-1>, ... .
 ```
 
-**Example: A Shard Document at `https://alice.example.org/indices/shopping-entries/partitions/2025-08/shard-0`**
+**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/partitions/2025-08/shard-0`**
 This document contains entries pointing to shopping list data resources from August 2025.
 
 ```turtle
@@ -320,11 +350,11 @@ It's also possible to perform an On-Demand sync on a partitioned index, giving t
 
 The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
-1.  **Subscription:** The application explicitly tells the library what to sync (e.g., `subscribeToPartition("https://alice.example.org/indices/shopping-entries/partitions/2025-08")`).
+1.  **Subscription:** The application explicitly tells the library what to sync (e.g., `subscribeToPartition("https://alice.podprovider.org/indices/shopping-entries/partitions/2025-08")`).
 2.  **Efficient Index Discovery:** The library fetches the appropriate partition index, reads its `idx:hasShard` list, and then synchronizes only the active shards.
 3.  **App Notification (`onIndexUpdate`):** The library notifies the application with the list of headers from the synchronized shards.
 4.  **Developer Control:** The developer uses the header list to populate a UI (e.g., showing "2 lbs fresh tomatoes" for meal plan on "Aug 15") and decides when to fetch full data.
-5.  **On-Demand Fetch (`fetchFromRemote`):** When the app needs the full data for an item, it calls `fetchFromRemote("https://alice.example.org/data/shopping-entries/item-001")`.
+5.  **On-Demand Fetch (`fetchFromRemote`):** When the app needs the full data for an item, it calls `fetchFromRemote("https://alice.podprovider.org/data/shopping-entries/item-001")`.
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the appropriate **Merge Contract** (e.g., the shopping-entry-v1 rules), performs the property-by-property merge, and returns the final, merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged shopping list entry object, which the developer can then save to their own local database.
 
