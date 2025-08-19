@@ -154,11 +154,11 @@ This shows the full recipe resource with the CRDT mechanics included.
    # The full, structured Vector Clock
    crdt:hasClockEntry
     [
-        crdt:clientId <https://example.com/clients/A>;
+        crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000>;
         crdt:clockValue "15"^^xsd:integer
     ],
     [
-        crdt:clientId <https://example.com/clients/B>;
+        crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8>;
         crdt:clockValue "8"^^xsd:integer
     ];
    # A pre-calculated hash of the clock for efficient index updates
@@ -205,7 +205,7 @@ The state-based merge process follows standard CRDT algorithms adapted for RDF. 
 
 Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These documents are stored in containers found via the Type Index and provide traceability for vector clock entries.
 
-**Example client installation at `https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz`:**
+**Example client installation at `https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000`:**
 
 ```turtle
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
@@ -218,7 +218,82 @@ Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` docume
    crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime .
 ```
 
-Applications discover the installations container through the Type Index, then generate unique installation IDs using implementation-specific methods (UUIDs, timestamps, etc.).
+**Client ID Generation:**
+
+Applications discover the installations container through the Type Index, then generate unique installation IDs using standard UUID v4:
+
+- **Recommended:** Use UUID v4 for guaranteed uniqueness across devices and time
+- **Example:** `550e8400-e29b-41d4-a716-446655440000`
+
+**Simple Generation:**
+```
+1. Generate UUID v4: uuid.v4() → "550e8400-e29b-41d4-a716-446655440000"
+2. Client installation IRI: https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000
+```
+
+UUIDs provide cryptographically strong uniqueness guarantees without requiring complex generation logic or coordination between clients.
+
+#### 4.2.2. Vocabulary Versioning and Evolution
+
+**Vocabulary URI Strategy:**
+
+The framework vocabularies use versioned URIs to enable backward compatibility and smooth evolution:
+
+```turtle
+# Current stable vocabularies
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+
+# Future versioned vocabularies (when breaking changes are needed)
+@prefix idx2: <https://kkalass.github.io/solid_crdt_sync/vocab/v2/idx#> .
+@prefix sync2: <https://kkalass.github.io/solid_crdt_sync/vocab/v2/sync#> .
+```
+
+**Merge Contract Versioning:**
+
+Merge contracts use explicit versioning in their URIs to handle algorithm evolution:
+
+```turtle
+# Stable contract versions
+sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> .
+sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v2> .
+
+# Contract evolution example
+# v1: Basic LWW/OR-Set mappings
+# v2: Adds new CRDT types, maintains backward compatibility
+# v3: Breaking change - different property mappings
+```
+
+**When to Create New Versions:**
+
+**DO NOT create new versions for:**
+- Adding new optional properties to existing classes
+- Adding new CRDT types to the vocabulary  
+- Adding new classes that don't conflict with existing ones
+- Documentation or comment updates
+
+**DO create new versions ONLY for breaking changes:**
+- Changing property semantics (e.g., schema:name becomes multi-valued)
+- Removing or renaming existing properties/classes
+- Changing CRDT merge behavior in incompatible ways
+- Altering required property constraints
+
+**Version Numbering:**
+- Use simple integer versioning: `recipe-v1`, `recipe-v2`, `recipe-v3`
+- **Never use semantic versioning** like `recipe-v1.1.1` - this creates confusion about compatibility
+
+**Compatibility Strategy:**
+- **Backward compatible changes:** Keep same version number, clients ignore unknown properties
+- **Breaking changes:** New version number, explicit migration path required
+- **Client handling:** Gracefully handle unknown properties and CRDT types within same major version
+- **Contract conflicts:** When clients reference different major versions, use most conservative merge approach
+
+**Migration Process:**
+1. **Deploy new vocabulary version** alongside existing one
+2. **Update reference implementations** to support both versions
+3. **Gradual client adoption** of new features
+4. **Deprecation notices** for old versions (but never breaking compatibility)
 
 **Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see the [CRDT Specification Document](CRDT-SPECIFICATION.md).
 
@@ -237,17 +312,74 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 * **`idx:GroupIndexTemplate`:** A "rulebook" resource that defines *how* a data type is grouped. It does **not** contain data entries itself.
 * **`idx:GroupIndex`:** A concrete index representing a single group (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `GroupIndexTemplate` rulebook.
 
-### 4.3.1. Indexing Conventions and Best Practices
+### 4.3.1. Sharding Algorithm Details
+
+**Resource Assignment to Shards:**
+
+When a new resource is created or an existing resource is updated, the framework determines which shard should contain its index entry using the configured sharding algorithm:
+
+```
+1. Extract resource IRI: https://alice.podprovider.org/data/recipes/tomato-soup
+2. Apply hash function: xxhash64("https://alice.podprovider.org/data/recipes/tomato-soup") → 0x1A2B3C4D5E6F7890
+3. Convert to decimal: 1883669071845588112
+4. Calculate modulo: 1883669071845588112 % 2 = 0
+5. Assign to shard: shard-0
+```
+
+**Consistency Guarantees:**
+- The same resource always maps to the same shard (deterministic)
+- Resources are distributed roughly evenly across shards
+- Adding new shards requires rebalancing existing entries
+
+**When Sharding Decisions Are Made:**
+- **During writes:** When storing a resource, calculate which shard to update
+- **During index discovery:** When finding a resource's index entry, check the calculated shard
+- **During index rebuilds:** When migrating to different shard counts
+
+### 4.3.2. Multi-Application Coordination
+
+**Index Sharing and Compatibility:**
+
+When multiple applications work with the same data type, they must coordinate their indexing strategies to maintain interoperability:
+
+**Discovery-First Approach:**
+1. **Always discover first:** Applications query the Type Index to find existing indices before creating new ones
+2. **Compatibility check:** Evaluate if discovered index meets minimum requirements (FullIndex vs GroupIndexTemplate, required `idx:indexedProperty` fields)
+3. **Graceful coexistence:** If existing index is incompatible, create application-specific index without modifying the shared one
+
+**Index Naming Conventions:**
+- **Default index:** `/indices/{data-type}/index` (discovered via Type Index)
+- **Application-specific:** `/indices/{data-type}/{app-name}/index` (avoid namespace conflicts)
+
+**Example Coordination Scenario:**
+```turtle
+# Recipe Manager App discovers this default index
+<#recipe-index> a solid:TypeRegistration;
+   solid:forClass idx:FullIndex; 
+   solid:instance <../indices/recipes/index> .
+
+# Meal Planner App needs GroupIndexTemplate, so creates its own:
+<#meal-planner-recipe-index> a solid:TypeRegistration;
+   solid:forClass idx:GroupIndexTemplate;
+   solid:instance <../indices/recipes/meal-planner/index> .
+```
+
+**Coordination Guidelines:**
+- **Minimize index proliferation:** Consider if existing indices can be extended rather than creating new ones
+- **Use minimal default indices:** Keep shared indices lightweight to reduce sync overhead for all applications
+- **Document index purposes:** Use `rdfs:comment` to explain index design decisions
+
+### 4.3.3. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
- *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `RootIndex` but the app needs a `PartitionedIndex`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
+ *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
  
  *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of data resources. They should typically include only essential fields necessary for broad interoperability, such as `foaf:name` or `schema:name` (if at all), and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all applications that interact with that data type.
 
  *   **Application-Specific Indices and "Good Citizenship":** Applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on *all* applications that interact with that data type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the entire ecosystem. 
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index`**
-This resource is the "rulebook" for all shopping list entry groups in our meal planning application.
+This resource is the "rulebook" for all shopping list entry groups in our meal planning application. Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only vector clock hashes for change detection.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -258,7 +390,9 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
 
 <> a idx:GroupIndexTemplate;
    idx:indexesClass meal:ShoppingListEntry;
+   # No idx:indexedProperty needed - groups are loaded fully
    # A default sharding algorithm for all group indices created under this rule.
+   # Resources within each group are assigned to shards using: hash(resourceIRI) % numberOfShards
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
      idx:hashAlgorithm "xxhash64";
@@ -286,7 +420,9 @@ This is a concrete index for shopping list entries from August 2025 meal plans.
    sync:isGovernedBy mappings:group-index-v1;
    # Back-link to the rulebook.
    idx:basedOn <../../index>;
-   # It inherits its configuration (indexed properties, etc.) from the rulebook.
+   # It inherits its configuration from the GroupIndexTemplate rulebook.
+   # This includes idx:indexedProperty values, which determine what header
+   # information is copied into this group's index shards.
    # It has its own list of active shards, which are sibling documents.
    idx:hasShard <shard-0>, <shard-1>, ... .
 ```
@@ -327,6 +463,7 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
    # Include properties needed for recipe browsing UI
    idx:indexedProperty schema:name, schema:keywords, schema:totalTime;
    # Default sharding for the recipe collection
+   # Resources are assigned to shards using: hash(resourceIRI) % numberOfShards
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
      idx:hashAlgorithm "xxhash64";
@@ -381,7 +518,7 @@ This decision depends on the expected size and structure of the dataset.
 
 This decision depends on the application's use case and performance requirements.
 
-*   **Full Data Sync:** The application downloads the relevant index (or index partition) and then immediately fetches the full data for all resources listed in it. This is useful when the application needs the complete data to function.
+*   **Full Data Sync:** The application downloads the relevant index (or index group) and then immediately fetches the full data for all resources listed in it. This is useful when the application needs the complete data to function.
 *   **On-Demand Sync (Index-Only):** The application *only* downloads the index by default. This provides the app with a lightweight list of "headers" (e.g., IRI, title). The full data for a specific resource is only fetched when the application explicitly requests it (e.g., when a user clicks on an item). This is ideal for improving initial load times and reducing bandwidth usage.
 
 #### 4.4.3. Common Strategies
@@ -398,7 +535,7 @@ It's also possible to perform an On-Demand sync on a grouped index, giving the d
 
 The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
-1.  **Index Selection:** The application chooses which indices to sync based on its needs (e.g., current month's shopping entries, all recipes, etc.).
+1.  **Index Selection:** The application chooses which indices to sync based on its needs. For GroupedSync, this means subscribing to specific groups (e.g., "2025-08" for August shopping entries). For FullSync/OnDemandSync, this means syncing the entire FullIndex.
 2.  **Index Synchronization:** The library fetches the selected index, reads its `idx:hasShard` list, and synchronizes the active shards.
 3.  **App Notification (`onIndexUpdate`):** The library notifies the application with the list of headers from the synchronized index.
 4.  **Sync Strategy Application:** Based on the configured strategy:
@@ -468,33 +605,24 @@ During extended network unavailability:
 - **Online-Only Operation:** Pod configuration modifications require network connectivity (not CRDT-compatible)
 
 **Example Setup Dialog Flow:**
-```
-┌─────── Pod Setup Required ───────┐
-│                                  │
-│ This app needs to configure      │ 
-│ data storage in your Solid Pod   │
-│ to enable synchronization.       │
-│                                  │
-│ ○ Automatic Setup                │
-│   Use standard Solid paths       │
-│   (recommended)                  │
-│                                  │
-│ ○ Custom Setup                   │
-│   Review and customize paths     │
-│                                  │
-│ [ Continue ]  [ Cancel ]         │
-└──────────────────────────────────┘
-```
 
-Custom Setup shows editable configuration:
-- Type Index Location: /settings/publicTypeIndex.ttl
-- Recipe Data: /data/recipes/ [editable]
-- Recipe Index: /indices/recipes/index [editable]
-- Client Installations: /installations/ [editable]
-- [Apply Changes] [Cancel]
+**Initial Setup Dialog:**
+- **Title:** "Pod Setup Required"  
+- **Message:** "This app needs to configure data storage in your Solid Pod to enable synchronization."
+- **Options:**
+  - ○ **Automatic Setup** - Use standard Solid paths (recommended)
+  - ○ **Custom Setup** - Review and customize paths
+- **Actions:** [Continue] [Cancel]
 
-If user cancels entirely: App runs with /solid-crdt-sync/recipes/ etc., 
-warns about reduced interoperability with other Solid apps.
+**Custom Setup Details (if chosen):**
+- Type Index Location: `/settings/publicTypeIndex.ttl`
+- Recipe Data: `/data/recipes/` [editable]
+- Recipe Index: `/indices/recipes/index` [editable]  
+- Client Installations: `/installations/` [editable]
+- **Actions:** [Apply Changes] [Cancel]
+
+**Fallback Behavior (if user cancels entirely):**
+App runs with fallback paths like `/solid-crdt-sync/recipes/` and warns about reduced interoperability with other Solid apps.
 
 **Inaccessible Resources:**
 When discovery finds IRIs that can't be fetched:
@@ -647,21 +775,21 @@ Understanding the different levels at which synchronization can be blocked helps
 * **Discoverability and Resilience:** The system is highly discoverable and resilient to changes in the indexing strategy over time.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 7. Alignment with Standardization Efforts
+## 8. Alignment with Standardization Efforts
 
-### 7.1. Community Alignment
+### 8.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 7.2. Architectural Differentiators
+### 8.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This framework is designed as an "add-on" library. The developer retains control over their local storage and querying logic.
 * **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 8. Outlook: Future Enhancements
+## 9. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
