@@ -34,6 +34,10 @@ idx:PartitionRule a rdfs:Class;
     rdfs:label "Partition Rule";
     rdfs:comment "A declarative rule that describes how a data resource should be assigned to a specific partition based on its properties." .
 
+idx:ModuloHashSharding a rdfs:Class;
+    rdfs:label "Modulo Hash Sharding";
+    rdfs:comment "A sharding strategy that calculates a hash of a resource's IRI and then uses the modulo operator to assign it to a shard." .
+
 # --- Property Definitions ---
 
 idx:belongsToIndex a rdf:Property;
@@ -64,7 +68,19 @@ idx:shardingAlgorithm a rdf:Property;
     rdfs:label "sharding algorithm";
     rdfs:comment "Defines the algorithm used to place new items into shards.";
     rdfs:domain [ a owl:Class; owl:unionOf (idx:Index idx:PartitionedIndex) ];
+    rdfs:range rdfs:Resource .
+
+idx:hashAlgorithm a rdf:Property;
+    rdfs:label "hash algorithm";
+    rdfs:comment "The hashing algorithm to be used (e.g., 'xxhash64').";
+    rdfs:domain idx:ModuloHashSharding;
     rdfs:range xsd:string .
+
+idx:numberOfShards a rdf:Property;
+    rdfs:label "number of shards";
+    rdfs:comment "The number of shards to distribute items across.";
+    rdfs:domain idx:ModuloHashSharding;
+    rdfs:range xsd:integer .
 
 idx:isShardOf a rdf:Property;
     rdfs:label "is shard of";

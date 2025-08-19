@@ -132,7 +132,11 @@ This file is the "rulebook" for all shopping entry partitions.
    idx:indexesClass schema:ListItem;
    idx:indexedProperty schema:name;
    # A default sharding algorithm for all partitions created under this rule.
-   idx:shardingAlgorithm "modulo-hash(xxhash64, 4)" ;
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 4
+   ] ;
    sync:isGovernedBy mappings:partitioned-index-v1;
 
    # The declarative rule for how to assign items to partitions.
