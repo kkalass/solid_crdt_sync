@@ -21,10 +21,6 @@ sync:ClassMapping a rdfs:Class;
     rdfs:comment "A resource that defines the merge behavior for a specific class of data (e.g., schema:Recipe).";
     rdfs:subClassOf sync:Mapping .
 
-sync:IndexMapping a rdfs:Class;
-    rdfs:label "Index Mapping";
-    rdfs:comment "A resource that defines the merge behavior for a specific class of index (e.g., idx:RootIndex).";
-    rdfs:subClassOf sync:Mapping .
 
 sync:PropertyMapping a rdfs:Class;
     rdfs:label "Property Mapping";
