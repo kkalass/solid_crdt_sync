@@ -78,17 +78,18 @@ class GroupedSync extends SyncStrategy {
   });
 }
 
-/// Strategy for very large datasets where only indices are synced by default.
+/// Strategy for datasets where only indices are synced by default, loading full data on-demand.
 /// 
-/// Uses idx:FullIndex but only syncs the index entries (with header properties)
-/// until explicit fetchFromRemote() calls are made.
+/// Can use either idx:FullIndex (for browseable collections) or idx:GroupIndexTemplate 
+/// (for naturally grouped data). Only syncs index entries until explicit fetchFromRemote() calls.
 /// 
-/// Suitable when:
-/// - Individual resources are large (documents, images, etc.)
-/// - Application needs browse-then-load workflow  
-/// - Network bandwidth is constrained
+/// **OnDemand + FullIndex:** Browse entire collection, load individual items
+/// - Suitable when: Need to search/filter across whole collection  
+/// - Example: Personal recipe collection, document library, photo albums
 /// 
-/// Example: Document libraries, photo albums, video collections
+/// **OnDemand + GroupIndex:** Load specific groups, then load individual items within group
+/// - Suitable when: Data naturally groups but individual groups are large
+/// - Example: Financial transactions by year, health records by condition, music by genre
 class OnDemandSync extends SyncStrategy {
   OnDemandSync({
     required super.type,
@@ -314,7 +315,11 @@ enum SyncStatus {
 /// This demonstrates the three different sync strategies:
 /// - Recipes: OnDemandSync (browse titles, load on-demand)
 /// - Shopping entries: GroupedSync (framework reads RDF GroupingRule automatically)
-/// - Meal plans: FullSync (small dataset, always needed)
+/// - Meal plans: FullSync (small dataset, always sync)
+///
+/// Note: All indices automatically scale their internal sharding as data grows.
+/// Developers need no configuration - the system defaults to single-shard and
+/// scales to 2→4→8→16 shards as needed based on entry count thresholds.
 /*
 
 void setupMealPlanningSync() {

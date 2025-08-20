@@ -7,4 +7,4 @@ mappings:group-index-v1 a sync:ClassMapping;
    sync:appliesToClass idx:GroupIndex;
    sync:propertyMapping
      [ sync:property idx:basedOn; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:hasShard; crdt:mergeWith crdt:OR_Set ].
+     [ sync:property idx:hasShard; crdt:mergeWith crdt:2P_Set ].

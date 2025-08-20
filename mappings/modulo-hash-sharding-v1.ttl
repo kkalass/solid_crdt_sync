@@ -1,0 +1,12 @@
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+mappings:modulo-hash-sharding-v1 a sync:ClassMapping;
+   sync:appliesToClass idx:ModuloHashSharding;
+   sync:propertyMapping
+     [ sync:property idx:hashAlgorithm; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:property idx:numberOfShards; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:property idx:configVersion; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:property idx:autoScaleThreshold; crdt:mergeWith crdt:LWW_Register ].

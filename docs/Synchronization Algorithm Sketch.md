@@ -105,8 +105,8 @@ This process is triggered when the application calls `store()` on an object.
 
 1. **Strategy-Based Location Determination:**
    1. Look up the SyncStrategy for the object's type
-   2. **For FullSync:** Determine shard based on sharding algorithm
-   3. **For GroupedSync:** Use grouper function to determine group(s), then shard within group
+   2. **For FullSync:** Determine shard based on current sharding algorithm configuration
+   3. **For GroupedSync:** Apply discovered GroupingRule to determine group(s), then calculate shard within group
    4. **For OnDemandSync:** Same as FullSync (single index, determine shard)
 
 2. **Resource Merge and Update:**
@@ -117,14 +117,43 @@ This process is triggered when the application calls `store()` on an object.
 
 3. **Index Updates:**
    1. For each index the resource belongs to:
-      * Fetch affected shard(s)
+      * Fetch affected shard(s) using current configuration (handle legacy shards if present)
       * Update entries with new vector clock hash and indexed properties
+      * Check if shard exceeds autoScaleThreshold during update
+      * If scaling needed: auto-increment configVersion and begin lazy migration to new shard count
       * Upload updated shard(s)
 
 4. **Cross-Strategy Consistency:**
    1. If resource belongs to multiple indices (different applications/strategies):
       * Update all relevant index shards
       * Ensure vector clock consistency across all references
+
+## **Phase 6: Automatic Scaling Management**
+
+This process handles automatic shard scaling when capacity thresholds are exceeded.
+
+1. **Scaling Detection:**
+   1. During index updates, monitor entry counts per shard
+   2. When any shard exceeds `idx:autoScaleThreshold` (default: 1000 entries)
+   3. Trigger automatic scaling process
+
+2. **Configuration Update:**
+   1. Calculate new shard count (typically double: 1→2→4→8→16)
+   2. Auto-increment configVersion scale component: `v1_0_0` → `v1_1_0`
+   3. Update index configuration with new `numberOfShards` and `configVersion`
+   4. Add new shard names to `idx:hasShard` list using format `shard-mod-xxhash64-{count}-{num}-v{major}_{scale}_{conflict}`
+
+3. **Lazy Migration Initialization:**
+   1. Begin using new shard count for all new entries
+   2. Existing entries remain in legacy shards until opportunistically migrated
+   3. Read operations check all active shards listed in `idx:hasShard`
+   4. Write operations migrate entries if found in non-current shards
+
+4. **Conflict Resolution:**
+   1. If configVersion conflicts detected (2P-Set rejects shard name or entry)
+   2. Auto-increment conflict component: `v1_1_0` → `v1_1_1`
+   3. Retry with new conflict-free version
+   4. All clients converge on same resolution deterministically
 
 ## **Error Handling Integration**
 
@@ -140,6 +169,8 @@ All phases integrate the comprehensive error handling strategies defined in the 
 
 1. **Type Index as Single Source of Truth:** Always use Type Index for discovery, never hardcoded paths
 2. **Conditional Requests:** Leverage HTTP ETags for bandwidth efficiency
-3. **Vector Clock Consistency:** Maintain causality across all index and data updates
+3. **Document-Level Vector Clocks:** Maintain causality across all index and data updates using document-level vector clocks
 4. **Strategy Flexibility:** Support mixed strategies (FullSync recipes + GroupedSync shopping entries)
-5. **Graceful Degradation:** Continue operation with partial functionality when possible
+5. **Zero-Configuration Scaling:** System defaults to single shard with automatic scaling (1→2→4→8→16) based on entry thresholds
+6. **Self-Healing Conflicts:** Automatic configVersion conflict resolution using deterministic suffix increments
+7. **Graceful Degradation:** Continue operation with partial functionality when possible

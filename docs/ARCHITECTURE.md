@@ -199,7 +199,30 @@ This resource shows how shopping list entries are derived from recipes in the me
 
 #### 4.2.1. CRDT Merge Mechanics
 
-The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using vector clocks on document level (e.g. Recipe or Shopping List Entry) for causality determination.
+The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using **document-level vector clocks** for causality determination. Each resource document (e.g., a complete Recipe or Shopping List Entry) has a single vector clock that tracks changes to the entire document, keeping the original resource content clean.
+
+**Vector Clock Example:**
+```turtle
+<https://alice.podprovider.org/data/recipes/tomato-soup> {
+  <https://alice.podprovider.org/data/recipes/tomato-soup>
+    a schema:Recipe ;
+    schema:name "Tomato Soup" ;
+    schema:recipeIngredient "2 cans tomatoes", "1 onion" ;
+    schema:recipeInstructions "Sauté onion, add tomatoes, simmer 20 minutes." .
+    
+  # Document-level vector clock stored separately from resource content
+  <> crdt:vectorClock [
+    crdt:clientEntry [
+      crdt:clientId <https://alice.podprovider.org/apps/meal-planner/client-123> ;
+      crdt:counter 5
+    ] ;
+    crdt:clientEntry [
+      crdt:clientId <https://bob.podprovider.org/apps/shared-recipes/client-456> ;
+      crdt:counter 2
+    ]
+  ] .
+}
+```
 
 **Client Installation Documents**
 
@@ -301,7 +324,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 
 This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only vector clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
-* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that **minimally contain a lightweight hash of each resource's vector clock** for change detection. Indices may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
+* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that **minimally contain a lightweight hash of each document's vector clock** for change detection. Indices may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
 
 * **Structure:** The index is a two-level hierarchy of **Groups** (logical groups) and **Shards** (technical splits). Each index is self-describing.
 
@@ -328,13 +351,127 @@ When a new resource is created or an existing resource is updated, the framework
 
 **Consistency Guarantees:**
 - The same resource always maps to the same shard (deterministic)
-- Resources are distributed roughly evenly across shards
-- Adding new shards requires rebalancing existing entries
+- Resources are distributed roughly evenly across shards  
+- Shard count changes use lazy, client-side rebalancing
+
+**Client-Side Shard Evolution:**
+
+In Solid's decentralized context, users are not system administrators and cannot perform traditional "maintenance operations." Instead, shard count changes are handled as application upgrades with lazy migration:
+
+**Automatic and Manual Shard Changes:**
+1. **System defaults:** Framework defaults to `v1_0_0` and single shard, library authors should make these explicit in index creation
+2. **Developer override (if needed):** Developer can specify major version for breaking changes (e.g., `v2_0_0`)
+3. **Automatic scaling:** System increases shard count when any active shard exceeds threshold (e.g., 1000 entries)
+4. **Natural progression:** 1 → 2 → 4 → 8 → 16 shards as data grows
+5. **Version auto-increment:** System automatically increments middle number: `v1_0_0` → `v1_1_0` → `v1_2_0` for shard scaling
+6. **Gradual deployment:** Updated configurations coexist during lazy migration period
+7. **Lazy migration:** Existing entries migrate opportunistically during normal operations
+
+**Lazy Migration Process:**
+```turtle
+# Index configuration shows current sharding algorithm  
+<https://alice.podprovider.org/indices/recipes/index>
+  idx:shardingAlgorithm [
+    a idx:ModuloHashSharding ;
+    idx:hashAlgorithm "xxhash64" ;
+    idx:numberOfShards 4 ;           # Current configuration (auto-scaled from 1)
+    idx:configVersion "1_2_0" ;      # Default v1, auto-scale 2 (1→2→4), conflict 0
+    idx:autoScaleThreshold 1000      # Framework default threshold
+  ] ;
+  idx:hasShard 
+    # Evolution: single shard → 2 shards → 4 shards
+    # Legacy: <shard-mod-xxhash64-1-0-v1_0_0> (migrated out, tombstoned)
+    # Legacy: <shard-mod-xxhash64-2-0-v1_1_0>, <shard-mod-xxhash64-2-1-v1_1_0> (migrated out)
+    # Current shards (4-shard configuration) 
+    <shard-mod-xxhash64-4-0-v1_2_0>, <shard-mod-xxhash64-4-1-v1_2_0>, 
+    <shard-mod-xxhash64-4-2-v1_2_0>, <shard-mod-xxhash64-4-3-v1_2_0> .
+```
+
+**Recommended Library Implementation:**
+```turtle
+# When library creates new index, explicitly write defaults:
+<https://alice.podprovider.org/indices/recipes/index>
+  idx:shardingAlgorithm [
+    a idx:ModuloHashSharding ;
+    idx:hashAlgorithm "xxhash64" ;
+    idx:numberOfShards 1 ;           # Explicit default
+    idx:configVersion "1_0_0" ;      # Explicit default  
+    idx:autoScaleThreshold 1000      # Explicit default
+  ] ;
+  idx:hasShard <shard-mod-xxhash64-1-0-v1_0_0> .
+```
+
+**Automatic Scaling Algorithm:**
+1. **Monitor shard sizes:** During writes and sync, track entry counts in active shards
+2. **Trigger scaling:** When any shard exceeds `idx:autoScaleThreshold` entries (e.g., 1000)
+3. **Calculate new shard count:** Double current count (1→2→4→8→16) or use configured algorithm  
+4. **Auto-increment version:** Increment scale component: `v2_0_0` → `v2_1_0` → `v2_2_0`
+5. **Begin lazy migration:** Start using new shards for new entries, migrate opportunistically
+
+**Self-Describing Shard Names:**
+- Format: `shard-{algorithm}-{hash}-{totalShards}-{shardNumber}-v{major}_{scale}_{conflict}`
+- Example: `shard-mod-xxhash64-4-0-v2_1_0` = modulo, xxhash64, 4 shards, shard #0, dev version 2, auto-scale 1, conflict resolution 0
+- **Version Components:**
+  - `major`: Developer-controlled version (increment for breaking changes)
+  - `scale`: Auto-increment when system increases shard count due to size thresholds
+  - `conflict`: Auto-increment for 2P-Set conflict resolution during cycles
+- Benefits: Fully automated scaling with deterministic conflict resolution
+
+**Migration Triggers (Opportunistic):**
+- **During writes:** New/updated resources use current shard count, migrate existing entry if found in different shard
+- **During sync:** If index entry found in non-current shard, opportunistically migrate to correct shard  
+- **During cleanup (optional):** Future versions may implement background migration during idle time
+
+**Migration Process Details:**
+- **"Migrate" means:** Add entry to correct shard (using 2P-Set add), remove from incorrect shard (using 2P-Set remove)  
+- **Empty shard cleanup:** When a shard becomes empty, remove it from `idx:hasShard` list (using 2P-Set remove with tombstone)
+- **New installations:** Only sync shards currently listed in `idx:hasShard` - avoid downloading empty legacy shards
+- **Configuration cycles:** 2→4→2 cycles work: `v1_1_0` (2 shards) → `v1_2_0` (4 shards) → `v1_3_0` (2 shards). Each version gets unique shard names avoiding 2P-Set conflicts
+- **Version conflict resolution:** If attempting to add a shard name that exists in tombstones, automatically increment to next available version (e.g., v2_0_0 → v2_0_1)
+
+**Client-Side Constraints:**
+- **Limited execution time:** Migration happens in small batches to respect mobile background limits
+- **Concurrent access:** Multiple clients may migrate simultaneously - use CRDT merge rules for conflicts
+- **Never "finished":** Accept that some entries may remain in non-current shards indefinitely  
+- **Graceful lookup:** Check all active shards in `idx:hasShard` list (empty shards are automatically tombstoned)
+
+**Example migration:** Resource `tomato-soup` with hash `...1112` starts in legacy `shard-mod-xxhash64-2-0-v1` (1112 % 2 = 0), eventually migrates to new `shard-mod-xxhash64-4-0-v2` (1112 % 4 = 0) when accessed.
+
+**Configuration Version Conflict Handling:**
+
+When a client detects that `idx:configVersion` was not properly incremented, the system automatically resolves conflicts:
+
+**Auto-Resolution Algorithm:**
+1. **Detect conflict:** `shard-mod-xxhash64-2-0-v2_0_0` has tombstoned entries blocking new additions
+2. **Auto-increment conflict:** Try `shard-mod-xxhash64-2-0-v2_0_1`, then `v2_0_2`, `v2_0_3`, etc.
+3. **Find unused version:** Stop at first version without conflicts (no shard or entry tombstones)
+4. **Update configuration:** Set `idx:configVersion` to the working version (e.g., `"2_0_1"`)
+5. **Continue sync:** Proceed with new shards using the conflict-free version
+
+**Deterministic Resolution:**
+- All clients follow identical algorithm, converging on same solution
+- Multiple concurrent clients will discover same working version
+- Manual developer override (e.g., `v3`) takes precedence over auto-generated versions
+
+**Version Precedence Rules:**
+- `v3_0_0` > `v2_999_999` (higher major version wins)  
+- `v2_2_0` > `v2_1_0` (higher scale version wins)
+- `v2_1_5` > `v2_1_3` (higher conflict resolution wins)
+- Lexicographic comparison: `"2_1_0"` vs `"2_0_5"` → `"2_1_0"` wins
+
+**Benefits:**
+- **Self-scaling:** System automatically increases shard count as data grows
+- **Self-healing:** No manual intervention required for configuration cycles or conflicts
+- **Concurrent-safe:** Multiple clients reach same conclusion independently  
+- **Zero-config:** Developers need no configuration (system defaults to `v1_0_0` and 1 shard), library makes defaults explicit
+- **Performance optimized:** Proactive scaling prevents performance degradation
+- **No data loss:** System continues functioning instead of stopping on conflicts
 
 **When Sharding Decisions Are Made:**
-- **During writes:** When storing a resource, calculate which shard to update
-- **During index discovery:** When finding a resource's index entry, check the calculated shard
-- **During index rebuilds:** When migrating to different shard counts
+- **During writes:** Calculate shard using current numberOfShards, migrate if found in wrong location
+- **During reads:** Check all active shards in `idx:hasShard` to locate entries (read-only, no migration)
+- **During discovery:** Search all active shards listed in `idx:hasShard` to locate entries
+- **During config changes:** Validate new shard names against tombstone list before proceeding
 
 ### 4.3.2. Multi-Application Coordination
 
@@ -369,7 +506,42 @@ When multiple applications work with the same data type, they must coordinate th
 - **Use minimal default indices:** Keep shared indices lightweight to reduce sync overhead for all applications
 - **Document index purposes:** Use `rdfs:comment` to explain index design decisions
 
-### 4.3.3. Indexing Conventions and Best Practices
+### 4.3.3. Index Creation and Bootstrap Process
+
+**Cold Start Problem:**
+
+When an application first encounters a Pod with no existing indices for a data type, it must create the initial indexing structure:
+
+**Bootstrap Decision Flow:**
+1. **Discovery first:** Query Type Index for existing indices of the required type
+2. **If none found:** Application creates initial index based on its Sync Strategy requirements
+3. **Index creation:** Create appropriate index type (FullIndex or GroupIndexTemplate) 
+4. **Registration:** Add index to Type Index for future discoverability
+5. **Initial population:** Scan existing data containers and populate index with current resources
+
+**Example Bootstrap Scenario:**
+```turtle
+# Application discovers no recipe index exists
+# Creates FullIndex for OnDemand recipe browsing
+# Registers in Type Index:
+<#recipe-index> a solid:TypeRegistration;
+   solid:forClass idx:FullIndex;
+   solid:instance <../indices/recipes/index> ;
+   idx:indexesClass schema:Recipe .
+```
+
+**Who Creates Indices:**
+- **First application:** The first app to work with a data type creates the default index
+- **Subsequent applications:** Discover existing index and evaluate compatibility
+- **Setup process:** Applications can create indices during initial Pod configuration
+- **User control:** Setup dialogs allow users to approve index creation
+
+**Bootstrap Timing:**
+- **During setup:** Indices created when configuring Pod for first time
+- **On first sync:** Indices created when first syncing a data type
+- **Lazy creation:** Indices created when first storing a resource of that type
+
+### 4.3.4. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
  *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
@@ -421,8 +593,8 @@ This is a concrete index for shopping list entries from August 2025 meal plans.
    # Back-link to the rulebook.
    idx:basedOn <../../index>;
    # It inherits its configuration from the GroupIndexTemplate rulebook.
-   # This includes idx:indexedProperty values, which determine what header
-   # information is copied into this group's index shards.
+   # Since the template has no idx:indexedProperty defined, this group's shards
+   # will contain only resource IRIs and vector clock hashes (no header data).
    # It has its own list of active shards, which are sibling documents.
    idx:hasShard <shard-0>, <shard-1>, ... .
 ```
@@ -505,31 +677,57 @@ This document contains entries for recipe resources. Since recipes are used with
 
 ### 4.4. Layer 4: The Sync Strategy
 
-This is the client-side layer where the application developer makes choices about how to synchronize data. The architecture provides flexibility by separating two key decisions: the **Indexing Strategy** (how data is organized on the Pod) and the **Sync Behavior** (what the app syncs by default).
+This is the client-side layer where the application developer configures how to synchronize data. The framework balances **discovery** (finding existing Pod configuration) with **developer intent** (application requirements). Developers declare their preferred sync approach, and the framework either uses discovered compatible indices or creates new ones as needed.
 
-#### 4.4.1. Decision 1: Indexing Strategy
+#### 4.4.1. Decision 1: Index Structure
 
-This decision depends on the expected size and structure of the dataset.
+This decision determines how data is organized and indexed in the Pod.
 
-*   **Monolithic Index (`idx:FullIndex`):** A single, global index is used for the entire dataset. This is suitable for small to medium-sized datasets where a complete list of all items is needed (e.g., a user's recipe collection).
-*   **Grouped Index (`idx:GroupIndexTemplate`):** The index is broken into smaller, logical chunks, or groups (e.g., by date, by category). This is the right choice for very large or time-series datasets where a full index would be too large and inefficient (e.g., shopping list entries grouped by meal plan date, or recipes grouped by cuisine type).
+**FullIndex (Monolithic):**
+*   Single index covering entire dataset
+*   Good for bounded, searchable collections
+*   Examples: Personal recipes, document library, contact list
 
-#### 4.4.2. Decision 2: Sync Behavior
+**GroupIndexTemplate (Grouped):**
+*   Data split into logical groups via GroupingRule  
+*   Good for unbounded or naturally-grouped data
+*   Examples: Shopping entries by month, financial transactions by year
 
-This decision depends on the application's use case and performance requirements.
+**Framework Discovery Process:**
+1. **Developer declares data pattern:** "I have recipe data that needs to be searchable"
+2. **Framework discovers:** Checks Type Index for existing recipe indices  
+3. **Compatibility evaluation:** Does discovered index structure meet data pattern needs?
+4. **Resolution:** Use compatible index OR create new index with appropriate structure
 
-*   **Full Data Sync:** The application downloads the relevant index (or index group) and then immediately fetches the full data for all resources listed in it. This is useful when the application needs the complete data to function.
-*   **On-Demand Sync (Index-Only):** The application *only* downloads the index by default. This provides the app with a lightweight list of "headers" (e.g., IRI, title). The full data for a specific resource is only fetched when the application explicitly requests it (e.g., when a user clicks on an item). This is ideal for improving initial load times and reducing bandwidth usage.
+#### 4.4.2. Decision 2: Sync Timing
+
+This decision determines when and how much data gets loaded from the Pod.
+
+**Full Data Sync:**
+*   Downloads index AND immediately fetches all resource data
+*   Good for small datasets that are frequently accessed
+*   Examples: User settings, small contact lists, preferences
+
+**On-Demand Sync (Index-Only):**
+*   Downloads only index initially (provides headers/metadata)
+*   Fetches full resource data only when explicitly requested  
+*   Good for large datasets or browse-then-load workflows
+*   Examples: Large recipe collections, document libraries, photo albums
 
 #### 4.4.3. Common Strategies
 
-The named sync strategies are simply convenient bundles of these two decisions:
+The named sync strategies combine the two decisions above:
 
-*   **`FullSync`:** A **Full Data Sync** using a **Monolithic Index**.
-*   **`GroupedSync`:** A **Full Data Sync** using a **Grouped Index**. The application subscribes to specific groups.
-*   **`OnDemandSync`:** An **On-Demand (Index-Only) Sync** using a **Monolithic Index**.
+| Strategy | Index Structure | Sync Timing | Use Case |
+|----------|----------------|-------------|----------|
+| **`FullSync`** | FullIndex | Full Data Sync | Small, frequently-accessed datasets |
+| **`GroupedSync`** | GroupIndexTemplate | Full Data Sync | Time-series data with active groups |
+| **`OnDemandSync`** | FullIndex OR GroupIndexTemplate | On-Demand Sync | Large collections, browse-then-load |
 
-It's also possible to perform an On-Demand sync on a grouped index, giving the developer fine-grained control over performance for massive, grouped datasets.
+**Examples:**
+*   **FullSync:** User preferences, small contact lists → FullIndex + immediate data loading
+*   **GroupedSync:** Shopping entries, activity logs → GroupIndexTemplate + immediate data for subscribed groups  
+*   **OnDemandSync:** Recipe collections, document libraries → Any index + headers-only until requested
 
 ## 5. Synchronization Workflow
 

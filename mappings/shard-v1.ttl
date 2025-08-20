@@ -6,4 +6,4 @@
 mappings:shard-v1 a sync:ClassMapping;
    sync:appliesToClass idx:Shard;
    sync:propertyMapping
-     [ sync:property idx:containsEntry; crdt:mergeWith crdt:OR_Set ].
+     [ sync:property idx:containsEntry; crdt:mergeWith crdt:2P_Set ].

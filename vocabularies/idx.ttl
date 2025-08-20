@@ -91,6 +91,18 @@ idx:numberOfShards a rdf:Property;
     rdfs:domain idx:ModuloHashSharding;
     rdfs:range xsd:integer .
 
+idx:configVersion a rdf:Property;
+    rdfs:label "configuration version";
+    rdfs:comment "Version string for shard configuration using format 'major_scale_conflict' where major is developer-controlled, scale auto-increments for capacity scaling, and conflict auto-increments for 2P-Set resolution.";
+    rdfs:domain idx:ModuloHashSharding;
+    rdfs:range xsd:string .
+
+idx:autoScaleThreshold a rdf:Property;
+    rdfs:label "auto scale threshold";
+    rdfs:comment "The number of entries per shard that triggers automatic scaling to more shards (default: 1000).";
+    rdfs:domain idx:ModuloHashSharding;
+    rdfs:range xsd:integer .
+
 idx:isShardOf a rdf:Property;
     rdfs:label "is shard of";
     rdfs:comment "A back-link from a shard to the root index or partition it belongs to.";
