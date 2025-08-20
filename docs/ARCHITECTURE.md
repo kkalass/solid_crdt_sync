@@ -22,9 +22,9 @@ The proposed solution addresses both challenges through a declarative, developer
 
 ## 3. Discovery Protocol
 
-Applications discover data locations through the standard Solid discovery mechanism, extended with index-specific resolution:
+Applications discover data locations through the standard Solid discovery mechanism ([Solid Protocol](https://solidproject.org/TR/protocol)), extended with index-specific resolution:
 
-1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index:
+1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index ([Type Index](https://github.com/solid/type-indexes)):
 
 ```turtle
 # In Profile Document at https://alice.podprovider.org/profile/card#me
@@ -74,7 +74,7 @@ Applications discover data locations through the standard Solid discovery mechan
 
 4. **Index Type Detection:** Applications query the Type Index for both data types (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:FullIndex`), enabling automatic discovery of the complete synchronization setup.
 
-**Advantages:** Using TypeRegistration for indices enables full discoverability - applications can find both data and indices through standard Solid mechanisms, making the architecture truly self-describing.
+**Advantages:** Using TypeRegistration for indices enables full discoverability - applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), making the architecture truly self-describing.
 
 ## 4. Architectural Layers
 
@@ -89,55 +89,6 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 * **Vocabulary:** The primary data uses well-known public or custom vocabularies (e.g., `schema.org`).
 
 * **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
-
-#### 4.1.1. Data Organization and Performance Considerations
-
-**The Challenge:**
-
-Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
-
-**Fundamental Principle: IRIs Must Be Stable**
-
-Resource IRIs are **identifiers**, not storage locations. Any organizational structure must derive from **invariant properties** of the resource that will never change. Changing IRIs breaks references and violates RDF principles.
-
-**Recommended Approaches:**
-
-**1. Semantic Organization (Preferred)**
-
-Structure paths based on meaningful, invariant properties:
-```turtle
-# By semantic category (if immutable)
-/data/recipes/cuisine/italian/pasta-carbonara
-/data/recipes/cuisine/mexican/tacos-al-pastor
-
-# By creation date (if relevant and stable)
-/data/shopping-entries/created/2024/08/weekly-shopping-list-001
-/data/journal-entries/created/2024/08/15/morning-reflection
-```
-
-**2. UUID-Based Distribution (For Large Datasets)**
-
-For UUID-based identifiers, use prefix-based distribution:
-```turtle
-# UUID: af1e2d43-3ed4-4f5e-9876-1234567890ab
-/data/resources/af/1e/af1e2d43-3ed4-4f5e-9876-1234567890ab
-
-# Benefits: Predictable, evenly distributed, derived from invariant UUID
-```
-
-**3. Flat Structure (Small Datasets)**
-
-For small collections (< 1000 resources), flat structure is acceptable:
-```turtle
-/data/recipes/tomato-soup-recipe
-/data/recipes/pasta-carbonara-recipe
-```
-
-**Critical Guidelines:**
-- **Never change IRIs**: Once published, IRIs are permanent identifiers
-- **Derive from invariants**: Path structure must be computable from unchanging resource properties
-- **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
-- **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
 
 #### Example Application Context
 
@@ -167,7 +118,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
    # Pointer to the Merge Contract (Layer 2)
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to
-   idx:belongsToIndexShard <../../indices/recipes/shard-0> .
+   idx:belongsToIndexShard <../../indices/recipes/shard-mod-xxhash64-2-0-v1_0_0> .
 ```
 
 ### 4.2. Layer 2: The Merge Contract
@@ -236,7 +187,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    # Links to the source recipe that generated this shopping item
    meal:derivedFrom <../../../../recipes/tomato-basil-soup> ;
    # Links to the meal plan date that requires this ingredient
-   meal:requiredForDate "2025-08-15"^^xsd:date .
+   meal:requiredForDate "2024-08-15"^^xsd:date .
 
 # -- Pointers to Other Layers --
 <> a foaf:Document;
@@ -244,7 +195,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    # Uses a different merge contract for shopping list entries
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
    # Points to index shard within the appropriate group
-   idx:belongsToIndexShard <../../../../../indices/shopping-entries/groups/2025-08/shard-0> .
+   idx:belongsToIndexShard <../../../../../indices/shopping-entries/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
 ```
 
 #### 4.2.1. CRDT Merge Mechanics
@@ -261,8 +212,10 @@ The state-based merge process follows standard CRDT algorithms adapted for RDF. 
 # -- The Recipe Data --
 :it a schema:Recipe ;
     schema:name "Tomato Soup" ;
+    schema:keywords "vegan", "soup" ;
     schema:recipeIngredient "2 cans tomatoes", "1 onion" ;
-    schema:recipeInstructions "Sauté onion, add tomatoes, simmer 20 minutes." .
+    schema:recipeInstructions "Sauté onion, add tomatoes, simmer 20 minutes." ;
+    schema:totalTime "PT30M" .
     
 # -- Document-level Vector Clock --
 <> crdt:hasClockEntry [
@@ -369,14 +322,34 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 
 * **Structure:** The index is a two-level hierarchy of **Groups** (logical groups) and **Shards** (technical splits). Each index is self-describing.
 
-**Index Naming Hierarchy:**
+**Framework Vocabulary Hierarchy:**
 
+**Core Index Classes:**
 * **`idx:Index`:** The abstract base class for any sharded index that directly contains data entries.
 * **`idx:FullIndex`:** A concrete, monolithic index for a dataset. It is used when a `GroupIndexTemplate` is not required. It inherits from `idx:Index`.
 * **`idx:GroupIndexTemplate`:** A "rulebook" resource that defines *how* a data type is grouped. It does **not** contain data entries itself.
-* **`idx:GroupIndex`:** A concrete index representing a single group (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `GroupIndexTemplate` rulebook.
-* **`idx:GroupingRule`:** Defines how resources are assigned to groups based on property values.
-* **`idx:ModuloHashSharding`:** Specifies hash-based shard distribution algorithm.
+* **`idx:GroupIndex`:** A concrete index representing a single group (e.g., "August 2024"). It inherits from `idx:Index` and links back to its `GroupIndexTemplate` rulebook.
+* **`idx:Shard`:** A technical partition within an index containing actual entry data.
+
+**Framework Properties:**
+* **`idx:indexesClass`:** Links index to the RDF class it indexes (e.g., schema:Recipe)
+* **`idx:indexedProperty`:** Specifies which properties to include in index headers
+* **`idx:hasShard`:** Links index to its component shards
+* **`idx:belongsToIndexShard`:** Links data resource to its index shard
+* **`idx:basedOn`:** Links GroupIndex back to its GroupIndexTemplate
+* **`idx:isShardOf`:** Links shard back to its parent index
+* **`idx:containsEntry`:** Contains an index entry with resource IRI and metadata
+* **`idx:resource`:** Points to the actual data resource from an index entry
+* **`idx:groupedBy`:** Links GroupIndexTemplate to its GroupingRule
+* **`idx:sourceProperty`:** Property to extract grouping value from (in GroupingRule)
+* **`idx:format`:** Format pattern for date/time values (in GroupingRule)
+* **`idx:groupTemplate`:** Template for group index paths (in GroupingRule)
+* **`idx:shardingAlgorithm`:** Specifies the sharding algorithm configuration
+* **`idx:GroupingRule`:** Class defining how resources are assigned to groups
+* **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
+
+**Application Vocabulary:**
+Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the framework vocabulary but work within the framework's structure.
 
 ### 4.3.1. Sharding Overview
 
@@ -463,7 +436,40 @@ When an application first encounters a Pod with no existing indices for a data t
 - **On first sync:** Indices created when first syncing a data type
 - **Lazy creation:** Indices created when first storing a resource of that type
 
-### 4.3.4. Indexing Conventions and Best Practices
+### 4.3.4. Pod Setup and Configuration Process
+
+When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
+
+**Comprehensive Setup Process:**
+1. Check WebID Profile Document for solid:publicTypeIndex
+2. If found, query Type Index for required data types (schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
+3. Collect all missing/required configuration:
+   - Missing Type Index entirely
+   - Missing Type Registrations for data types
+   - Missing Type Registrations for indices  
+   - Missing Type Registrations for client installations
+4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
+5. User chooses approach:
+   1. **"Automatic Setup"** - Configure Pod with standard paths automatically
+   2. **"Custom Setup"** - Review and modify proposed Profile/Type Index changes before applying
+6. If user cancels: Run with hardcoded default paths, warn about reduced interoperability
+
+**Setup Dialog Design Principles:**
+- **Explicit Consent:** Never modify Pod configuration without user permission
+- **Progressive Disclosure:** Automatic Setup shields users from complexity, Custom Setup provides full control
+- **Clear Options:** Two main paths - trust the app or customize the details
+- **Graceful Fallback:** Always offer alternative approaches if user declines configuration changes
+
+**Example Setup Flow:**
+```
+1. Discover missing Type Index registrations for recipes
+2. Present setup dialog: "This app needs to configure recipe storage in your Pod"
+3. User selects "Automatic Setup"
+4. App creates Type Index entries for recipes, recipe index, client installations
+5. App proceeds with normal synchronization workflow
+```
+
+### 4.3.5. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
  *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
@@ -506,8 +512,8 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
    ].
 ```
 
-**Example 2: A `GroupIndex` document at `https://alice.podprovider.org/indices/shopping-entries/groups/2025-08/index`**
-This is a concrete index for shopping list entries from August 2025 meal plans.
+**Example 2: A `GroupIndex` document at `https://alice.podprovider.org/indices/shopping-entries/groups/2024-08/index`**
+This is a concrete index for shopping list entries from August 2024 meal plans.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -517,7 +523,10 @@ This is a concrete index for shopping list entries from August 2025 meal plans.
    sync:isGovernedBy mappings:group-index-v1;
    # Back-link to the rulebook.
    idx:basedOn <../../index>;
-   # It inherits its configuration from the GroupIndexTemplate rulebook.
+   # Inherits configuration from GroupIndexTemplate:
+   # - Sharding algorithm (ModuloHashSharding with xxhash64, 4 shards)
+   # - Indexed properties (none defined, so minimal entries only)
+   # - CRDT merge contract (mappings:group-index-v1)
    # Since the template has no idx:indexedProperty defined, this group's shards
    # will contain only resource IRIs and vector clock hashes (no header data).
    # It has its own list of active shards, which are sibling documents.
@@ -525,8 +534,8 @@ This is a concrete index for shopping list entries from August 2025 meal plans.
                 <shard-mod-xxhash64-4-2-v1_0_0>, <shard-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/groups/2025-08/shard-mod-xxhash64-4-0-v1_0_0`**
-This document contains entries pointing to shopping list data resources from August 2025. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and vector clock hash, no header properties).
+**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
+This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and vector clock hash, no header properties).
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -659,13 +668,13 @@ The named sync strategies combine the two decisions above:
 
 The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
-1.  **Index Selection:** The application chooses which indices to sync based on its needs. For GroupedSync, this means subscribing to specific groups (e.g., "2025-08" for August shopping entries). For FullSync/OnDemandSync, this means syncing the entire FullIndex.
+1.  **Index Selection:** The application chooses which indices to sync based on its needs. For GroupedSync, this means subscribing to specific groups (e.g., "2024-08" for August shopping entries). For FullSync/OnDemandSync, this means syncing the entire FullIndex.
 2.  **Index Synchronization:** The library fetches the selected index, reads its `idx:hasShard` list, and synchronizes the active shards.
 3.  **App Notification (`onIndexUpdate`):** The library notifies the application with the list of headers from the synchronized index.
 4.  **Sync Strategy Application:** Based on the configured strategy:
      - **FullSync:** Immediately fetch all resources listed in the index
      - **OnDemandSync:** Wait for explicit resource requests
-5.  **On-Demand Fetch (`fetchFromRemote`):** When needed, the app calls `fetchFromRemote("https://alice.podprovider.org/data/shopping-entries/item-001")`.
+5.  **On-Demand Fetch (`fetchFromRemote`):** When needed, the app calls `fetchFromRemote("https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001")`.
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the **Merge Contract**, performs property-by-property merging, and returns the merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged object for local storage.
 
@@ -785,28 +794,74 @@ The architecture's index-based approach provides efficient incremental synchroni
 
 For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
 
-## 8. Benefits of this Architecture
+## 8. Data Organization Principles
+
+### 8.1. Resource IRI Design and Pod Performance
+
+**The Challenge:**
+Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
+
+**Fundamental Principle: IRIs Must Be Stable**
+Resource IRIs are **identifiers**, not storage locations. Any organizational structure must derive from **invariant properties** of the resource that will never change. Changing IRIs breaks references and violates RDF principles.
+
+**Recommended Approaches:**
+
+**1. Semantic Organization (Preferred)**
+Structure paths based on meaningful, invariant properties:
+```turtle
+# By semantic category (if immutable)
+/data/recipes/cuisine/italian/pasta-carbonara
+/data/recipes/cuisine/mexican/tacos-al-pastor
+
+# By creation date (if relevant and stable)
+/data/shopping-entries/created/2024/08/weekly-shopping-list-001
+/data/journal-entries/created/2024/08/15/morning-reflection
+```
+
+**2. UUID-Based Distribution (For Large Datasets)**
+For UUID-based identifiers, use prefix-based distribution:
+```turtle
+# UUID: af1e2d43-3ed4-4f5e-9876-1234567890ab
+/data/resources/af/1e/af1e2d43-3ed4-4f5e-9876-1234567890ab
+
+# Benefits: Predictable, evenly distributed, derived from invariant UUID
+```
+
+**3. Flat Structure (Small Datasets)**
+For small collections (< 1000 resources), flat structure is acceptable:
+```turtle
+/data/recipes/tomato-soup-recipe
+/data/recipes/pasta-carbonara-recipe
+```
+
+**Critical Guidelines:**
+- **Never change IRIs**: Once published, IRIs are permanent identifiers
+- **Derive from invariants**: Path structure must be computable from unchanging resource properties
+- **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
+- **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
+
+## 9. Benefits of this Architecture
 
 * **True Interoperability:** By publishing the merge rules and linking to them from the data, any application can learn how to correctly and safely collaborate.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Discoverability and Resilience:** The system is highly discoverable and resilient to changes in the indexing strategy over time.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 9. Alignment with Standardization Efforts
+## 10. Alignment with Standardization Efforts
 
-### 9.1. Community Alignment
+### 10.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 9.2. Architectural Differentiators
+### 10.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This framework is designed as an "add-on" library. The developer retains control over their local storage and querying logic.
 * **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 10. Outlook: Future Enhancements
+## 11. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
