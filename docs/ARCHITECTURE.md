@@ -406,12 +406,12 @@ In Solid's decentralized context, users are not system administrators and cannot
 1. **Monitor shard sizes:** During writes and sync, track entry counts in active shards
 2. **Trigger scaling:** When any shard exceeds `idx:autoScaleThreshold` entries (e.g., 1000)
 3. **Calculate new shard count:** Double current count (1→2→4→8→16) or use configured algorithm  
-4. **Auto-increment version:** Increment scale component: `v2_0_0` → `v2_1_0` → `v2_2_0`
+4. **Auto-increment version:** Increment scale component: `v1_0_0` → `v1_1_0` → `v1_2_0`
 5. **Begin lazy migration:** Start using new shards for new entries, migrate opportunistically
 
 **Self-Describing Shard Names:**
 - Format: `shard-{algorithm}-{hash}-{totalShards}-{shardNumber}-v{major}_{scale}_{conflict}`
-- Example: `shard-mod-xxhash64-4-0-v2_1_0` = modulo, xxhash64, 4 shards, shard #0, dev version 2, auto-scale 1, conflict resolution 0
+- Example: `shard-mod-xxhash64-4-0-v1_2_0` = modulo, xxhash64, 4 shards, shard #0, dev version 1, auto-scale version 2, conflict resolution 0
 - **Version Components:**
   - `major`: Developer-controlled version (increment for breaking changes)
   - `scale`: Auto-increment when system increases shard count due to size thresholds
