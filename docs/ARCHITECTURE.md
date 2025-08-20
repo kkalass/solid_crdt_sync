@@ -90,12 +90,62 @@ This layer defines the atomic unit of data: a single, self-contained RDF resourc
 
 * **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
 
+#### 4.1.1. Data Organization and Performance Considerations
+
+**The Challenge:**
+
+Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
+
+**Fundamental Principle: IRIs Must Be Stable**
+
+Resource IRIs are **identifiers**, not storage locations. Any organizational structure must derive from **invariant properties** of the resource that will never change. Changing IRIs breaks references and violates RDF principles.
+
+**Recommended Approaches:**
+
+**1. Semantic Organization (Preferred)**
+
+Structure paths based on meaningful, invariant properties:
+```turtle
+# By semantic category (if immutable)
+/data/recipes/cuisine/italian/pasta-carbonara
+/data/recipes/cuisine/mexican/tacos-al-pastor
+
+# By creation date (if relevant and stable)
+/data/shopping-entries/created/2024/08/weekly-shopping-list-001
+/data/journal-entries/created/2024/08/15/morning-reflection
+```
+
+**2. UUID-Based Distribution (For Large Datasets)**
+
+For UUID-based identifiers, use prefix-based distribution:
+```turtle
+# UUID: af1e2d43-3ed4-4f5e-9876-1234567890ab
+/data/resources/af/1e/af1e2d43-3ed4-4f5e-9876-1234567890ab
+
+# Benefits: Predictable, evenly distributed, derived from invariant UUID
+```
+
+**3. Flat Structure (Small Datasets)**
+
+For small collections (< 1000 resources), flat structure is acceptable:
+```turtle
+/data/recipes/tomato-soup-recipe
+/data/recipes/pasta-carbonara-recipe
+```
+
+**Critical Guidelines:**
+- **Never change IRIs**: Once published, IRIs are permanent identifiers
+- **Derive from invariants**: Path structure must be computable from unchanging resource properties
+- **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
+- **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
+
 #### Example Application Context
 
 The following examples demonstrate the architecture using a **meal planning application** that manages recipes, meal plans, and automatically generates shopping lists from planned meals. This integrated workflow shows how different data types can reference each other while maintaining clean separation of concerns.
 
-**Example: A recipe resource at `https://alice.podprovider.org/data/recipes/123`**
-This resource lives in Alice's Pod and describes a recipe. It contains metadata that links it to other architectural layers, enabling its use within the synchronization framework.
+**Example: A recipe resource at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`**
+
+This resource uses a semantic IRI based on the recipe name. The resource describes a recipe and contains metadata linking it to other architectural layers.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -116,7 +166,7 @@ This resource lives in Alice's Pod and describes a recipe. It contains metadata 
    foaf:primaryTopic :it;
    # Pointer to the Merge Contract (Layer 2)
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
-   # Pointer to the specific index shard this resource belongs to.
+   # Pointer to the specific index shard this resource belongs to
    idx:belongsToIndexShard <../../indices/recipes/shard-0> .
 ```
 
@@ -145,7 +195,7 @@ This file, published at a public URL, defines how to merge a `schema:Recipe`.
      [ sync:property schema:totalTime; crdt:mergeWith crdt:LWW_Register ].
 ```
 
-**Example: The Mechanics embedded in `https://alice.podprovider.org/data/recipes/123`**
+**Example: The Mechanics embedded in `https://alice.podprovider.org/data/recipes/tomato-basil-soup`**
 This shows the full recipe resource with the CRDT mechanics included.
 
 ```turtle
@@ -170,8 +220,8 @@ This shows the full recipe resource with the CRDT mechanics included.
 << :it schema:keywords "quick" >> crdt:isDeleted true .
 ```
 
-**Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/item-001`**
-This resource shows how shopping list entries are derived from recipes in the meal planning workflow.
+**Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
+This resource uses semantic date-based organization, reflecting when the shopping list was created (an invariant property). It shows how shopping list entries are derived from recipes in the meal planning workflow.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -187,7 +237,7 @@ This resource shows how shopping list entries are derived from recipes in the me
    meal:quantity "2" ;
    meal:unit "lbs" ;
    # Links to the source recipe that generated this shopping item
-   meal:derivedFrom <../recipes/123> ;
+   meal:derivedFrom <../../../../recipes/tomato-basil-soup> ;
    # Links to the meal plan date that requires this ingredient
    meal:requiredForDate "2025-08-15"^^xsd:date .
 
@@ -196,38 +246,48 @@ This resource shows how shopping list entries are derived from recipes in the me
    foaf:primaryTopic :it;
    # Uses a different merge contract for shopping list entries
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
-   idx:belongsToIndexShard <../../indices/shopping-entries/groups/2025-08/shard-0> .
+   # Points to index shard within the appropriate group
+   idx:belongsToIndexShard <../../../../../indices/shopping-entries/groups/2025-08/shard-0> .
 ```
 
 #### 4.2.1. CRDT Merge Mechanics
 
 The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using **document-level vector clocks** for causality determination. Each resource document (e.g., a complete Recipe or Shopping List Entry) has a single vector clock that tracks changes to the entire document, keeping the original resource content clean.
 
-**Vector Clock Example:**
+**Vector Clock Example at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`:**
 ```turtle
-<https://alice.podprovider.org/data/recipes/tomato-soup> {
-  <https://alice.podprovider.org/data/recipes/tomato-soup>
-    a schema:Recipe ;
+@prefix schema: <https://schema.org/> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix : <#> .
+
+# -- The Recipe Data --
+:it a schema:Recipe ;
     schema:name "Tomato Soup" ;
     schema:recipeIngredient "2 cans tomatoes", "1 onion" ;
     schema:recipeInstructions "Sauté onion, add tomatoes, simmer 20 minutes." .
     
-  # Document-level vector clock stored separately from resource content
-  <> crdt:hasClockEntry [
+# -- Document-level Vector Clock --
+<> crdt:hasClockEntry [
     crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
     crdt:clockValue "5"^^xsd:integer
-  ] ;
-  crdt:hasClockEntry [
+  ] ,
+  [
     crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
     crdt:clockValue "2"^^xsd:integer
   ] ;
   crdt:vectorClockHash "xxh64:abcdef1234567890" .
-}
 ```
 
 **Client Installation Documents**
 
-Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These documents are stored in containers found via the Type Index and provide traceability for vector clock entries.
+Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability and identity management for vector clock entries across the distributed system.
+
+**Discovery and Lifecycle:**
+1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
+2. **ID Generation:** Generate unique UUID v4 for each application installation
+3. **Registration:** Create installation document at discovered container location
+4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
 
 **Example client installation at `https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000`:**
 
@@ -242,82 +302,65 @@ Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` docume
    crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime .
 ```
 
-##### Client ID Generation
-
-Applications discover the installations container through the Type Index, then generate unique installation IDs using standard UUID v4:
-
-- **Recommended:** Use UUID v4 for guaranteed uniqueness across devices and time
-- **Example:** `550e8400-e29b-41d4-a716-446655440000`
-
-**Simple Generation:**
-```
-1. Generate UUID v4: uuid.v4() → "550e8400-e29b-41d4-a716-446655440000"
-2. Client installation IRI: https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000
+**Type Index Registration Example:**
+```turtle
+# In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
+<#client-installations> a solid:TypeRegistration;
+   solid:forClass crdt:ClientInstallation;
+   solid:instanceContainer <../installations/> .
 ```
 
-UUIDs provide cryptographically strong uniqueness guarantees without requiring complex generation logic or coordination between clients.
+##### Client ID Generation Process
+
+**Recommended Approach (UUID v4):**
+1. **Discover container:** Query Type Index for `crdt:ClientInstallation` container
+2. **Generate UUID:** Use UUID v4 for cryptographically strong uniqueness
+3. **Create IRI:** `{container-url}/{uuid}` 
+4. **Register installation:** POST installation document to container
+5. **Use in vector clocks:** Reference full installation IRI in `crdt:clientId`
+
+**Example Generation:**
+```
+1. Container: https://alice.podprovider.org/installations/
+2. UUID v4: 550e8400-e29b-41d4-a716-446655440000
+3. Installation IRI: https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000
+4. Vector clock usage: crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000>
+```
+
+**Benefits of This Approach:**
+- **Uniqueness:** UUID v4 provides collision-resistant identifiers
+- **Traceability:** Installation documents link clients to WebIDs and applications  
+- **Discoverability:** Standard Type Index enables client validation and debugging
+- **No Coordination:** Each client generates IDs independently without coordination
 
 #### 4.2.2. Vocabulary Versioning and Evolution
 
-**Vocabulary URI Strategy:**
+**Versioning Strategy:**
 
-The framework vocabularies use versioned URIs to enable backward compatibility and smooth evolution:
-
-```turtle
-# Current stable vocabularies
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-
-# Future versioned vocabularies (when breaking changes are needed)
-@prefix idx2: <https://kkalass.github.io/solid_crdt_sync/vocab/v2/idx#> .
-@prefix sync2: <https://kkalass.github.io/solid_crdt_sync/vocab/v2/sync#> .
-```
-
-##### Merge Contract Versioning
-
-Merge contracts use explicit versioning in their URIs to handle algorithm evolution:
+The framework uses simple integer versioning for merge contracts to handle evolution over time:
 
 ```turtle
-# Stable contract versions
+# Merge contract versioning examples
 sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> .
 sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v2> .
-
-# Contract evolution example
-# v1: Basic LWW/OR-Set mappings
-# v2: Adds new CRDT types, maintains backward compatibility
-# v3: Breaking change - different property mappings
 ```
 
-**When to Create New Versions:**
+**When to Increment Versions:**
 
-**DO NOT create new versions for:**
-- Adding new optional properties to existing classes
-- Adding new CRDT types to the vocabulary  
-- Adding new classes that don't conflict with existing ones
-- Documentation or comment updates
+**Backward Compatible (same version):**
+- Adding new optional properties
+- Adding new CRDT types to vocabulary
+- Documentation updates
 
-**DO create new versions ONLY for breaking changes:**
-- Changing property semantics (e.g., schema:name becomes multi-valued)
-- Removing or renaming existing properties/classes
-- Changing CRDT merge behavior in incompatible ways
-- Altering required property constraints
+**Breaking Changes (new version required):**
+- Changing property semantics or constraints
+- Removing/renaming existing properties
+- Incompatible CRDT merge behavior changes
 
-**Version Numbering:**
-- Use simple integer versioning: `recipe-v1`, `recipe-v2`, `recipe-v3`
-- **Never use semantic versioning** like `recipe-v1.1.1` - this creates confusion about compatibility
-
-**Compatibility Strategy:**
-- **Backward compatible changes:** Keep same version number, clients ignore unknown properties
-- **Breaking changes:** New version number, explicit migration path required
-- **Client handling:** Gracefully handle unknown properties and CRDT types within same major version
-- **Contract conflicts:** When clients reference different major versions, use most conservative merge approach
-
-**Migration Process:**
-1. **Deploy new vocabulary version** alongside existing one
-2. **Update reference implementations** to support both versions
-3. **Gradual client adoption** of new features
-4. **Deprecation notices** for old versions (but never breaking compatibility)
+**Client Compatibility:**
+- Clients gracefully handle unknown properties within same major version
+- Different contract versions use conservative merge approach
+- Framework vocabularies evolve through major version URI changes when needed
 
 **Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see the [CRDT Specification Document](CRDT-SPECIFICATION.md).
 
@@ -336,143 +379,22 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 * **`idx:GroupIndexTemplate`:** A "rulebook" resource that defines *how* a data type is grouped. It does **not** contain data entries itself.
 * **`idx:GroupIndex`:** A concrete index representing a single group (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `GroupIndexTemplate` rulebook.
 
-### 4.3.1. Sharding Algorithm Details
+### 4.3.1. Sharding Overview
 
-**Resource Assignment to Shards:**
+**Resource Assignment:**
 
-When a new resource is created or an existing resource is updated, the framework determines which shard should contain its index entry using the configured sharding algorithm:
+Resources are assigned to shards using a deterministic hash algorithm, ensuring even distribution and consistent assignment across clients.
 
-```
-1. Extract resource IRI: https://alice.podprovider.org/data/recipes/tomato-soup
-2. Apply hash function: xxhash64("https://alice.podprovider.org/data/recipes/tomato-soup") → 0x1A2B3C4D5E6F7890
-3. Convert to decimal: 1883669071845588112
-4. Calculate modulo: 1883669071845588112 % 2 = 0
-5. Assign to shard: shard-0
-```
+**Key Concepts:**
+- **Automatic Scaling:** System increases shard count when size thresholds are exceeded (default: 1000 entries per shard)
+- **Lazy Migration:** Existing entries migrate opportunistically during normal operations
+- **Self-Describing Names:** Shard names encode algorithm, configuration, and version information
+- **Conflict Resolution:** Automatic version increment resolves configuration conflicts
 
-**Consistency Guarantees:**
-- The same resource always maps to the same shard (deterministic)
-- Resources are distributed roughly evenly across shards  
-- Shard count changes use lazy, client-side rebalancing
+**Migration Process:**
+Shard count changes are handled through lazy, client-side migration rather than centralized maintenance operations. This approach respects Solid's decentralized nature where users are not system administrators.
 
-**Client-Side Shard Evolution:**
-
-In Solid's decentralized context, users are not system administrators and cannot perform traditional "maintenance operations." Instead, shard count changes are handled as application upgrades with lazy migration:
-
-**Automatic and Manual Shard Changes:**
-1. **System defaults:** Framework defaults to `v1_0_0` and single shard, library authors should make these explicit in index creation
-2. **Developer override (if needed):** Developer can specify major version for breaking changes (e.g., `v2_0_0`)
-3. **Automatic scaling:** System increases shard count when any active shard exceeds threshold (e.g., 1000 entries)
-4. **Natural progression:** 1 → 2 → 4 → 8 → 16 shards as data grows
-5. **Version auto-increment:** System automatically increments middle number: `v1_0_0` → `v1_1_0` → `v1_2_0` for shard scaling
-6. **Gradual deployment:** Updated configurations coexist during lazy migration period
-7. **Lazy migration:** Existing entries migrate opportunistically during normal operations
-
-**Lazy Migration Process:**
-```turtle
-# Index configuration shows current sharding algorithm  
-<https://alice.podprovider.org/indices/recipes/index>
-  idx:shardingAlgorithm [
-    a idx:ModuloHashSharding ;
-    idx:hashAlgorithm "xxhash64" ;
-    idx:numberOfShards 4 ;           # Current configuration (auto-scaled from 1)
-    idx:configVersion "1_2_0" ;      # Default v1, auto-scale 2 (1→2→4), conflict 0
-    idx:autoScaleThreshold 1000      # Framework default threshold
-  ] ;
-  idx:hasShard 
-    # Evolution: single shard → 2 shards → 4 shards
-    # Legacy: <shard-mod-xxhash64-1-0-v1_0_0> (migrated out, tombstoned)
-    # Legacy: <shard-mod-xxhash64-2-0-v1_1_0>, <shard-mod-xxhash64-2-1-v1_1_0> (migrated out)
-    # Current shards (4-shard configuration) 
-    <shard-mod-xxhash64-4-0-v1_2_0>, <shard-mod-xxhash64-4-1-v1_2_0>, 
-    <shard-mod-xxhash64-4-2-v1_2_0>, <shard-mod-xxhash64-4-3-v1_2_0> .
-```
-
-**Recommended Library Implementation:**
-```turtle
-# When library creates new index, explicitly write defaults:
-<https://alice.podprovider.org/indices/recipes/index>
-  idx:shardingAlgorithm [
-    a idx:ModuloHashSharding ;
-    idx:hashAlgorithm "xxhash64" ;
-    idx:numberOfShards 1 ;           # Explicit default
-    idx:configVersion "1_0_0" ;      # Explicit default  
-    idx:autoScaleThreshold 1000      # Explicit default
-  ] ;
-  idx:hasShard <shard-mod-xxhash64-1-0-v1_0_0> .
-```
-
-**Automatic Scaling Algorithm:**
-1. **Monitor shard sizes:** During writes and sync, track entry counts in active shards
-2. **Trigger scaling:** When any shard exceeds `idx:autoScaleThreshold` entries (e.g., 1000)
-3. **Calculate new shard count:** Double current count (1→2→4→8→16) or use configured algorithm  
-4. **Auto-increment version:** Increment scale component: `v1_0_0` → `v1_1_0` → `v1_2_0`
-5. **Begin lazy migration:** Start using new shards for new entries, migrate opportunistically
-
-**Self-Describing Shard Names:**
-- Format: `shard-{algorithm}-{hash}-{totalShards}-{shardNumber}-v{major}_{scale}_{conflict}`
-- Example: `shard-mod-xxhash64-4-0-v1_2_0` = modulo, xxhash64, 4 shards, shard #0, dev version 1, auto-scale version 2, conflict resolution 0
-- **Version Components:**
-  - `major`: Developer-controlled version (increment for breaking changes)
-  - `scale`: Auto-increment when system increases shard count due to size thresholds
-  - `conflict`: Auto-increment for 2P-Set conflict resolution during cycles
-- Benefits: Fully automated scaling with deterministic conflict resolution
-
-**Migration Triggers (Opportunistic):**
-- **During writes:** New/updated resources use current shard count, migrate existing entry if found in different shard
-- **During sync:** If index entry found in non-current shard, opportunistically migrate to correct shard  
-- **During cleanup (optional):** Future versions may implement background migration during idle time
-
-**Migration Process Details:**
-- **"Migrate" means:** Add entry to correct shard (using 2P-Set add), remove from incorrect shard (using 2P-Set remove)  
-- **Empty shard cleanup:** When a shard becomes empty, remove it from `idx:hasShard` list (using 2P-Set remove with tombstone)
-- **New installations:** Only sync shards currently listed in `idx:hasShard` - avoid downloading empty legacy shards
-- **Configuration cycles:** 2→4→2 cycles work: `v1_1_0` (2 shards) → `v1_2_0` (4 shards) → `v1_3_0` (2 shards). Each version gets unique shard names avoiding 2P-Set conflicts
-- **Version conflict resolution:** If attempting to add a shard name that exists in tombstones, automatically increment to next available version (e.g., v2_0_0 → v2_0_1)
-
-**Client-Side Constraints:**
-- **Limited execution time:** Migration happens in small batches to respect mobile background limits
-- **Concurrent access:** Multiple clients may migrate simultaneously - use CRDT merge rules for conflicts
-- **Never "finished":** Accept that some entries may remain in non-current shards indefinitely  
-- **Graceful lookup:** Check all active shards in `idx:hasShard` list (empty shards are automatically tombstoned)
-
-**Example migration:** Resource `tomato-soup` with hash `...1112` starts in legacy `shard-mod-xxhash64-2-0-v1` (1112 % 2 = 0), eventually migrates to new `shard-mod-xxhash64-4-0-v2` (1112 % 4 = 0) when accessed.
-
-**Configuration Version Conflict Handling:**
-
-When a client detects that `idx:configVersion` was not properly incremented, the system automatically resolves conflicts:
-
-**Auto-Resolution Algorithm:**
-1. **Detect conflict:** `shard-mod-xxhash64-2-0-v2_0_0` has tombstoned entries blocking new additions
-2. **Auto-increment conflict:** Try `shard-mod-xxhash64-2-0-v2_0_1`, then `v2_0_2`, `v2_0_3`, etc.
-3. **Find unused version:** Stop at first version without conflicts (no shard or entry tombstones)
-4. **Update configuration:** Set `idx:configVersion` to the working version (e.g., `"2_0_1"`)
-5. **Continue sync:** Proceed with new shards using the conflict-free version
-
-**Deterministic Resolution:**
-- All clients follow identical algorithm, converging on same solution
-- Multiple concurrent clients will discover same working version
-- Manual developer override (e.g., `v3`) takes precedence over auto-generated versions
-
-**Version Precedence Rules:**
-- `v3_0_0` > `v2_999_999` (higher major version wins)  
-- `v2_2_0` > `v2_1_0` (higher scale version wins)
-- `v2_1_5` > `v2_1_3` (higher conflict resolution wins)
-- Lexicographic comparison: `"2_1_0"` vs `"2_0_5"` → `"2_1_0"` wins
-
-**Benefits:**
-- **Self-scaling:** System automatically increases shard count as data grows
-- **Self-healing:** No manual intervention required for configuration cycles or conflicts
-- **Concurrent-safe:** Multiple clients reach same conclusion independently  
-- **Zero-config:** Developers need no configuration (system defaults to `v1_0_0` and 1 shard), library makes defaults explicit
-- **Performance optimized:** Proactive scaling prevents performance degradation
-- **No data loss:** System continues functioning instead of stopping on conflicts
-
-**When Sharding Decisions Are Made:**
-- **During writes:** Calculate shard using current numberOfShards, migrate if found in wrong location
-- **During reads:** Check all active shards in `idx:hasShard` to locate entries (read-only, no migration)
-- **During discovery:** Search all active shards listed in `idx:hasShard` to locate entries
-- **During config changes:** Validate new shard names against tombstone list before proceeding
+For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
 
 ### 4.3.2. Multi-Application Coordination
 
@@ -661,7 +583,7 @@ This document contains entries for recipe resources. Since recipes are used with
    sync:isGovernedBy mappings:shard-v1;
    idx:isShardOf <index>;
    idx:containsEntry [
-     idx:resource <../../data/recipes/tomato-soup>;
+     idx:resource <../../data/recipes/tomato-basil-soup>;
      schema:name "Tomato Basil Soup";
      schema:keywords "vegan", "soup";
      schema:totalTime "PT30M";
@@ -746,249 +668,103 @@ The synchronization process is governed by the **Sync Strategy** that the develo
 
 ## 6. Error Handling and Resilience
 
-Real-world synchronization faces numerous failure modes. This architecture provides specific strategies for maintaining consistency and availability despite various error conditions.
+Real-world synchronization faces numerous failure modes. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions.
 
-### 6.1. Network and Connectivity Failures
+### 6.1. Failure Classification
 
-**Sync Failure Classification:**
-Distinguish between systemic and resource-specific failures:
+**Error Granularities:**
+- **Type-Level:** Entire data type cannot sync (missing merge contracts, authentication failures)
+- **Resource-Level:** Individual resource blocked (parse errors, access control changes)  
+- **Property-Level:** Specific property cannot sync (unknown CRDT types, schema violations)
 
-- **Systemic Failures (abort entire sync):**
-  - Network connectivity issues (DNS, connection timeouts)
-  - Server errors (HTTP 500, 502, 503) indicating server overload/maintenance
-  - Authentication provider unavailable
-  - Pattern detection: >20% resource fetch failures suggests systemic issue
+### 6.2. Core Resilience Strategies
 
-- **Resource-Specific Failures (skip and continue):**
-  - Individual HTTP 404 (resource deleted/moved)
-  - Individual HTTP 403 (access control changed for specific resource)
-  - Individual parse errors (malformed RDF in single resource)
+**Network Resilience:**
+- Distinguish between systemic failures (abort entire sync) vs. resource-specific failures (skip and continue)
+- Exponential backoff for systemic issues, immediate retry for individual resources
+- Offline operation continues with local vector clock increments
 
-**Sync Recovery Strategies:**
-- **Index Sync Interruption:** Always abort and retry from beginning - partial indices create inconsistent views
-- **Systemic Failure Detection:** Stop current sync, schedule retry with exponential backoff (5min, 15min, 45min...)
-- **Resource-Specific Failures:** Log failure, continue sync with remaining resources, retry failed resources on next sync cycle
-- **Upload Failures:** Queue locally, retry with backoff, but preserve vector clock consistency
+**Discovery and Setup:**
+- Comprehensive Pod setup process with user consent for configuration changes
+- Graceful fallback to hardcoded paths if discovery fails
+- Progressive disclosure: automatic vs. custom setup options
 
-**Network Partitioning:**
-During extended network unavailability:
+**Data Integrity:**
+- Index inconsistency detection and automatic resolution
+- CRDT merge conflict resolution at property level
+- Vector clock anomaly detection and handling
 
-- **Offline Operation:** Applications continue working with locally cached data and indices
-- **Local-Only Updates:** Continue incrementing vector clocks for local changes
-- **Sync Resume:** On reconnection, normal CRDT merge processes handle any conflicts from the partition period
+### 6.3. Graceful Degradation
 
-### 6.2. Resource Discovery Failures
+The system provides multiple operational modes based on error conditions:
 
-**Comprehensive Setup Process:**
+1. **Full Functionality:** Complete discovery, sync, and merge operations
+2. **Limited Discovery:** Manual resource specification, reduced auto-discovery  
+3. **Read-Only Mode:** Display data but cannot sync changes
+4. **Offline Mode:** Local cache only, queue changes for later sync
 
-1. Check WebID Profile Document for solid:publicTypeIndex
-2. If found, query Type Index for required data types (schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
-3. Collect all missing/required configuration:
-   - Missing Type Index entirely
-   - Missing Type Registrations for data types
-   - Missing Type Registrations for indices  
-   - Missing Type Registrations for client installations
-4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
-5. User chooses approach:
-   1. "Automatic Setup" - Configure Pod with standard paths automatically
-   2. "Custom Setup" - Review and modify proposed Profile/Type Index changes before applying
-6. If user cancels: Run with hardcoded default paths, warn about reduced interoperability
+For comprehensive implementation guidance including specific error scenarios, recovery procedures, and user interface recommendations, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
+## 7. Performance Characteristics
 
-**Setup Dialog Design Principles:**
+### 7.1. Sync Strategy Performance Trade-offs
 
-- **Explicit Consent:** Never modify Pod configuration without user permission
-- **Progressive Disclosure:** Automatic Setup shields users from complexity, Custom Setup provides full control
-- **Clear Options:** Two main paths - trust the app or customize the details
-- **Graceful Fallback:** Always offer alternative approaches if user declines configuration changes
-- **Online-Only Operation:** Pod configuration modifications require network connectivity (not CRDT-compatible)
+The choice of sync strategy fundamentally determines application performance characteristics:
 
-**Example Setup Dialog Flow:**
+**FullSync:**
+- **Scaling:** Linear with total dataset size
+- **Best for:** Small, frequently-accessed datasets (< 100 resources)
+- **Limitation:** Becomes impractical beyond ~1000 resources
 
-**Initial Setup Dialog:**
-- **Title:** "Pod Setup Required"  
-- **Message:** "This app needs to configure data storage in your Solid Pod to enable synchronization."
-- **Options:**
-  - ○ **Automatic Setup** - Use standard Solid paths (recommended)
-  - ○ **Custom Setup** - Review and customize paths
-- **Actions:** [Continue] [Cancel]
+**GroupedSync:**
+- **Scaling:** Linear with subscribed group sizes only (independent of total collection size)
+- **Best for:** Time-based or logically-grouped data where users work with specific subsets
+- **Key insight:** Performance depends only on groups you subscribe to, not total dataset
 
-**Custom Setup Details (if chosen):**
-- Type Index Location: `/settings/publicTypeIndex.ttl`
-- Recipe Data: `/data/recipes/` [editable]
-- Recipe Index: `/indices/recipes/index` [editable]  
-- Client Installations: `/installations/` [editable]
-- **Actions:** [Apply Changes] [Cancel]
+**OnDemandSync:**
+- **Scaling:** Constant-time sync regardless of dataset size
+- **Best for:** Large collections with unpredictable access patterns
+- **Trade-off:** Individual resource fetches add latency to data access
 
-**Fallback Behavior (if user cancels entirely):**
-App runs with fallback paths like `/solid-crdt-sync/recipes/` and warns about reduced interoperability with other Solid apps.
+### 7.2. Index-Based Change Detection
 
-**Inaccessible Resources:**
-When discovery finds IRIs that can't be fetched:
-- **HTTP 404 (Not Found):** Remove stale entries from local cache, mark for re-discovery
-- **HTTP 403 (Forbidden):** Log access control issue, continue with available data
-- **HTTP 500 (Server Error):** Retry with exponential backoff, don't remove from cache
+The architecture's index-based approach provides efficient incremental synchronization:
 
-### 6.3. Merge Contract Failures
+- **Cold Start:** Must download all relevant index shards (O(s) where s = number of shards)
+- **Incremental Sync:** Download only changed shards through vector clock hash comparison (O(k) where k = changed shards)
+- **Bandwidth Efficiency:** Index headers provide metadata without downloading full resources
 
-**Missing Merge Contracts:**
-When `sync:isGovernedBy` references an inaccessible resource:
+### 7.3. Architecture Performance Benefits
 
-```
-1. Attempt to fetch merge contract with retries
-2. Check local cache for previously fetched contract
-3. If neither available: Mark resource as non-syncable, work offline only
-4. Display error to user about sync unavailability for this data type
-5. Periodically retry contract fetching in background
-```
+- **Parallel Fetching:** Sharded indices enable concurrent synchronization
+- **Partial Failure Resilience:** Failed shards don't block others
+- **Conflict-Free Merging:** State-based CRDT approach eliminates merge conflicts
+- **Offline Capability:** Applications remain functional without network connectivity
 
-**Corrupted Merge Contracts:**
-When merge contract parsing fails:
-- **Syntax Errors:** Mark resources as non-syncable, work offline, display error to user
-- **Unknown CRDT Types:** 
-  - If no local changes to property: Accept remote state ("trust remote")
-  - If local changes exist: Skip property in merge, keep local value, continue syncing other properties
-  - Log warning and recommend app update
-- **Missing Property Mappings:** Use LWW-Register fallback based on vector clocks, log warning
+For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
 
-**Version Conflicts:**
-When different clients reference different contract versions:
-- Treat `sync:isGovernedBy` as CRDT-managed property itself (see CRDT Specification for details)
-- If contracts fundamentally contradict: Mark resources as non-syncable until resolved
-
-### 6.4. Index Consistency Failures
-
-**Shard Inconsistencies:**
-When index shards contain conflicting information:
-
-```
-1. Detect inconsistency during index merge (conflicting vectorClockHash values)
-2. Fetch all conflicting shards and compare vector clocks
-3. Use CRDT merge logic on shard contents themselves
-4. Write merged shard back to Pod
-5. Log inconsistency for monitoring/debugging
-```
-
-**Missing Index Shards:**
-When group index references non-existent shards:
-- **Remove stale shard references** from group index
-- **Create empty replacement shards** if write access available
-- **Continue with available shards** to maintain partial functionality
-
-**Index-Data Divergence:**
-When index entries point to non-existent or modified data:
-- **Validate index entries** against actual data resource vector clocks
-- **Remove stale entries** during index sync
-- **Rebuild index entries** for resources with updated clocks
-- **Rate-limit rebuilding** to avoid performance impact
-
-### 6.5. Authentication and Authorization
-
-**Authentication Failures:**
-- **Expired Tokens:** Attempt token refresh through authentication provider
-- **Invalid Credentials:** Prompt user to re-authenticate
-- **Provider Unavailable:** Skip sync operations, continue working with local data and incrementing vector clocks for offline changes
-
-**Access Control Changes:**
-When resource permissions change between syncs:
-- **HTTP 403 on Previously Accessible Resource:** Keep in local cache, mark as sync-blocked, inform user of access issue
-- **Partial Access Loss:** Continue with accessible resources, inform user of limited functionality  
-- **Permission Escalation:** Retry previously failed operations, update local capabilities
-
-### 6.6. Data Integrity Failures
-
-**Vector Clock Anomalies:**
-- **Clock Regression:** Detect and log impossible clock decreases, reject such updates
-- **Unknown Client IDs:** Preserve unknown entries as-is (no need to validate existence)
-- **Massive Clock Skew:** Log warning about potential client ID collision or corruption
-
-**RDF Parse Errors:**
-When resource content is malformed:
-- **Syntax Errors:** Mark resource as non-syncable, work offline only, inform user
-- **Schema Violations:** Use available valid properties, log warnings for invalid ones
-- **Encoding Issues:** Attempt alternative parsers, character set detection
-
-### 6.7. Performance Degradation Handling
-
-**Large Resource Handling:**
-- **Timeout Protection:** Abort operations exceeding configurable time limits
-- **Memory Pressure:** Use streaming/partial processing for oversized resources
-- **Selective Sync:** Allow applications to skip problematic large resources
-
-**High Conflict Scenarios:**
-When merge operations become expensive:
-- **Conflict Rate Monitoring:** Track merge complexity and warn on excessive conflicts
-- **Back-pressure Mechanisms:** Slow sync rate when merge queue grows large
-- **User Notification:** Inform users about sync performance issues
-
-### 6.8. Fallback and Recovery Strategies
-
-**Graceful Degradation:**
-1. **Full Functionality:** All discovery, sync, and merge operations working
-2. **Limited Discovery:** Manual resource specification, reduced auto-discovery
-3. **Read-Only Mode:** Can fetch and display data, cannot sync changes
-4. **Offline Mode:** Work with local cache only, queue changes for later sync
-
-**Recovery Procedures:**
-- **Sync State Reset:** Clear local cache and re-sync from Pod (last resort)
-- **Selective Recovery:** Rebuild specific indices or resource caches
-- **Error Resolution UI:** Present merge contract failures or data corruption issues requiring user intervention (CRDT merges themselves never fail)
-
-### 6.9. Sync Blocking Granularities
-
-Understanding the different levels at which synchronization can be blocked helps implementers design appropriate user interfaces and recovery strategies.
-
-**Type-Level Blocking (Entire Data Type Cannot Sync):**
-- **Missing Merge Contracts:** No `sync:isGovernedBy` reference can be resolved
-- **Corrupted Merge Contracts:** Syntax errors make contract unparseable  
-- **Missing Type Registrations:** Cannot discover where data of this type is stored
-- **Authentication Failures:** No access to any resources of this type
-- **User Impact:** All recipes, all shopping lists, etc. stop syncing
-- **UI Suggestion:** "Recipe sync unavailable - [Details] [Retry]"
-
-**Resource-Level Blocking (Individual Resource Cannot Sync):**
-- **RDF Parse Errors:** Resource content is malformed and unparseable
-- **Access Control Loss:** HTTP 403 for previously accessible specific resource
-- **Network Failures:** Specific resource consistently unreachable (while others work)
-- **Vector Clock Corruption:** Clock regression or invalid clock data
-- **User Impact:** "Tomato Soup recipe" won't sync, but other recipes work fine
-- **UI Suggestion:** "Some recipes cannot sync - [Show Details] [Work Offline]"
-
-**Property-Level Blocking (Specific Property Cannot Sync):**
-- **Unknown CRDT Types:** Property uses algorithm not supported by this client
-- **Schema Violations:** Property value doesn't match expected format
-- **Conflicting Contracts:** Different clients reference incompatible merge rules for same property
-- **User Impact:** Recipe name syncs fine, but rating stays local-only
-- **UI Suggestion:** "Recipe synced (some features require app update)"
-
-**Implementation Guidance:**
-- **Cascade Up:** Property failures don't block resource sync, resource failures don't block type sync
-- **User Feedback:** Match error granularity to user mental model (they care about "recipes" more than "properties")
-- **Recovery Paths:** Provide different retry/fix options based on blocking level
-- **Monitoring:** Track blocking patterns to identify systemic vs. isolated issues
-
-## 7. Benefits of this Architecture
+## 8. Benefits of this Architecture
 
 * **True Interoperability:** By publishing the merge rules and linking to them from the data, any application can learn how to correctly and safely collaborate.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Discoverability and Resilience:** The system is highly discoverable and resilient to changes in the indexing strategy over time.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 8. Alignment with Standardization Efforts
+## 9. Alignment with Standardization Efforts
 
-### 8.1. Community Alignment
+### 9.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 8.2. Architectural Differentiators
+### 9.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This framework is designed as an "add-on" library. The developer retains control over their local storage and querying logic.
 * **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 9. Outlook: Future Enhancements
+## 10. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
