@@ -195,8 +195,11 @@ propertyLevelMerge(local, remote, contract):
 ## 5. Edge Cases and Error Handling
 
 ### 5.1. Missing Merge Contracts
-- **TODO: Define fallback behavior when `sync:isGovernedBy` resource is unavailable**
-- **FIXME: Should operations fail or use default merge strategies?**
+If a resource's `sync:isGovernedBy` link points to a merge contract that is unavailable (e.g., due to network failure, or the resource was deleted), the resource cannot be safely merged. 
+
+**Policy:**
+- **Resource-Level Failure:** If the merge contract for a resource is inaccessible, a client **MUST NOT** attempt to merge that resource. It should be treated as temporarily offline-only. The client should periodically retry fetching the contract.
+- **Property-Level Failure:** If a contract is successfully fetched but it does not contain a `sync:propertyMapping` for a specific property present in the resource, that property **MUST NOT** be merged. The client should preserve its local value for the unmapped property and may log a warning.
 
 ### 5.2. Partial Resource Synchronization
 - **TODO: Handle cases where only some properties are available**
@@ -207,29 +210,33 @@ propertyLevelMerge(local, remote, contract):
 - **FIXME: Client ID verification and validation**
 
 ### 5.4. Large Vector Clocks
-- **TODO: Clock pruning strategies for clients that haven't been seen recently**
-- **FIXME: Storage efficiency for resources with many historical clients**
+For resources that are edited by a very large number of clients over a long period, the vector clock can grow in size, potentially impacting performance and storage.
+
+**Policy:** Naive pruning of vector clock entries (e.g., removing the oldest entry) is **unsafe** as it destroys the causal history required for correct merging, and can lead to data divergence. 
+
+A robust, general-purpose, and safe clock pruning algorithm requires coordination between clients and is an advanced topic beyond the scope of this core specification. For use cases with an extremely high number of collaborators, developers should consider architectural solutions, such as splitting the resource into smaller, more focused resources with independent clocks.
 
 ## 6. Implementation Notes
 
 ### 6.1. Performance Optimizations
-- **TODO: Incremental merge algorithms for large resources**
-- **TODO: Efficient vector clock comparison algorithms**
-- **FIXME: Memory usage optimization for vector clocks**
+- **Incremental Merging:** Instead of creating a new merged resource from scratch, a more memory-efficient approach is to calculate a diff or patch and apply it to the local resource. This is especially effective for large resources with small changes.
+- **Efficient Clock Representation:** Vector clocks can be stored in memory as sorted lists or maps for efficient lookups and comparisons. For persistence, client ID IRIs can be compressed using a local mapping (e.g., to integers) to reduce storage size.
 
 ### 6.2. Concurrency Control
-- **TODO: Lock-free merge algorithms**
-- **FIXME: Atomic resource updates during merge operations**
+- **Atomic Updates:** The process of merging and persisting the new state MUST be atomic. An implementation should ensure that a failure during a write operation does not leave the local storage in an inconsistent state. A common pattern is to write the new resource to a temporary file and then atomically rename it to its final destination.
+- **Locking:** While the merge algorithm itself is deterministic, the process of reading the local state, merging, and writing it back should be treated as a single transaction to prevent race conditions with other local operations.
 
 ## 7. Testing and Validation
 
-### 7.1. Convergence Properties
-- **TODO: Automated tests for CRDT convergence properties**
-- **FIXME: Stress testing with high concurrency scenarios**
+A robust implementation of this specification requires a comprehensive test suite. The following strategies are recommended:
 
-### 7.2. Interoperability Testing
-- **TODO: Cross-implementation compatibility tests**
-- **FIXME: Version compatibility for vocabulary changes**
+### 7.1. Convergence Properties
+- **Property-Based Testing:** Use property-based testing frameworks (like `QuickCheck` or `Hypothesis`) to generate long, random sequences of concurrent operations applied to multiple replicas. The test should assert that all replicas eventually converge to the identical state after all operations are merged.
+- **Formal Modeling:** For critical components, consider using a formal methods tool like TLA+ or Alloy to prove that the algorithms satisfy the required CRDT properties (associativity, commutativity, idempotence).
+
+### 7.2. Interoperability and Conformance
+- **Common Test Suite:** A shared conformance test suite should be developed. This suite would contain a set of reference resources, merge scenarios, and their expected outcomes. Different client implementations can run against this suite to ensure they are fully interoperable.
+- **Vocabulary Versioning:** The test suite must include scenarios for handling changes in the `crdt`, `sync`, and `idx` vocabularies, as well as in the application-specific merge contracts. This includes testing for both backward and forward compatibility where applicable.
 
 ## 8. Open Questions
 
