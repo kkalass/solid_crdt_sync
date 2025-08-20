@@ -213,16 +213,15 @@ The state-based merge process follows standard CRDT algorithms adapted for RDF. 
     schema:recipeInstructions "Sauté onion, add tomatoes, simmer 20 minutes." .
     
   # Document-level vector clock stored separately from resource content
-  <> crdt:vectorClock [
-    crdt:clientEntry [
-      crdt:clientId <https://alice.podprovider.org/apps/meal-planner/client-123> ;
-      crdt:counter 5
-    ] ;
-    crdt:clientEntry [
-      crdt:clientId <https://bob.podprovider.org/apps/shared-recipes/client-456> ;
-      crdt:counter 2
-    ]
-  ] .
+  <> crdt:hasClockEntry [
+    crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
+    crdt:clockValue "5"^^xsd:integer
+  ] ;
+  crdt:hasClockEntry [
+    crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
+    crdt:clockValue "2"^^xsd:integer
+  ] ;
+  crdt:vectorClockHash "xxh64:abcdef1234567890" .
 }
 ```
 
@@ -243,7 +242,7 @@ Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` docume
    crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime .
 ```
 
-**Client ID Generation:**
+##### Client ID Generation
 
 Applications discover the installations container through the Type Index, then generate unique installation IDs using standard UUID v4:
 
@@ -275,7 +274,7 @@ The framework vocabularies use versioned URIs to enable backward compatibility a
 @prefix sync2: <https://kkalass.github.io/solid_crdt_sync/vocab/v2/sync#> .
 ```
 
-**Merge Contract Versioning:**
+##### Merge Contract Versioning
 
 Merge contracts use explicit versioning in their URIs to handle algorithm evolution:
 
