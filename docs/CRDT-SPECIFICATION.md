@@ -55,15 +55,20 @@ Vector clocks track causality between client operations using structured entries
 Used for properties where only the most recent value matters.
 
 **Merge Algorithm:**
+When merging two versions of a resource, A and B:
 ```
 merge(A, B):
   if A.clock dominates B.clock:
     return A.value
   elif B.clock dominates A.clock:
     return B.value
-  else: // concurrent
-    // FIXME: Need deterministic tie-breaking (e.g., lexicographic order of client IDs)
-    return deterministicChoice(A.value, B.value, A.clientId, B.clientId)
+  else: // Concurrent change
+    // Deterministic tie-breaking is required for concurrent updates.
+    // The value from the client with the lexicographically greater client ID wins.
+    if A.clientId > B.clientId:
+        return A.value
+    else:
+        return B.value
 ```
 
 **Example:**
@@ -77,58 +82,77 @@ schema:name "Tomato Soup"
 # Result: "Tomato Basil Soup" (Alice's clock wins)
 ```
 
-### 3.2. OR-Set (Observed-Remove Set)
+### 3.2. 2P-Set (Two-Phase Set)
 
-Used for properties where elements can be added and removed multiple times.
+A 2P-Set is used for multi-value properties where removal is permanent. Once an element is removed, it cannot be re-added.
 
-**Current Implementation Issues:**
+**RDF Representation:**
+- **Additions:** The presence of a triple in the resource (e.g., `:it schema:keywords "vegan"`) signifies that the value is in the set.
+- **Removals:** A removal is marked with a simple, un-timestamped tombstone using RDF-Star.
+
 ```turtle
-# FIXME: Current implementation is actually 2P-Set (Two-Phase Set)
-schema:keywords "vegan", "soup"   # Alice's version
-vs.
-schema:keywords "vegan", "quick"  # Bob's version  
-→ Result: "vegan", "soup", "quick" # Simple union
-
-# TODO: True OR-Set needs unique tags per add operation:
-# schema:keywords [
-#   crdt:element "vegan";
-#   crdt:addTag "alice-mobile-001"
-# ], [
-#   crdt:element "soup";  
-#   crdt:addTag "alice-mobile-002"
-# ] .
+# The tombstone marks the triple as deleted.
+<< :it schema:keywords "vegan" >> crdt:isDeleted true .
 ```
 
-**True OR-Set Algorithm (TODO):**
-```
-merge(A, B):
-  added = union(A.added, B.added)
-  removed = union(A.removed, B.removed)
-  return added - removed  // Elements in added but not removed
-```
+**Merge Algorithm:**
+The merge of two replicas, A and B, is the union of their elements minus the union of their tombstones.
+1.  `merged_elements = elements(A) ∪ elements(B)`
+2.  `merged_tombstones = tombstones(A) ∪ tombstones(B)`
+3.  `result = { e | e ∈ merged_elements and e ∉ merged_tombstones }`
 
-### 3.3. Tombstone Handling
+**Limitation:** Because tombstones are simple truthy values without causality information, they are permanent. If a value is removed, it can never be re-added, as the tombstone will always cause it to be removed during a merge.
 
-**Current Tombstone Structure:**
-```turtle
-<< :it schema:keywords "spicy" >> crdt:isDeleted true .
-```
+### 3.3. OR-Set (Observed-Remove Set) with Add-Wins
 
-**Issues with Current Approach:**
-- **FIXME: No timestamp/causality info on tombstones**
-- **TODO: Tombstone cleanup cannot work safely without timing information**
-- **TODO: Need `crdt:deletedAt` timestamp or vector clock on tombstones**
+A true OR-Set allows elements to be added and removed multiple times. The recommended implementation for this framework uses an "Add-Wins" semantic, which is efficient and avoids the metadata overhead of traditional tagged OR-Sets.
 
-**Proposed Tombstone Structure (TODO):**
+An element's presence is determined by comparing the causality information of its addition (the resource's vector clock) and its removal (a timestamped tombstone).
+
+**RDF Representation:**
+- **Additions:** The presence of a triple in a version of a resource implies an "add" operation whose timestamp is the resource's document-level vector clock.
+- **Removals:** A removal is marked with a **timestamped tombstone**. This tombstone must capture the document's vector clock at the time of removal.
+
+**Tombstone Structure:**
 ```turtle
 << :it schema:keywords "spicy" >> crdt:isDeleted true;
-   crdt:deletedAt "2024-08-19T15:30:00Z"^^xsd:dateTime;
-   crdt:deletedByClient <https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz>;
-   crdt:deletionClock [
-     crdt:clientId <https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz>;
+   # The vector clock at the time of deletion.
+   crdt:hasClockEntry [
+     crdt:clientId <...>;
      crdt:clockValue "5"^^xsd:integer
+   ], [
+     crdt:clientId <...>;
+     crdt:clockValue "8"^^xsd:integer
    ] .
 ```
+
+**Merge Algorithm (Add-Wins):**
+When merging two replicas, A and B, every potential element `e` is decided by comparing the clocks of the conflicting states (add vs. remove).
+
+For each element `e`:
+- If `e` exists in A and not in B (and no tombstone for `e` exists in B), it is kept.
+- If `e` exists in A and is tombstoned in B:
+    1. Get the vector clock from resource A: `add_clock`.
+    2. Get the vector clock from the tombstone in B: `remove_clock`.
+    3. If `add_clock` dominates `remove_clock`, the add is newer. The element is kept and the tombstone is discarded.
+    4. If `remove_clock` dominates `add_clock`, the remove is newer. The element is removed.
+    5. If the clocks are concurrent, the conflict must be resolved deterministically. **The recommended policy is Add-Wins**, meaning the element is kept. This ensures that if two users concurrently add and remove the same item, it is preserved.
+- The final vector clock of the merged resource is the union of the clocks from the resource and any winning tombstones.
+
+This Add-Wins approach provides the desired OR-Set semantics (elements can be re-added) without requiring complex tags on every set element, thus preserving the clean, interoperable nature of the RDF data.
+
+#### 3.3.1. Tombstone Garbage Collection (Cleanup)
+
+To prevent unbounded growth of tombstones over the lifetime of an application, a garbage collection mechanism is essential. Tombstones can be safely removed once they become redundant.
+
+**Cleanup Rule:**
+A tombstone for an element `e` with clock `C_remove` is considered redundant and can be safely deleted if the current resource state contains the element `e`, and the resource's vector clock `C_add` dominates `C_remove`.
+
+**Why this is safe:**
+The existence of the "add" state with a dominating clock `C_add` is sufficient to guarantee that this version of the element will win against any older version of the resource, including any that were concurrent with the removal. The tombstone is therefore no longer needed to ensure the correct outcome of future merges.
+
+This cleanup process can be performed by any client during a regular merge operation or as a periodic background task.
+
 
 ## 4. Merge Process Details
 
