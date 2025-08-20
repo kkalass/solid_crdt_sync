@@ -202,19 +202,16 @@ This shows the full recipe resource with the CRDT mechanics included.
 # ... prefixes and primary data from Layer 1 ...
 
 # -- CRDT Mechanics --
-<>
-   # The full, structured Vector Clock
-   crdt:hasClockEntry
-    [
-        crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000>;
-        crdt:clockValue "15"^^xsd:integer
-    ],
-    [
-        crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8>;
-        crdt:clockValue "8"^^xsd:integer
-    ];
-   # A pre-calculated hash of the clock for efficient index updates
-   crdt:vectorClockHash "xxh64:abcdef1234567890" .
+<> crdt:hasClockEntry [
+    crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
+    crdt:clockValue "15"^^xsd:integer
+  ] ,
+  [
+    crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
+    crdt:clockValue "8"^^xsd:integer
+  ] ;
+  # A pre-calculated hash of the clock for efficient index updates
+  crdt:vectorClockHash "xxh64:abcdef1234567890" .
 
 # The RDF-Star tombstone for a deleted keyword
 << :it schema:keywords "quick" >> crdt:isDeleted true .
@@ -362,7 +359,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Different contract versions use conservative merge approach
 - Framework vocabularies evolve through major version URI changes when needed
 
-**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see the [CRDT Specification Document](CRDT-SPECIFICATION.md).
+**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
 ### 4.3. Layer 3: The Indexing Layer
 
@@ -378,6 +375,8 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 * **`idx:FullIndex`:** A concrete, monolithic index for a dataset. It is used when a `GroupIndexTemplate` is not required. It inherits from `idx:Index`.
 * **`idx:GroupIndexTemplate`:** A "rulebook" resource that defines *how* a data type is grouped. It does **not** contain data entries itself.
 * **`idx:GroupIndex`:** A concrete index representing a single group (e.g., "August 2025"). It inherits from `idx:Index` and links back to its `GroupIndexTemplate` rulebook.
+* **`idx:GroupingRule`:** Defines how resources are assigned to groups based on property values.
+* **`idx:ModuloHashSharding`:** Specifies hash-based shard distribution algorithm.
 
 ### 4.3.1. Sharding Overview
 
@@ -483,6 +482,9 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
+# Note: The mappings: namespace contains CRDT merge contracts for framework components
+# such as group-index-template-v1, group-index-v1, shard-v1, full-index-v1
+
 <> a idx:GroupIndexTemplate;
    idx:indexesClass meal:ShoppingListEntry;
    # No idx:indexedProperty needed - groups are loaded fully
@@ -498,9 +500,9 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
    # The declarative rule for how to assign items to group indices.
    idx:groupedBy [
      a idx:GroupingRule;
-     idx:sourceProperty meal:requiredForDate;  # Group by meal plan date
-     idx:format "YYYY-MM";
-     idx:groupTemplate "groups/{value}/index"
+     idx:sourceProperty meal:requiredForDate;  # Property to extract grouping value from
+     idx:format "YYYY-MM";                     # Format pattern for date/time values  
+     idx:groupTemplate "groups/{value}/index"  # Template for group index paths
    ].
 ```
 
@@ -519,11 +521,12 @@ This is a concrete index for shopping list entries from August 2025 meal plans.
    # Since the template has no idx:indexedProperty defined, this group's shards
    # will contain only resource IRIs and vector clock hashes (no header data).
    # It has its own list of active shards, which are sibling documents.
-   idx:hasShard <shard-0>, <shard-1>, ... .
+   idx:hasShard <shard-mod-xxhash64-4-0-v1_0_0>, <shard-mod-xxhash64-4-1-v1_0_0>, 
+                <shard-mod-xxhash64-4-2-v1_0_0>, <shard-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/groups/2025-08/shard-0`**
-This document contains entries pointing to shopping list data resources from August 2025. Since shopping entries are typically loaded in full groups, this index contains minimal header information.
+**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/groups/2025-08/shard-mod-xxhash64-4-0-v1_0_0`**
+This document contains entries pointing to shopping list data resources from August 2025. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and vector clock hash, no header properties).
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -535,11 +538,11 @@ This document contains entries pointing to shopping list data resources from Aug
    sync:isGovernedBy mappings:shard-v1;
    idx:isShardOf <index>; # Back-link to its GroupIndex document
    idx:containsEntry [
-     idx:resource <../../../../data/shopping-entries/item-001>;
+     idx:resource <../../../../data/shopping-entries/created/2024/08/weekly-shopping-001>;
      crdt:vectorClockHash "xxh64:abcdef1234567890"
    ],
    [
-     idx:resource <../../../../data/shopping-entries/item-002>;
+     idx:resource <../../../../data/shopping-entries/created/2024/08/weekly-shopping-002>;
      crdt:vectorClockHash "xxh64:fedcba9876543210"
    ].
 ```
@@ -566,11 +569,11 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
    ];
    sync:isGovernedBy mappings:full-index-v1;
    # List of active shards containing recipe entries
-   idx:hasShard <shard-0>, <shard-1> .
+   idx:hasShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0> .
 ```
 
-**Example: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/shard-0`**
-This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header information to support browsing without loading full recipe data.
+**Example: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/shard-mod-xxhash64-2-0-v1_0_0`**
+This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header properties (schema:name, schema:keywords, etc.) as specified in the FullIndex's `idx:indexedProperty` list to support browsing without loading full recipe data.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -627,7 +630,7 @@ This decision determines how data is organized and indexed in the Pod.
 This decision determines when and how much data gets loaded from the Pod.
 
 **Full Data Sync:**
-*   Downloads index AND immediately fetches all resource data
+*   Downloads index AND immediately fetches all resource data for the selected indices/groups
 *   Good for small datasets that are frequently accessed
 *   Examples: User settings, small contact lists, preferences
 
@@ -665,6 +668,45 @@ The synchronization process is governed by the **Sync Strategy** that the develo
 5.  **On-Demand Fetch (`fetchFromRemote`):** When needed, the app calls `fetchFromRemote("https://alice.podprovider.org/data/shopping-entries/item-001")`.
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the **Merge Contract**, performs property-by-property merging, and returns the merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged object for local storage.
+
+### 5.1. Concrete Workflow Example
+
+**Scenario:** OnDemandSync for recipe collection
+
+```javascript
+// 1. Index Selection: App requests recipe synchronization
+await syncLibrary.syncDataType('schema:Recipe', { strategy: 'OnDemandSync' });
+
+// 2. Index Synchronization: Library fetches recipe index and its shards
+// Internal: GET https://alice.podprovider.org/indices/recipes/index
+// Internal: GET https://alice.podprovider.org/indices/recipes/shard-mod-xxhash64-2-0-v1_0_0
+// Internal: GET https://alice.podprovider.org/indices/recipes/shard-mod-xxhash64-2-1-v1_0_0
+
+// 3. App Notification: Library provides index headers for browsing
+syncLibrary.onIndexUpdate((headers) => {
+  console.log('Available recipes:', headers);
+  // headers = [
+  //   { iri: '.../tomato-basil-soup', name: 'Tomato Basil Soup', keywords: ['vegan', 'soup'] },
+  //   { iri: '.../pasta-carbonara', name: 'Pasta Carbonara', keywords: ['pasta', 'italian'] }
+  // ]
+});
+
+// 4. Sync Strategy Application: OnDemandSync waits for explicit requests
+
+// 5. On-Demand Fetch: User clicks on recipe, app requests full data
+const recipe = await syncLibrary.fetchFromRemote('https://alice.podprovider.org/data/recipes/tomato-basil-soup');
+
+// 6. State-based Merge: Library downloads resource, applies CRDT merge rules
+// Internal: GET https://alice.podprovider.org/data/recipes/tomato-basil-soup
+// Internal: Consult merge contract at https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1
+// Internal: Merge with local copy using LWW-Register and OR-Set algorithms
+
+// 7. App Notification: Library provides merged recipe object
+syncLibrary.onUpdate((mergedResource) => {
+  console.log('Recipe ready for display:', mergedResource);
+  // mergedResource = { name: 'Tomato Basil Soup', ingredients: [...], ... }
+});
+```
 
 ## 6. Error Handling and Resilience
 
