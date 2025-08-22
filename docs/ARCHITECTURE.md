@@ -127,7 +127,7 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 * **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
 
-* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **RDF-Star Tombstones** for managing deletions.
+* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **RDF Reification Tombstones** for managing deletions.
 
 **Example: The Rules File `recipe-v1`**
 This file, published at a public URL, defines how to merge a `schema:Recipe`.
@@ -164,8 +164,16 @@ This shows the full recipe resource with the CRDT mechanics included.
   # A pre-calculated hash of the clock for efficient index updates
   crdt:vectorClockHash "xxh64:abcdef1234567890" .
 
-# The RDF-Star tombstone for a deleted keyword
-<< :it schema:keywords "quick" >> crdt:isDeleted true .
+# RDF Reification tombstone for a deleted keyword
+# Note: RDF Reification is semantically correct for tombstones (vs RDF-Star which would assert the triple)
+# Fragment identifier generated deterministically from the deleted triple
+<#crdt-tombstone-f8e4d2b1> a rdf:Statement;
+  rdf:subject :it;
+  rdf:predicate schema:keywords;
+  rdf:object "quick";
+  crdt:isDeleted true;
+  # All RDF data in a pod must be governed by merge contracts for mergeability
+  sync:isGovernedBy <https://kkalass.github.io/solid_crdt_sync/mappings/statement-v1> .
 ```
 
 **Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
@@ -201,6 +209,16 @@ This resource uses semantic date-based organization, reflecting when the shoppin
 #### 4.2.1. CRDT Merge Mechanics
 
 The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using **document-level vector clocks** for causality determination. Each resource document (e.g., a complete Recipe or Shopping List Entry) has a single vector clock that tracks changes to the entire document, keeping the original resource content clean.
+
+**RDF Reification for Tombstones:**
+
+This architecture uses **RDF Reification** to represent tombstones for deleted triples. RDF Reification is the semantically correct approach for this use case because:
+
+- **Tombstone Semantics:** We need to mark statements as deleted without asserting them
+- **RDF-Star Incompatibility:** RDF-Star syntax (`<< :it schema:keywords "deleted" >>`) would assert the triple, which is semantically incorrect for deletions
+- **Reification Advantages:** RDF Reification allows us to make statements about statements without asserting the original statement
+- **Implementation:** We use RDF 1.1 Reification vocabulary (`rdf:Statement`, `rdf:subject`, `rdf:predicate`, `rdf:object`) to represent deleted triples
+- **Document-Level Timing:** Tombstones rely on the document-level vector clock rather than storing individual timestamps, simplifying implementation at the cost of preventing compaction
 
 **Vector Clock Example at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`:**
 ```turtle

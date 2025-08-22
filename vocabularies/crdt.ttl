@@ -75,6 +75,6 @@ crdt:vectorClockHash a rdf:Property;
 
 crdt:isDeleted a rdf:Property;
     rdfs:label "is deleted";
-    rdfs:comment "An RDF-Star property used as a tombstone to mark a triple as deleted, for use in set-based CRDTs.";
-    rdfs:domain rdf:Statement; # This property can only be attached to a triple
+    rdfs:comment "A property used with RDF Reification to mark a reified statement as deleted, for use in set-based CRDTs. RDF Reification is the semantically correct approach for tombstones since it allows making statements about triples without asserting them (unlike RDF-Star which would assert the triple). Tombstones use the document-level vector clock for timing rather than storing their own vector clock, simplifying implementation at the cost of preventing compaction.";
+    rdfs:domain rdf:Statement; # Applied to reified statements (rdf:Statement instances)
     rdfs:range xsd:boolean .

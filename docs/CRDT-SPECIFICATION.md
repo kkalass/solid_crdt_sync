@@ -11,6 +11,7 @@ This specification defines how to implement conflict-free replicated data types 
 - **RDF-native**: Uses RDF vocabularies and structures throughout
 - **Property-level**: Different CRDT types can be applied to different properties
 - **Vector clock causality**: Determines merge order and conflict resolution
+- **RDF Reification for tombstones**: Uses RDF Reification to represent deleted statements, which is semantically correct since it describes statements without asserting them (unlike RDF-Star which would assert the triple being "deleted")
 
 ## 2. Vector Clock Mechanics
 
@@ -88,11 +89,18 @@ A 2P-Set is used for multi-value properties where removal is permanent. Once an 
 
 **RDF Representation:**
 - **Additions:** The presence of a triple in the resource (e.g., `:it schema:keywords "vegan"`) signifies that the value is in the set.
-- **Removals:** A removal is marked with a simple, un-timestamped tombstone using RDF-Star.
+- **Removals:** A removal is marked with a simple, un-timestamped tombstone using RDF Reification, which is semantically correct for representing deleted statements without asserting them.
 
 ```turtle
-# The tombstone marks the triple as deleted.
-<< :it schema:keywords "vegan" >> crdt:isDeleted true .
+# The tombstone marks the triple as deleted using RDF Reification
+# Fragment identifier generated deterministically from the deleted triple
+<#crdt-tombstone-8f2a1c7d> a rdf:Statement;
+  rdf:subject :it;
+  rdf:predicate schema:keywords;
+  rdf:object "vegan";
+  crdt:isDeleted true;
+  # All RDF data in a pod must be governed by merge contracts for mergeability
+  sync:isGovernedBy <https://kkalass.github.io/solid_crdt_sync/mappings/statement-v1> .
 ```
 
 **Merge Algorithm:**
@@ -107,51 +115,113 @@ The merge of two replicas, A and B, is the union of their elements minus the uni
 
 A true OR-Set allows elements to be added and removed multiple times. The recommended implementation for this framework uses an "Add-Wins" semantic, which is efficient and avoids the metadata overhead of traditional tagged OR-Sets.
 
-An element's presence is determined by comparing the causality information of its addition (the resource's vector clock) and its removal (a timestamped tombstone).
+An element's presence is determined by comparing the causality information of its addition (the document-level vector clock) and its removal (using the document-level vector clock at removal time).
 
 **RDF Representation:**
-- **Additions:** The presence of a triple in a version of a resource implies an "add" operation whose timestamp is the resource's document-level vector clock.
-- **Removals:** A removal is marked with a **timestamped tombstone**. This tombstone must capture the document's vector clock at the time of removal.
+- **Additions:** The presence of a triple in a version of a resource implies an "add" operation whose timestamp is the document-level vector clock.
+- **Removals:** A removal is marked with a **simple tombstone** using RDF Reification. The tombstone itself does NOT store its own vector clock - instead, it relies on the document-level vector clock of the resource version where the tombstone was created.
 
 **Tombstone Structure:**
 ```turtle
-<< :it schema:keywords "spicy" >> crdt:isDeleted true;
-   # The vector clock at the time of deletion.
-   crdt:hasClockEntry [
-     crdt:clientId <...>;
-     crdt:clockValue "5"^^xsd:integer
-   ], [
-     crdt:clientId <...>;
-     crdt:clockValue "8"^^xsd:integer
-   ] .
+# Simple tombstone using RDF Reification (semantically correct for deletions)
+# Fragment identifier generated deterministically from the deleted triple
+<#crdt-tombstone-a1b2c3d4> a rdf:Statement;
+  rdf:subject :it;
+  rdf:predicate schema:keywords;
+  rdf:object "spicy";
+  crdt:isDeleted true;
+  # All RDF data in a pod must be governed by merge contracts for mergeability
+  sync:isGovernedBy <https://kkalass.github.io/solid_crdt_sync/mappings/statement-v1> .
+
+# The timing of this tombstone is determined by the document-level vector clock:
+<> crdt:hasClockEntry [
+    crdt:clientId <client-that-deleted>;
+    crdt:clockValue "5"^^xsd:integer
+  ], [
+    crdt:clientId <other-client>;
+    crdt:clockValue "8"^^xsd:integer
+  ] .
 ```
 
 **Merge Algorithm (Add-Wins):**
-When merging two replicas, A and B, every potential element `e` is decided by comparing the clocks of the conflicting states (add vs. remove).
+When merging two replicas, A and B, every potential element `e` is decided by comparing the document-level clocks of the conflicting states (add vs. remove).
 
 For each element `e`:
 - If `e` exists in A and not in B (and no tombstone for `e` exists in B), it is kept.
 - If `e` exists in A and is tombstoned in B:
-    1. Get the vector clock from resource A: `add_clock`.
-    2. Get the vector clock from the tombstone in B: `remove_clock`.
+    1. Get the document-level vector clock from document A: `add_clock`.
+    2. Get the document-level vector clock from document B (where the tombstone was created): `remove_clock`.
     3. If `add_clock` dominates `remove_clock`, the add is newer. The element is kept and the tombstone is discarded.
     4. If `remove_clock` dominates `add_clock`, the remove is newer. The element is removed.
     5. If the clocks are concurrent, the conflict must be resolved deterministically. **The recommended policy is Add-Wins**, meaning the element is kept. This ensures that if two users concurrently add and remove the same item, it is preserved.
-- The final vector clock of the merged resource is the union of the clocks from the resource and any winning tombstones.
+- The final document-level vector clock of the merged document is the standard clock merge (max of each client's counter).
 
 This Add-Wins approach provides the desired OR-Set semantics (elements can be re-added) without requiring complex tags on every set element, thus preserving the clean, interoperable nature of the RDF data.
 
-#### 3.3.1. Tombstone Garbage Collection (Cleanup)
+**Deterministic Tombstone Fragment Identifier Algorithm:**
 
-To prevent unbounded growth of tombstones over the lifetime of an application, a garbage collection mechanism is essential. Tombstones can be safely removed once they become redundant.
+Since tombstones use RDF Reification, they integrate seamlessly with our standard CRDT merge algorithms via the `statement-v1` merge contract. To prevent fragment identifier collisions when multiple clients independently create tombstones for the same triple, we use deterministic identifier generation.
 
-**Cleanup Rule:**
-A tombstone for an element `e` with clock `C_remove` is considered redundant and can be safely deleted if the current resource state contains the element `e`, and the resource's vector clock `C_add` dominates `C_remove`.
+**Algorithm Specification:**
 
-**Why this is safe:**
-The existence of the "add" state with a dominating clock `C_add` is sufficient to guarantee that this version of the element will win against any older version of the resource, including any that were concurrent with the removal. The tombstone is therefore no longer needed to ensure the correct outcome of future merges.
+1. **Resolve Relative IRIs:** Convert all relative IRIs to absolute form using the document's base URI
+2. **Canonicalize as N-Triple:** Serialize the triple using strict N-Triples format with absolute IRIs
+3. **Generate Hash:** Apply XXH64 hash function to the canonical N-Triple string
+4. **Format Identifier:** Use format `#crdt-tombstone-{8-char-hex-hash}`
 
-This cleanup process can be performed by any client during a regular merge operation or as a periodic background task.
+**Example:**
+```
+Triple: <#it> schema:keywords "spicy"
+Base URI: https://alice.podprovider.org/data/recipes/tomato-soup
+Canonical: <https://alice.podprovider.org/data/recipes/tomato-soup#it> <https://schema.org/keywords> "spicy" .
+Hash: XXH64("...") = a1b2c3d4e5f67890
+Result: #crdt-tombstone-a1b2c3d4
+```
+
+**Implementation Notes:**
+- **Pod Migration Limitation:** When documents are copied between pods, base URIs change, resulting in different tombstone identifiers for semantically equivalent tombstones. This is acceptable as equivalent tombstones merge correctly.
+- **Blank Node Limitation:** FIXME - Blank node subjects are not supported due to unstable serialization labels in RDF specifications.
+- **Collision Resistance:** XXH64 provides sufficient collision resistance for practical use cases while maintaining compact identifiers.
+
+**Implementation Guidance:**
+- **Library Support:** RDF libraries should provide helper functions for generating deterministic tombstone identifiers to ensure consistency across implementations.
+- **Base URI Resolution:** Use the document's base URI (typically the document URL without fragment) for resolving relative IRIs in the canonical N-Triple.
+- **N-Triples Canonicalization:** Follow RFC 7932 N-Triples specification strictly, ensuring proper IRI bracketing, literal escaping, and terminating period.
+- **Hash Truncation:** Use only the first 8 characters of the XXH64 hex output to keep fragment identifiers compact while maintaining sufficient collision resistance.
+
+#### 3.3.1. Tombstone Garbage Collection (Compaction Limitation)
+
+**Important Limitation:** With the document-level vector clock approach, tombstone compaction (cleanup) is **not possible** in the general case.
+
+**Why Compaction is Not Safe:**
+Since tombstones rely on the document-level vector clock rather than storing their own creation timestamp, we cannot determine if a tombstone is truly redundant without full causal history. A tombstone can only be safely removed if we can prove that the "add" operation definitively happened after the "remove" operation across all possible merge scenarios.
+
+**Trade-off Decision:**
+- **Document-level clocks**: Simpler implementation, less storage overhead, but permanent tombstones
+- **Per-tombstone clocks**: More complex, higher storage cost, but allows compaction
+
+**Alternative Approaches for Large-Scale Use:**
+For applications where tombstone accumulation becomes problematic:
+1. **Resource Splitting**: Partition large multi-value properties into separate documents with independent clocks
+2. **Periodic Rebuilding**: Occasionally recreate documents with clean state (requires coordination)
+3. **Hybrid Approach**: Use per-tombstone clocks only for properties expected to have high churn
+
+**Current Recommendation:**
+Accept the storage trade-off in favor of implementation simplicity. The document-level approach aligns with the passive storage philosophy and reduces the metadata burden on RDF data.
+
+### 3.4. RDF Reification Tombstone Design Summary
+
+The final tombstone design addresses two key requirements:
+
+1. **Mergeable RDF Data**: All tombstone statements include `sync:isGovernedBy` to reference their merge contract, ensuring they can be properly merged as RDF data.
+
+2. **Document-Level Vector Clocks**: Tombstones rely on the document-level vector clock rather than storing individual timestamps, which:
+   - **Simplifies implementation** by avoiding per-tombstone clock management
+   - **Reduces storage overhead** for RDF data
+   - **Prevents compaction** as a trade-off, but enables passive storage approach
+   - **Aligns with passive storage philosophy** by minimizing metadata complexity
+
+This approach prioritizes simplicity and interoperability over storage optimization, consistent with the framework's core principles.
 
 
 ## 4. Merge Process Details
@@ -210,11 +280,11 @@ If a resource's `sync:isGovernedBy` link points to a merge contract that is unav
 - **FIXME: Client ID verification and validation**
 
 ### 5.4. Large Vector Clocks
-For resources that are edited by a very large number of clients over a long period, the vector clock can grow in size, potentially impacting performance and storage.
+For documents that are edited by a very large number of clients over a long period, the document-level vector clock can grow in size, potentially impacting performance and storage.
 
 **Policy:** Naive pruning of vector clock entries (e.g., removing the oldest entry) is **unsafe** as it destroys the causal history required for correct merging, and can lead to data divergence. 
 
-A robust, general-purpose, and safe clock pruning algorithm requires coordination between clients and is an advanced topic beyond the scope of this core specification. For use cases with an extremely high number of collaborators, developers should consider architectural solutions, such as splitting the resource into smaller, more focused resources with independent clocks.
+A robust, general-purpose, and safe clock pruning algorithm requires coordination between clients and is an advanced topic beyond the scope of this core specification. For use cases with an extremely high number of collaborators, developers should consider architectural solutions, such as splitting the document into smaller, more focused documents with independent clocks.
 
 ## 6. Implementation Notes
 
