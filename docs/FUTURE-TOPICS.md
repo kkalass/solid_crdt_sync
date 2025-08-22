@@ -93,6 +93,35 @@ This document tracks substantial topics identified for future discussion and pot
 
 ---
 
+## 6. RDF Collections and Extended CRDT Algorithms
+
+**Status**: Open Question  
+**Current Gap**: Framework focuses on basic CRDT types but doesn't address complex RDF structures or additional CRDT algorithms.
+
+**RDF Structure Analysis Needed**:
+- **rdf:List**: How do ordered lists merge? Position-based vs content-based conflict resolution?
+- **rdf:Seq/rdf:Bag/rdf:Alt**: Merge semantics for RDF container types
+- **Blank Node Graphs**: Complex structures with interdependent blank nodes
+- **Property Paths**: Multi-hop relationships and their CRDT implications
+- **Reification Chains**: Nested reified statements and metadata
+
+**Additional CRDT Algorithms to Specify**:
+- **Counters**: G-Counter, PN-Counter for numeric aggregation use cases
+- **Sequences**: CRDT algorithms for ordered data (recipes steps, procedure lists)
+- **Maps/Dictionaries**: Key-value structures with CRDT merge semantics  
+- **Trees**: Hierarchical data structures (taxonomies, organizational charts)
+- **Multi-Value Registers**: MV-Register for preserving concurrent writes
+
+**Design Questions**:
+- Should complex RDF structures be decomposed into simpler CRDT-manageable parts?
+- How do we handle CRDT operations on interdependent RDF subgraphs?
+- Can we define compositional rules for building complex CRDT behaviors from simpler ones?
+- What's the interaction between RDF semantics and CRDT operational semantics?
+
+**Related**: Current CRDT-SPECIFICATION.md sections 3.1-3.3 cover only basic types, section 8 mentions "Blank Nodes" as open question
+
+---
+
 ## Contributing to Future Topics
 
 When identifying new topics:
