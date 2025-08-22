@@ -20,7 +20,28 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **Decentralized & Server-Agnostic:** The Solid Pod acts as a simple, passive storage bucket. All synchronization logic resides within the client-side library.
 
-## 3. Discovery Protocol
+## 3. Fundamental Constraints: Blank Nodes and Merge Boundaries
+
+**The Challenge:** RDF blank nodes present fundamental boundaries for CRDT merging operations. Blank nodes are document-scoped by definition - their identifiers are only meaningful within a single document instance. When merging two documents, it is impossible to determine if `_:b1` in document A corresponds to `_:b2` in document B, even if they represent semantically identical structures.
+
+**Merge Boundaries:** CRDT merging operations generally **stop at blank node boundaries**. Properties whose values are blank nodes typically require atomic treatment (e.g., LWW-Register semantics) rather than deep structural merging.
+
+**Conditional Mergeability:** However, some blank node structures can be merged using specialized approaches:
+
+- **Identifying Properties:** Blank nodes with stable identifying properties (like `crdt:clientId` in vector clock entries) can enable merge operations within their scope
+- **Structural Patterns:** Well-defined structures like ordered lists may support algorithmic matching approaches
+
+**Current Implementation Note:** This constraint is evident in the framework's own vector clock implementation, which uses blank nodes for clock entries. These can be merged because `crdt:clientId` provides a stable identifier within the scope of the document's clock structure - demonstrating both the challenge and potential solutions.
+
+**Development Implications:** 
+
+- **Data Modeling Decisions:** Developers should prefer IRIs over blank nodes when deep merging is required for their use case
+- **Mapping Validation:** CRDT mapping rules must be compatible with blank node constraints to ensure sound merge operations
+- **Depth Control:** The framework requires mechanisms to specify when merging should "descend" into blank node structures versus treating them atomically
+
+This constraint affects all subsequent architectural decisions regarding merge contracts, indexing strategies, and sync algorithms.
+
+## 4. Discovery Protocol
 
 Applications discover data locations through the standard Solid discovery mechanism ([Solid Protocol](https://solidproject.org/TR/protocol)), extended with index-specific resolution:
 
@@ -76,11 +97,11 @@ Applications discover data locations through the standard Solid discovery mechan
 
 **Advantages:** Using TypeRegistration for indices enables full discoverability - applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), making the architecture truly self-describing.
 
-## 4. Architectural Layers
+## 5. Architectural Layers
 
 The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
 
-### 4.1. Layer 1: The Data Resource
+### 5.1. Layer 1: The Data Resource
 
 This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" using standard vocabularies.
 
@@ -121,7 +142,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
    idx:belongsToIndexShard <../../indices/recipes/shard-mod-xxhash64-2-0-v1_0_0> .
 ```
 
-### 4.2. Layer 2: The Merge Contract
+### 5.2. Layer 2: The Merge Contract
 
 This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
 
@@ -206,7 +227,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    idx:belongsToIndexShard <../../../../../indices/shopping-entries/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
 ```
 
-#### 4.2.1. CRDT Merge Mechanics
+#### 5.2.1. CRDT Merge Mechanics
 
 The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using **document-level vector clocks** for causality determination. Each resource document (e.g., a complete Recipe or Shopping List Entry) has a single vector clock that tracks changes to the entire document, keeping the original resource content clean.
 
@@ -301,7 +322,7 @@ Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` docume
 - **Discoverability:** Standard Type Index enables client validation and debugging
 - **No Coordination:** Each client generates IDs independently without coordination
 
-#### 4.2.2. Vocabulary Versioning and Evolution
+#### 5.2.2. Vocabulary Versioning and Evolution
 
 **Versioning Strategy:**
 
@@ -332,7 +353,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 
 **Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
-### 4.3. Layer 3: The Indexing Layer
+### 5.3. Layer 3: The Indexing Layer
 
 This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only vector clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
@@ -369,7 +390,7 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 **Application Vocabulary:**
 Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the framework vocabulary but work within the framework's structure.
 
-### 4.3.1. Sharding Overview
+### 5.3.1. Sharding Overview
 
 **Resource Assignment:**
 
@@ -386,7 +407,7 @@ Shard count changes are handled through lazy, client-side migration rather than 
 
 For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
 
-### 4.3.2. Multi-Application Coordination
+### 5.3.2. Multi-Application Coordination
 
 **Index Sharing and Compatibility:**
 
@@ -419,7 +440,7 @@ When multiple applications work with the same data type, they must coordinate th
 - **Use minimal default indices:** Keep shared indices lightweight to reduce sync overhead for all applications
 - **Document index purposes:** Use `rdfs:comment` to explain index design decisions
 
-### 4.3.3. Index Creation and Bootstrap Process
+### 5.3.3. Index Creation and Bootstrap Process
 
 **Cold Start Problem:**
 
@@ -454,7 +475,7 @@ When an application first encounters a Pod with no existing indices for a data t
 - **On first sync:** Indices created when first syncing a data type
 - **Lazy creation:** Indices created when first storing a resource of that type
 
-### 4.3.4. Pod Setup and Configuration Process
+### 5.3.4. Pod Setup and Configuration Process
 
 When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
 
@@ -487,7 +508,7 @@ When an application first encounters a Pod, it may need to configure the Type In
 5. App proceeds with normal synchronization workflow
 ```
 
-### 4.3.5. Indexing Conventions and Best Practices
+### 5.3.5. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
  *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
@@ -628,11 +649,11 @@ This document contains entries for recipe resources. Since recipes are used with
    ].
 ```
 
-### 4.4. Layer 4: The Sync Strategy
+### 5.4. Layer 4: The Sync Strategy
 
 This is the client-side layer where the application developer configures how to synchronize data. The framework balances **discovery** (finding existing Pod configuration) with **developer intent** (application requirements). Developers declare their preferred sync approach, and the framework either uses discovered compatible indices or creates new ones as needed.
 
-#### 4.4.1. Decision 1: Index Structure
+#### 5.4.1. Decision 1: Index Structure
 
 This decision determines how data is organized and indexed in the Pod.
 
@@ -652,7 +673,7 @@ This decision determines how data is organized and indexed in the Pod.
 3. **Compatibility evaluation:** Does discovered index structure meet data pattern needs?
 4. **Resolution:** Use compatible index OR create new index with appropriate structure
 
-#### 4.4.2. Decision 2: Sync Timing
+#### 5.4.2. Decision 2: Sync Timing
 
 This decision determines when and how much data gets loaded from the Pod.
 
@@ -667,7 +688,7 @@ This decision determines when and how much data gets loaded from the Pod.
 *   Good for large datasets or browse-then-load workflows
 *   Examples: Large recipe collections, document libraries, photo albums
 
-#### 4.4.3. Common Strategies
+#### 5.4.3. Common Strategies
 
 The named sync strategies combine the two decisions above:
 
@@ -682,7 +703,7 @@ The named sync strategies combine the two decisions above:
 *   **GroupedSync:** Shopping entries, activity logs → GroupIndexTemplate + immediate data for subscribed groups  
 *   **OnDemandSync:** Recipe collections, document libraries → Any index + headers-only until requested
 
-## 5. Synchronization Workflow
+## 6. Synchronization Workflow
 
 The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
@@ -735,18 +756,18 @@ syncLibrary.onUpdate((mergedResource) => {
 });
 ```
 
-## 6. Error Handling and Resilience
+## 7. Error Handling and Resilience
 
 Real-world synchronization faces numerous failure modes. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions.
 
-### 6.1. Failure Classification
+### 9.1. Failure Classification
 
 **Error Granularities:**
 - **Type-Level:** Entire data type cannot sync (missing merge contracts, authentication failures)
 - **Resource-Level:** Individual resource blocked (parse errors, access control changes)  
 - **Property-Level:** Specific property cannot sync (unknown CRDT types, schema violations)
 
-### 6.2. Core Resilience Strategies
+### 8.2. Core Resilience Strategies
 
 **Network Resilience:**
 - Distinguish between systemic failures (abort entire sync) vs. resource-specific failures (skip and continue)
@@ -763,7 +784,7 @@ Real-world synchronization faces numerous failure modes. The architecture provid
 - CRDT merge conflict resolution at property level
 - Vector clock anomaly detection and handling
 
-### 6.3. Graceful Degradation
+### 8.3. Graceful Degradation
 
 The system provides multiple operational modes based on error conditions:
 
@@ -774,9 +795,9 @@ The system provides multiple operational modes based on error conditions:
 
 For comprehensive implementation guidance including specific error scenarios, recovery procedures, and user interface recommendations, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
-## 7. Performance Characteristics
+## 8. Performance Characteristics
 
-### 7.1. Sync Strategy Performance Trade-offs
+### 9.1. Sync Strategy Performance Trade-offs
 
 The choice of sync strategy fundamentally determines application performance characteristics:
 
@@ -795,7 +816,7 @@ The choice of sync strategy fundamentally determines application performance cha
 - **Best for:** Large collections with unpredictable access patterns
 - **Trade-off:** Individual resource fetches add latency to data access
 
-### 7.2. Index-Based Change Detection
+### 8.2. Index-Based Change Detection
 
 The architecture's index-based approach provides efficient incremental synchronization:
 
@@ -803,7 +824,7 @@ The architecture's index-based approach provides efficient incremental synchroni
 - **Incremental Sync:** Download only changed shards through vector clock hash comparison (O(k) where k = changed shards)
 - **Bandwidth Efficiency:** Index headers provide metadata without downloading full resources
 
-### 7.3. Architecture Performance Benefits
+### 8.3. Architecture Performance Benefits
 
 - **Parallel Fetching:** Sharded indices enable concurrent synchronization
 - **Partial Failure Resilience:** Failed shards don't block others
@@ -812,9 +833,9 @@ The architecture's index-based approach provides efficient incremental synchroni
 
 For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
 
-## 8. Data Organization Principles
+## 9. Data Organization Principles
 
-### 8.1. Resource IRI Design and Pod Performance
+### 9.1. Resource IRI Design and Pod Performance
 
 **The Challenge:**
 Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
@@ -858,28 +879,28 @@ For small collections (< 1000 resources), flat structure is acceptable:
 - **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
 - **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
 
-## 9. Benefits of this Architecture
+## 10. Benefits of this Architecture
 
 * **True Interoperability:** By publishing the merge rules and linking to them from the data, any application can learn how to correctly and safely collaborate.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Discoverability and Resilience:** The system is highly discoverable and resilient to changes in the indexing strategy over time.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 10. Alignment with Standardization Efforts
+## 11. Alignment with Standardization Efforts
 
-### 10.1. Community Alignment
+### 11.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 10.2. Architectural Differentiators
+### 11.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This framework is designed as an "add-on" library. The developer retains control over their local storage and querying logic.
 * **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 11. Outlook: Future Enhancements
+## 12. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
