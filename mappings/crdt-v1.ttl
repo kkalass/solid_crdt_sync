@@ -1,0 +1,20 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+# Standard CRDT library for framework components
+# This DocumentMapping provides all essential CRDT mappings that most applications need
+
+<> a sync:DocumentMapping;
+   # Import existing statement mapping for tombstones
+   sync:classMapping mappings:statement-v1 ;
+   # Define vector clock mappings for typeless blank nodes
+   sync:predicateMapping <#clock-mappings> .
+
+# Standard mapping for vector clock entries (typeless blank nodes)  
+<#clock-mappings> a sync:PredicateMapping;
+   sync:identifyingPredicate crdt:clientId ;
+   sync:rule
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .

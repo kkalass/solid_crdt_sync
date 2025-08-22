@@ -5,7 +5,7 @@
 
 mappings:modulo-hash-sharding-v1 a sync:ClassMapping;
    sync:appliesToClass idx:ModuloHashSharding;
-   sync:propertyMapping
+   sync:rule
      [ sync:property idx:hashAlgorithm; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:numberOfShards; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:configVersion; crdt:mergeWith crdt:LWW_Register ],

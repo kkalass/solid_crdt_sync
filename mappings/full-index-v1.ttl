@@ -5,7 +5,7 @@
 
 mappings:full-index-v1 a sync:ClassMapping;
    sync:appliesToClass idx:FullIndex;
-   sync:propertyMapping
+   sync:rule
      [ sync:property idx:indexesClass; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:indexedProperty; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:hasShard; crdt:mergeWith crdt:2P_Set ],

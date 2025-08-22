@@ -6,7 +6,7 @@
 ///
 /// The developer declares a SyncStrategy for each data type, choosing between:
 /// 1. `FullSync`: For small to medium datasets using a single idx:FullIndex
-/// 2. `GroupedSync`: For large datasets with RDF-defined grouping rules via idx:GroupIndexTemplate  
+/// 2. `GroupedSync`: For large datasets with RDF-defined grouping rules via idx:GroupIndexTemplate
 /// 3. `OnDemandSync`: For very large datasets where only indices are synced initially
 
 library solid_crdt_sync_interface;
@@ -16,7 +16,7 @@ import 'dart:async';
 // --- Configuration: Sync Strategies ---
 
 /// Base class defining synchronization strategy for a data type.
-/// 
+///
 /// All configuration is discovered through the Solid Type Index - no hardcoded paths.
 /// The framework uses Type Index entries to find both data containers and corresponding indices.
 abstract class SyncStrategy {
@@ -34,15 +34,15 @@ abstract class SyncStrategy {
 }
 
 /// Strategy for small to medium datasets using a single idx:FullIndex.
-/// 
-/// The framework discovers the FullIndex via Type Index and syncs according to 
+///
+/// The framework discovers the FullIndex via Type Index and syncs according to
 /// the index's own configuration (sharding algorithm, indexed properties, etc.)
-/// 
+///
 /// Suitable when:
 /// - Dataset is small enough to sync completely (~1000s of items)
 /// - Application needs all data available locally
 /// - No logical grouping is needed
-/// 
+///
 /// Example: Personal recipe collection, contact lists, bookmarks
 class FullSync extends SyncStrategy {
   /// Whether to immediately load full data or just index headers
@@ -56,37 +56,37 @@ class FullSync extends SyncStrategy {
 }
 
 /// Strategy for large datasets with RDF-defined grouping via idx:GroupIndexTemplate.
-/// 
+///
 /// The framework discovers the GroupIndexTemplate via Type Index and reads the
 /// GroupingRule (idx:groupedBy) to understand how data should be grouped.
 /// The grouping logic is entirely defined in RDF, not in client code.
-/// 
+///
 /// Suitable when:
-/// - Dataset is very large (10,000s+ items)  
+/// - Dataset is very large (10,000s+ items)
 /// - Data has natural grouping defined in the GroupIndexTemplate
 /// - Application typically works with subsets
-/// 
+///
 /// Example: Shopping list entries grouped by month, photos by year, messages by conversation
 class GroupedSync extends SyncStrategy {
   /// Whether to immediately load full data for subscribed groups
   final bool loadDataImmediately;
 
   GroupedSync({
-    required super.type, 
+    required super.type,
     required super.rdfClass,
     this.loadDataImmediately = true,
   });
 }
 
 /// Strategy for datasets where only indices are synced by default, loading full data on-demand.
-/// 
-/// Can use either idx:FullIndex (for browseable collections) or idx:GroupIndexTemplate 
+///
+/// Can use either idx:FullIndex (for browseable collections) or idx:GroupIndexTemplate
 /// (for naturally grouped data). Only syncs index entries until explicit fetchFromRemote() calls.
-/// 
+///
 /// **OnDemand + FullIndex:** Browse entire collection, load individual items
-/// - Suitable when: Need to search/filter across whole collection  
+/// - Suitable when: Need to search/filter across whole collection
 /// - Example: Personal recipe collection, document library, photo albums
-/// 
+///
 /// **OnDemand + GroupIndex:** Load specific groups, then load individual items within group
 /// - Suitable when: Data naturally groups but individual groups are large
 /// - Example: Financial transactions by year, health records by condition, music by genre
@@ -100,7 +100,7 @@ class OnDemandSync extends SyncStrategy {
 // --- Data & Listener Interfaces ---
 
 /// Lightweight summary of a remote resource discovered from an index.
-/// 
+///
 /// Contains enough information for UI display without loading full resource.
 /// Properties available depend on the index's idx:indexedProperty configuration.
 class ResourceHeader {
@@ -108,15 +108,15 @@ class ResourceHeader {
   final Map<String, dynamic> properties;
 
   ResourceHeader({
-    required this.iri, 
+    required this.iri,
     required this.properties,
   });
-  
+
   /// Convenience getter for common title properties
-  String? get title => 
-    properties['schema:name'] ?? 
-    properties['foaf:name'] ?? 
-    properties['rdfs:label'];
+  String? get title =>
+      properties['schema:name'] ??
+      properties['foaf:name'] ??
+      properties['rdfs:label'];
 }
 
 /// Listener for changes in synchronized indices.
@@ -124,9 +124,9 @@ abstract interface class IndexChangeListener {
   /// Called when the library has synchronized an index and discovered changes.
   ///
   /// - For `FullSync`: [sourceId] is the data type's RDF class
-  /// - For `GroupedSync`: [sourceId] is the specific group identifier determined by GroupingRule  
+  /// - For `GroupedSync`: [sourceId] is the specific group identifier determined by GroupingRule
   /// - For `OnDemandSync`: [sourceId] is the data type's RDF class
-  /// 
+  ///
   /// [headers] contains the current set of resources in this index/group.
   void onIndexUpdate(String sourceId, List<ResourceHeader> headers);
 }
@@ -144,21 +144,21 @@ abstract interface class DataChangeListener {
 // --- Discovery and Configuration ---
 
 /// Service discovery and setup configuration.
-/// 
+///
 /// The framework automatically discovers data and index locations through the user's
 /// Solid Type Index. Missing configuration triggers a setup dialog.
 abstract interface class DiscoveryConfiguration {
   /// Called when Pod setup is required (missing Type Index entries).
-  /// 
+  ///
   /// The implementation should display a setup dialog allowing the user to:
   /// - Approve automatic configuration with standard paths
-  /// - Customize the proposed configuration  
+  /// - Customize the proposed configuration
   /// - Cancel setup (framework will use fallback paths with reduced interoperability)
-  /// 
+  ///
   /// Returns true if user approved setup, false if cancelled.
   Future<bool> requestPodSetup({
     required List<String> missingDataTypes,
-    required List<String> missingIndexTypes, 
+    required List<String> missingIndexTypes,
     required Map<String, String> proposedPaths,
   });
 
@@ -170,12 +170,12 @@ abstract interface class DiscoveryConfiguration {
 // --- Main Service API ---
 
 /// A service that synchronizes Dart objects with Solid Pods using CRDT-based merging.
-/// 
+///
 /// Initialization:
 /// 1. Configure with list of [SyncStrategy] instances for each data type
-/// 2. Set [DiscoveryConfiguration] for handling setup scenarios  
+/// 2. Set [DiscoveryConfiguration] for handling setup scenarios
 /// 3. Inject authentication service for Solid Pod access
-/// 
+///
 /// The service automatically:
 /// - Discovers data and index locations via Type Index
 /// - Handles first-time Pod setup with user consent
@@ -183,9 +183,8 @@ abstract interface class DiscoveryConfiguration {
 /// - Synchronizes indices and data according to strategies
 /// - Performs CRDT merging using published merge contracts
 abstract interface class SolidCrdtSyncService {
-  
   // --- Listener Management ---
-  
+
   void registerIndexChangeListener(IndexChangeListener listener);
   void unregisterIndexChangeListener(IndexChangeListener listener);
 
@@ -195,7 +194,7 @@ abstract interface class SolidCrdtSyncService {
   // --- Data Operations ---
 
   /// Stores a Dart object to the Solid Pod.
-  /// 
+  ///
   /// The service:
   /// 1. Determines storage location using Type Index discovery
   /// 2. For GroupedSync: Applies discovered GroupingRule to determine which group(s)
@@ -207,24 +206,24 @@ abstract interface class SolidCrdtSyncService {
   Future<void> store(Object object);
 
   /// Deletes an object by ID and type.
-  /// 
+  ///
   /// Creates tombstone entries in CRDT metadata and updates indices.
   Future<void> delete(String id, Type type);
 
   // --- Group Subscription Management (for GroupedSync) ---
 
   /// Subscribes to a specific group for a type configured with [GroupedSync].
-  /// 
-  /// [groupId] should match the group identifier format defined in the 
+  ///
+  /// [groupId] should match the group identifier format defined in the
   /// GroupIndexTemplate's GroupingRule. The service discovers the rule and
   /// validates the groupId format.
-  /// 
+  ///
   /// For example, if GroupingRule has format "YYYY-MM", use "2025-08".
-  /// 
+  ///
   /// The service will:
   /// 1. Discover the GroupIndexTemplate via Type Index
   /// 2. Validate [groupId] against the GroupingRule format
-  /// 3. Resolve the specific GroupIndex for [groupId]  
+  /// 3. Resolve the specific GroupIndex for [groupId]
   /// 4. Begin synchronizing that group's index and data
   Future<void> subscribeToGroup(Type type, String groupId);
 
@@ -238,26 +237,26 @@ abstract interface class SolidCrdtSyncService {
 
   /// Gets available groups for a type by examining the GroupIndexTemplate.
   /// Useful for UI to show available time periods, categories, etc.
-  /// 
+  ///
   /// Note: This requires fetching the GroupIndexTemplate to discover existing GroupIndex instances.
   Future<List<String>> getAvailableGroups(Type type);
 
   // --- On-Demand Operations ---
 
   /// Fetches full data for a single resource from the Solid Pod.
-  /// 
+  ///
   /// Primarily used with [OnDemandSync] strategy after browsing headers.
   /// The service:
   /// 1. Downloads the resource from [iri]
   /// 2. Performs CRDT merge with any local version
   /// 3. Notifies DataChangeListeners
   /// 4. Returns the merged object
-  /// 
+  ///
   /// Returns null if resource doesn't exist or is inaccessible.
   Future<T?> fetchFromRemote<T extends Object>(String iri);
 
   /// Gets currently cached headers for a type (without triggering network requests).
-  /// 
+  ///
   /// Useful for OnDemandSync to display available resources before loading data.
   /// For GroupedSync, optionally filter by groupId.
   List<ResourceHeader> getCachedHeaders(Type type, {String? groupId});
@@ -265,13 +264,13 @@ abstract interface class SolidCrdtSyncService {
   // --- Service Lifecycle ---
 
   /// Starts the synchronization service.
-  /// 
+  ///
   /// Begins discovery process and initial sync according to configured strategies.
   /// Will trigger setup dialog if Pod configuration is incomplete.
   Future<void> start();
 
   /// Stops the synchronization service.
-  /// 
+  ///
   /// Cancels ongoing sync operations but retains local data.
   Future<void> stop();
 
@@ -279,7 +278,7 @@ abstract interface class SolidCrdtSyncService {
   SyncStatus getStatus();
 
   /// Manually triggers a sync cycle for all configured types.
-  /// 
+  ///
   /// Useful for explicit refresh operations in UI.
   Future<void> triggerSync();
 }
@@ -288,22 +287,22 @@ abstract interface class SolidCrdtSyncService {
 enum SyncStatus {
   /// Service not started
   stopped,
-  
+
   /// Performing initial discovery and setup
   initializing,
-  
+
   /// Pod setup required (waiting for user)
   setupRequired,
-  
+
   /// Actively synchronizing data
   syncing,
-  
+
   /// Synchronized and monitoring for changes
   monitoring,
-  
+
   /// Offline mode (network unavailable)
   offline,
-  
+
   /// Error state requiring attention
   error,
 }
@@ -311,7 +310,7 @@ enum SyncStatus {
 // --- Usage Example ---
 
 /// Example showing how to configure the service for a meal planning application.
-/// 
+///
 /// This demonstrates the three different sync strategies:
 /// - Recipes: OnDemandSync (browse titles, load on-demand)
 /// - Shopping entries: GroupedSync (framework reads RDF GroupingRule automatically)

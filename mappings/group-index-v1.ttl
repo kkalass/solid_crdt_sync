@@ -5,6 +5,6 @@
 
 mappings:group-index-v1 a sync:ClassMapping;
    sync:appliesToClass idx:GroupIndex;
-   sync:propertyMapping
+   sync:rule
      [ sync:property idx:basedOn; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:hasShard; crdt:mergeWith crdt:2P_Set ].

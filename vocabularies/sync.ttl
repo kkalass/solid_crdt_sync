@@ -21,10 +21,20 @@ sync:ClassMapping a rdfs:Class;
     rdfs:comment "A resource that defines the merge behavior for a specific class of data (e.g., schema:Recipe).";
     rdfs:subClassOf sync:Mapping .
 
+sync:DocumentMapping a rdfs:Class;
+    rdfs:label "Document Mapping";
+    rdfs:comment "A resource that defines the complete merge behavior for all resources within a document, by importing other DocumentMappings and defining local ClassMappings and PredicateMappings.";
+    rdfs:subClassOf sync:Mapping .
 
-sync:PropertyMapping a rdfs:Class;
-    rdfs:label "Property Mapping";
-    rdfs:comment "A declarative rule that links a specific property to a CRDT merge algorithm." .
+sync:PredicateMapping a rdfs:Class;
+    rdfs:label "Predicate Mapping";
+    rdfs:comment "A resource that defines merge behavior for resources based on the predicates they appear with, useful for typeless blank nodes and predicate-based identification patterns.";
+    rdfs:subClassOf sync:Mapping .
+
+
+sync:Rule a rdfs:Class;
+    rdfs:label "Mapping Rule";
+    rdfs:comment "A declarative rule that links a specific predicate/property to a CRDT merge algorithm." .
 
 # --- Property Definitions ---
 
@@ -40,14 +50,45 @@ sync:appliesToClass a rdf:Property;
     rdfs:domain sync:Mapping;
     rdfs:range rdfs:Class .
 
-sync:propertyMapping a rdf:Property;
-    rdfs:label "property mapping";
-    rdfs:comment "Links a Mapping to a specific rule for one of its properties.";
+sync:appliesToPredicate a rdf:Property;
+    rdfs:label "applies to predicate";
+    rdfs:comment "Links a Mapping to a specific predicate, allowing mapping of resources that appear as objects of this predicate regardless of their type. Useful for typeless blank nodes.";
     rdfs:domain sync:Mapping;
-    rdfs:range sync:PropertyMapping .
+    rdfs:range rdf:Property .
 
-sync:property a rdf:Property;
-    rdfs:label "property";
-    rdfs:comment "Specifies the RDF property that a PropertyMapping applies to.";
-    rdfs:domain sync:PropertyMapping;
+
+sync:documentMapping a rdf:Property;
+    rdfs:label "document mapping";
+    rdfs:comment "Imports a complete DocumentMapping library, inheriting all its class and predicate mappings. Used for importing standard mapping libraries like CRDT or RDF vocabularies.";
+    rdfs:domain sync:DocumentMapping;
+    rdfs:range sync:DocumentMapping .
+
+sync:classMapping a rdf:Property;
+    rdfs:label "class mapping";
+    rdfs:comment "References a ClassMapping (either local or external) that defines merge behavior for a specific class of resources.";
+    rdfs:domain sync:DocumentMapping;
+    rdfs:range sync:ClassMapping .
+
+sync:predicateMapping a rdf:Property;
+    rdfs:label "predicate mapping";
+    rdfs:comment "References a PredicateMappings resource (either local or external) that defines merge behavior for resources based on predicates.";
+    rdfs:domain sync:DocumentMapping;
+    rdfs:range sync:PredicateMapping .
+
+sync:rule a rdf:Property;
+    rdfs:label "mapping rule";
+    rdfs:comment "Links a PredicateMappings or ClassMapping to a specific mapping Rule for one of its predicates.";
+    rdfs:domain sync:PredicateMapping, sync:ClassMapping;
+    rdfs:range sync:Rule .
+
+sync:predicate a rdf:Property;
+    rdfs:label "predicate";
+    rdfs:comment "Specifies the RDF predicate that a PropertyMapping applies to.";
+    rdfs:domain sync:Rule;
+    rdfs:range rdf:Property .
+
+sync:identifyingPredicate a rdf:Property;
+    rdfs:label "identifying predicate";
+    rdfs:comment "Declares that a specific predicate (or set of predicates) can be used to identify blank nodes within contexts. This enables context-based blank node identification for CRDT operations that require object identity (e.g., OR-Set, 2P-Set tombstone matching). Multiple predicates can be declared to create compound identification keys.";
+    rdfs:domain sync:Mapping;
     rdfs:range rdf:Property .

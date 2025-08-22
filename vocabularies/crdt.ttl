@@ -45,8 +45,8 @@ crdt:ClockEntry a rdfs:Class;
 
 crdt:mergeWith a rdf:Property;
     rdfs:label "merge with";
-    rdfs:comment "Links a sync:PropertyMapping to the specific CRDT Algorithm to be used for merging.";
-    rdfs:domain sync:PropertyMapping;
+    rdfs:comment "Links a sync:Rule to the specific CRDT Algorithm to be used for merging.";
+    rdfs:domain sync:Rule;
     rdfs:range crdt:Algorithm .
 
 crdt:hasClockEntry a rdf:Property;

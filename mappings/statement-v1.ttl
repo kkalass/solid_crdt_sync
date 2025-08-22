@@ -8,12 +8,12 @@
 
 mappings:statement-v1 a sync:ClassMapping;
    sync:appliesToClass rdf:Statement;
-   sync:propertyMapping
+   sync:rule
      # The subject, predicate, and object of the reified statement are immutable identifiers
-     [ sync:property rdf:subject; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property rdf:predicate; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property rdf:object; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate rdf:predicate; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate rdf:object; crdt:mergeWith crdt:LWW_Register ],
      
      # The deletion marker uses LWW semantics - once deleted, stays deleted
      # (Though in practice, tombstones rarely conflict since they're created atomically)
-     [ sync:property crdt:isDeleted; crdt:mergeWith crdt:LWW_Register ] .
+     [ sync:predicate crdt:isDeleted; crdt:mergeWith crdt:LWW_Register ] .

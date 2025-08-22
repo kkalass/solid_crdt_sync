@@ -5,7 +5,7 @@
 
 mappings:group-index-template-v1 a sync:ClassMapping;
    sync:appliesToClass idx:GroupIndexTemplate;
-   sync:propertyMapping
+   sync:rule
      [ sync:property idx:indexesClass; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:indexedProperty; crdt:mergeWith crdt:LWW_Register ],
      [ sync:property idx:shardingAlgorithm; crdt:mergeWith crdt:LWW_Register ],

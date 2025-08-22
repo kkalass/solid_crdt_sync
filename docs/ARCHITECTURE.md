@@ -20,26 +20,156 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **Decentralized & Server-Agnostic:** The Solid Pod acts as a simple, passive storage bucket. All synchronization logic resides within the client-side library.
 
-## 3. Fundamental Constraints: Blank Nodes and Merge Boundaries
+## 3. Fundamental Constraints: Resource Identity and CRDT Compatibility
 
-**The Challenge:** RDF blank nodes present fundamental boundaries for CRDT merging operations. Blank nodes are document-scoped by definition - their identifiers are only meaningful within a single document instance. When merging two documents, it is impossible to determine if `_:b1` in document A corresponds to `_:b2` in document B, even if they represent semantically identical structures.
+### 3.1. The Blank Node Challenge
 
-**Merge Boundaries:** CRDT merging operations generally **stop at blank node boundaries**. Properties whose values are blank nodes typically require atomic treatment (e.g., LWW-Register semantics) rather than deep structural merging.
+**The Fundamental RDF Constraint:** RDF blank nodes are document-instance-scoped by definition - their identifiers (like `_:b1`) only have meaning within a single document instance. The RDF specification allows different implementations to assign blank node labels arbitrarily, so the same semantic content might be labeled `_:b1` in one instance and `_:genid123` in another. When merging two document instances (e.g., local `recipe-123.ttl` and remote `recipe-123.ttl`), we cannot determine if `_:b1` in the local instance corresponds to `_:b1` in the remote instance - even if the labels match, this must be treated as incidental coincidence rather than semantic equivalence.
 
-**Conditional Mergeability:** However, some blank node structures can be merged using specialized approaches:
+**Why This Matters for CRDTs:** Many CRDT operations require stable identity to function correctly:
+- **OR-Set and 2P-Set** tombstones must match their target objects across documents
+- **Sequence CRDTs** need to maintain consistent element ordering
+- **Merge algorithms** must determine which resources represent the same entity
 
-- **Identifying Properties:** Blank nodes with stable identifying properties (like `crdt:clientId` in vector clock entries) can enable merge operations within their scope
-- **Structural Patterns:** Well-defined structures like ordered lists may support algorithmic matching approaches
+**The Core Problem:** Without stable identity, we cannot reliably merge RDF graphs containing blank nodes, leading to data inconsistency and CRDT convergence failures.
 
-**Current Implementation Note:** This constraint is evident in the framework's own vector clock implementation, which uses blank nodes for clock entries. These can be merged because `crdt:clientId` provides a stable identifier within the scope of the document's clock structure - demonstrating both the challenge and potential solutions.
+### 3.2. Resource Merging vs Property Merging
 
-**Development Implications:** 
+**Two Distinct Operations:** The framework performs two conceptually separate but coordinated operations:
 
-- **Data Modeling Decisions:** Developers should prefer IRIs over blank nodes when deep merging is required for their use case
-- **Mapping Validation:** CRDT mapping rules must be compatible with blank node constraints to ensure sound merge operations
-- **Depth Control:** The framework requires mechanisms to specify when merging should "descend" into blank node structures versus treating them atomically
+1. **Resource Merging:** Combine all properties belonging to the same identified resource across documents. This is resource-scoped processing - each identified resource gets merged independently based on its own properties, regardless of how many other resources reference it.
 
-This constraint affects all subsequent architectural decisions regarding merge contracts, indexing strategies, and sync algorithms.
+2. **Property Merging:** Within each identified resource, apply CRDT rules (LWW-Register, OR-Set, etc.) to merge individual property values according to the resource's merge contract.
+
+**Impact on Each Operation:** The blank node identity problem affects both merging operations differently:
+
+**Resource Merging Impact:** When non-identifiable resources appear as subjects, we cannot determine if `_:b1` in document A corresponds to `_:b1` in document B, even if they have identical properties. The blank node labels are arbitrary serialization decisions that only have meaning within a single document instance by RDF definition. Therefore, we cannot merge their properties - each document's version must be treated atomically.
+
+**Property Merging Impact:** When non-identifiable resources appear as object values, we cannot determine equality for CRDT operations that depend on identity. For example, OR-Set tombstones cannot match their target objects across documents because `[rdfs:label "homemade"]` in a tombstone cannot be reliably compared to `[rdfs:label "homemade"]` in the live data.
+
+### 3.3. The Solution: Context-Based Identification
+
+**The Key Insight:** Some blank nodes can become identifiable through the combination of context + properties, enabling safe CRDT operations within specific scopes.
+
+**The Mechanism:** Mapping documents can declare that specific properties serve as identifiers for blank nodes using `sync:identifyingPredicate`. This creates stable identity within a known context scope.
+
+**Example - Vector Clock Entries:**
+```turtle
+# Data: These blank nodes can be identified via crdt:clientId within vector clock context
+<> crdt:hasClockEntry [
+    crdt:clientId <https://alice.../installation-123> ;  # Identifying property
+    crdt:clockValue "15"^^xsd:integer
+] .
+```
+
+**Mapping Declaration:** The identification pattern is declared in our standard mapping document `https://kkalass.github.io/solid_crdt_sync/mappings/crdt-v1` using predicate-based mapping (since vector clock entries are typically typeless blank nodes):
+```turtle
+# Standard mapping for vector clock entries (typeless blank nodes)  
+<#clock-mappings> a sync:PredicateMapping;
+   sync:identifyingPredicate crdt:clientId ;
+   sync:rule
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+**Compound Keys:** Multiple identifying properties can create compound identification:
+```turtle
+# Example with compound identification key for nutrition info
+mappings:nutrition-mappings-v1 a sync:PredicateMapping;
+   sync:identifyingPredicate schema:calories, schema:servingSize ;  # Compound key
+   sync:rule
+     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+**The Pattern:** `(identifying predicate, identifying properties)` creates sufficient identity for safe merging within that scope. With compound keys, the pattern becomes `(identifying predicate, property1=value1, property2=value2, ...)`. For example, vector clock entries are identified by `(crdt:hasClockEntry, crdt:clientId=value)`.
+
+**Multi-Subject References (Aliases):** When the same blank node is referenced by multiple subjects, it creates multiple identification paths - essentially aliases for the same entity:
+
+**Example - Multiple Identification Paths:**
+```turtle
+# This blank node can be identified through multiple paths
+:recipe1 schema:nutrition _:nutritionInfo .
+:recipe2 schema:nutrition _:nutritionInfo .
+_:nutritionInfo a schema:NutritionInformation ;
+    schema:calories 250 ; 
+    schema:servingSize "1 cup" .
+```
+
+**Identification Aliases:** Using the predicate-based pattern with compound key `schema:calories, schema:servingSize`, this blank node has multiple valid identifications:
+- `(schema:nutrition, calories=250, servingSize="1 cup")` (from :recipe1)
+- `(schema:nutrition, calories=250, servingSize="1 cup")` (from :recipe2)
+
+In this case, both paths result in the same identification, confirming it's the same entity.
+
+**Matching Across Documents:** For two blank nodes from different documents to be considered the same entity, **at least one of their identification aliases must match**. An identification alias is the unique combination of `(identifying predicate, identifying properties)` derived from a path that references the blank node. If a blank node in Document A and a blank node in Document B share at least one identical identification alias, the framework treats them as the same resource, enabling their properties to be merged. 
+
+### 3.4. Identifiable vs Non-Identifiable Resources
+
+**The Critical Taxonomy:** Now that we understand the solution mechanism, we can categorize resources based on their identifiability:
+
+**Identifiable Resources** (safe for all CRDT operations):
+- **IRI-identified resources:** Have globally unique, stable identifiers
+- **Context-identified blank nodes:** Blank nodes with identifying properties declared via `sync:identifyingPredicate` in mapping documents within specific subject-predicate contexts
+
+**Non-Identifiable Resources** (limited to atomic operations):
+- **Standard blank nodes:** Document-scoped identifiers without declared identification patterns
+
+**Determining Identifiability:** A blank node becomes identifiable when:
+1. Its containing property has a mapping contract 
+2. That contract includes `sync:identifyingPredicate` declarations
+3. The blank node has the declared identifying property(ies)
+4. The identification occurs within the specified context scope
+
+### 3.5. When Identity-Dependent CRDTs Fail
+
+**The Technical Problem:** Identity-dependent CRDTs (OR-Set, 2P-Set) require comparing objects across documents to determine if a tombstone matches its target. With non-identifiable objects, this comparison fails.
+
+**Example - OR-Set with Non-Identifiable Objects:**
+```turtle
+# Document A: Contains blank node + its tombstone
+:recipe schema:keywords [rdfs:label "homemade"; custom:priority 1] .
+<#crdt-tombstone-a1b2c3d4> a rdf:Statement;
+  rdf:subject :recipe;
+  rdf:predicate schema:keywords;
+  rdf:object [rdfs:label "homemade"; custom:priority 1];
+  crdt:isDeleted true .
+
+# Document B: Contains similar but non-identical blank node  
+:recipe schema:keywords [rdfs:label "homemade"; custom:priority 2] .
+```
+
+**The Comparison Problem:** The tombstone in document A refers to `[rdfs:label "homemade"; custom:priority 1]` but document B contains `[rdfs:label "homemade"; custom:priority 2]`. Are these the same object that should be tombstoned, or different objects that should coexist?
+
+**Without Identity:** The framework cannot definitively answer this question. Different implementations might:
+- Compare structural equality (same properties/values)
+- Compare partial equality (ignore some properties)
+- Use heuristics based on processing order
+
+**Result:** Inconsistent merge behavior that violates CRDT convergence guarantees.
+
+**Why Not Structural Equality?** A tempting solution would be to declare two blank nodes equal if and only if all their properties are identical. However, this creates a subtle trap: if a blank node has naturally identifying properties (like `rdfs:label`) mixed with mutable properties (like `custom:priority`), then editing the mutable properties silently breaks tombstone matching. The deletion operation fails without error, creating hard-to-debug data inconsistencies. Therefore, this specification explicitly prohibits structural equality comparison and requires explicit identification patterns.
+
+**Solution Path:** This particular example could potentially be made identifiable by declaring `rdfs:label` as an identifying property using `sync:identifyingPredicate` in the mapping contract for `schema:keywords` properties. However, this only works when blank nodes have stable identifying properties that don't conflict across documents.
+
+### 3.6. CRDT Compatibility Rules
+
+**Mapping Validation Requirements:** Now that we understand identifiability, the framework must enforce these compatibility rules for **object values** in RDF triples:
+
+- **OR-Set, 2P-Set:** Can ONLY be used when object values are identifiable (IRIs, literals, or context-identified blank nodes)
+- **LWW-Register:** Can work with non-identifiable object values (treats them atomically)
+
+**Error Prevention:** Invalid mappings (e.g., OR-Set on non-identifiable blank nodes) must be detected during merge contract validation. Resources with invalid mappings are rejected at the resource level, allowing other resources of the same type to continue syncing. This provides users with a recovery path to locally edit or delete problematic properties before re-attempting synchronization.
+
+### 3.7. Development Implications
+
+- **Data Modeling:** Prefer IRIs over blank nodes when identity-dependent CRDT operations are needed
+- **Mapping Design:** Understand identifiability requirements for each CRDT type and use `sync:identifyingPredicate` appropriately
+- **Validation:** Implement mapping validation to prevent invalid configurations
+- **Performance:** Flat resource processing enables parallel merging optimizations
+
+This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
 
 ## 4. Discovery Protocol
 
@@ -71,7 +201,7 @@ Applications discover data locations through the standard Solid discovery mechan
    solid:instanceContainer <../data/shopping-entries/> .
 ```
 
-3. **Framework Type Resolution:** Applications also register framework-specific types (indices and client installations) in the Type Index using the same mechanism:
+3. **Specification Type Resolution:** Applications also register specification-defined types (indices and client installations) in the Type Index using the same mechanism:
 
 ```turtle
 # Also in Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
@@ -136,7 +266,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
 # -- Pointers to Other Layers --
 <> a foaf:Document;
    foaf:primaryTopic :it;
-   # Pointer to the Merge Contract (Layer 2)
+   # Pointer to the Merge Contract (Layer 2) - imports CRDT library + app mappings
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to
    idx:belongsToIndexShard <../../indices/recipes/shard-mod-xxhash64-2-0-v1_0_0> .
@@ -150,22 +280,41 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 * **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **RDF Reification Tombstones** for managing deletions.
 
-**Example: The Rules File `recipe-v1`**
-This file, published at a public URL, defines how to merge a `schema:Recipe`.
+**Example: Standard CRDT Library `crdt-v1`**
+This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping, which imports the existing [`statement-v1.ttl`](../mappings/statement-v1.ttl) for tombstone handling and defines predicate-based mappings for vector clock entries.
+
+**Example: Application-Specific Rules File `recipe-v1`**
+This file, created by application developers, imports the CRDT library and adds application-specific mappings.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 
-<> a sync:ClassMapping;
+<> a sync:DocumentMapping;
+   # Import standard CRDT library (gets statement and clock mappings automatically)
+   sync:documentMapping <https://kkalass.github.io/solid_crdt_sync/mappings/crdt-v1> ;
+   
+   # Define local application-specific mappings
+   sync:classMapping <#recipe> ;
+   sync:predicateMapping <#nutrition> .
+
+<#recipe> a sync:ClassMapping;
    sync:appliesToClass schema:Recipe;
-   sync:propertyMapping
-     [ sync:property schema:name; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property schema:keywords; crdt:mergeWith crdt:OR_Set ],
-     [ sync:property schema:recipeIngredient; crdt:mergeWith crdt:OR_Set ],
-     [ sync:property schema:totalTime; crdt:mergeWith crdt:LWW_Register ].
+   sync:rule
+     [ sync:predicate schema:name; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:keywords; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate schema:recipeIngredient; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate schema:totalTime; crdt:mergeWith crdt:LWW_Register ] .
+
+<#nutrition> a sync:PredicateMapping;
+   sync:identifyingPredicate schema:calories, schema:servingSize ;
+   sync:rule
+     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .
 ```
+
 
 **Example: The Mechanics embedded in `https://alice.podprovider.org/data/recipes/tomato-basil-soup`**
 This shows the full recipe resource with the CRDT mechanics included.
@@ -192,9 +341,7 @@ This shows the full recipe resource with the CRDT mechanics included.
   rdf:subject :it;
   rdf:predicate schema:keywords;
   rdf:object "quick";
-  crdt:isDeleted true;
-  # All RDF data in a pod must be governed by merge contracts for mergeability
-  sync:isGovernedBy <https://kkalass.github.io/solid_crdt_sync/mappings/statement-v1> .
+  crdt:isDeleted true .
 ```
 
 **Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
@@ -221,7 +368,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
 # -- Pointers to Other Layers --
 <> a foaf:Document;
    foaf:primaryTopic :it;
-   # Uses a different merge contract for shopping list entries
+   # Uses a different DocumentMapping for shopping list entries (imports CRDT library + shopping mappings)
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
    # Points to index shard within the appropriate group
    idx:belongsToIndexShard <../../../../../indices/shopping-entries/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
@@ -326,7 +473,7 @@ Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` docume
 
 **Versioning Strategy:**
 
-The framework uses simple integer versioning for merge contracts to handle evolution over time:
+The specification uses simple integer versioning for merge contracts to handle evolution over time:
 
 ```turtle
 # Merge contract versioning examples
@@ -388,7 +535,7 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
 
 **Application Vocabulary:**
-Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the framework vocabulary but work within the framework's structure.
+Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the specification vocabulary but work within the specification's structure.
 
 ### 5.3.1. Sharding Overview
 
@@ -527,7 +674,7 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
-# Note: The mappings: namespace contains CRDT merge contracts for framework components
+# Note: The mappings: namespace contains CRDT merge contracts for specification components
 # such as group-index-template-v1, group-index-v1, shard-v1, full-index-v1
 
 <> a idx:GroupIndexTemplate;
@@ -896,7 +1043,7 @@ This architecture aligns with the goals of the **W3C CRDT for RDF Community Grou
 
 ### 11.2. Architectural Differentiators
 
-* **"Add-on" vs. "Database":** This framework is designed as an "add-on" library. The developer retains control over their local storage and querying logic.
+* **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
 * **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 

@@ -98,9 +98,7 @@ A 2P-Set is used for multi-value properties where removal is permanent. Once an 
   rdf:subject :it;
   rdf:predicate schema:keywords;
   rdf:object "vegan";
-  crdt:isDeleted true;
-  # All RDF data in a pod must be governed by merge contracts for mergeability
-  sync:isGovernedBy <https://kkalass.github.io/solid_crdt_sync/mappings/statement-v1> .
+  crdt:isDeleted true .
 ```
 
 **Merge Algorithm:**
@@ -129,9 +127,7 @@ An element's presence is determined by comparing the causality information of it
   rdf:subject :it;
   rdf:predicate schema:keywords;
   rdf:object "spicy";
-  crdt:isDeleted true;
-  # All RDF data in a pod must be governed by merge contracts for mergeability
-  sync:isGovernedBy <https://kkalass.github.io/solid_crdt_sync/mappings/statement-v1> .
+  crdt:isDeleted true .
 
 # The timing of this tombstone is determined by the document-level vector clock:
 <> crdt:hasClockEntry [
@@ -180,7 +176,7 @@ Result: #crdt-tombstone-a1b2c3d4
 
 **Implementation Notes:**
 - **Pod Migration Limitation:** When documents are copied between pods, base URIs change, resulting in different tombstone identifiers for semantically equivalent tombstones. This is acceptable as equivalent tombstones merge correctly.
-- **Blank Node Limitation:** FIXME - Blank node subjects are not supported due to unstable serialization labels in RDF specifications.
+- **Blank Node Support:** Identifiable blank nodes (those with `sync:identifyingPredicate` declarations) can serve as tombstone subjects using their stable identity pattern. Non-identifiable blank nodes cannot be tombstoned as they lack stable identity across documents. See ARCHITECTURE.md section 3.3-3.4 for identification patterns.
 - **Collision Resistance:** XXH64 provides sufficient collision resistance for practical use cases while maintaining compact identifiers.
 
 **Implementation Guidance:**
@@ -213,7 +209,7 @@ Accept the storage trade-off in favor of implementation simplicity. The document
 
 The final tombstone design addresses two key requirements:
 
-1. **Mergeable RDF Data**: All tombstone statements include `sync:isGovernedBy` to reference their merge contract, ensuring they can be properly merged as RDF data.
+1. **Mergeable RDF Data**: All tombstone statements are governed by the document-level merge contract (imported via `sync:includes mappings:statement-v1`), ensuring they can be properly merged as RDF data.
 
 2. **Document-Level Vector Clocks**: Tombstones rely on the document-level vector clock rather than storing individual timestamps, which:
    - **Simplifies implementation** by avoiding per-tombstone clock management
@@ -223,14 +219,85 @@ The final tombstone design addresses two key requirements:
 
 This approach prioritizes simplicity and interoperability over storage optimization, consistent with the framework's core principles.
 
+## 4. CRDT Mapping Validation
 
-## 4. Merge Process Details
+To prevent invalid configurations, implementations must validate CRDT mappings against resource identifiability requirements before allowing merge operations.
 
-### 4.1. Full Merge Algorithm
+### 4.1. Identifiable vs Non-Identifiable Resources
+
+**Identifiable Resources** (safe for all CRDT types):
+- **IRI-identified resources:** Have globally unique, stable identifiers
+- **Context-identified blank nodes:** Blank nodes with identifying properties declared via `sync:identifyingPredicate` within specific subject-predicate contexts
+
+**Non-Identifiable Resources** (cause merge failures in identity-dependent CRDTs):
+- **Standard blank nodes:** Document-scoped identifiers that cannot be matched across documents without explicit identification patterns
+
+### 4.2. CRDT Compatibility Matrix
+
+| CRDT Type | Identifiable Resources | Non-Identifiable Resources |
+|-----------|----------------------|---------------------------|
+| **LWW-Register** | ✅ Supported | ✅ Supported (atomic treatment) |
+| **OR-Set** | ✅ Supported | ❌ **INVALID** - tombstone matching fails |
+| **2P-Set** | ✅ Supported | ❌ **INVALID** - tombstone matching fails |
+| **Sequence** | ✅ Supported | ❌ **INVALID** - element ordering undefined |
+
+### 4.3. Validation Algorithm
+
+```
+validateMapping(property, crdtType, objectTypes):
+  for each objectType in objectTypes:
+    if crdtType in [OR_Set, 2P_Set, Sequence]:
+      if not isIdentifiable(objectType):
+        throw ValidationError("CRDT type " + crdtType + " requires identifiable resources, but property " + property + " contains non-identifiable " + objectType)
+    
+  return valid
+```
+
+### 4.4. Identifying Property Patterns
+
+**Context-Identified Blank Nodes:** Blank nodes can become identifiable when mapping documents declare identifying properties using `sync:identifyingPredicate`.
+
+**Example - Vector Clock Mapping:**
+```turtle
+# Predicate-based mapping for vector clock entries (typeless blank nodes)
+mappings:clock-mappings-v1 a sync:PredicateMapping;
+   sync:identifyingPredicate crdt:clientId ;        # Identifying property
+   sync:rule
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+**Usage in Data:**
+```turtle
+# These blank nodes are now identifiable via declared pattern
+<> crdt:hasClockEntry [
+    crdt:clientId <https://alice.../installation-123> ;  # Identifying property
+    crdt:clockValue "15"^^xsd:integer
+] .
+```
+
+**Validation Rule:** Implementations recognize blank node patterns as identifiable when `sync:identifyingPredicate` are declared in PredicateMappings, or when `sync:identifyingPredicate` is declared in ClassMappings for explicitly typed resources.
+
+### 4.5. Error Handling
+
+**Invalid Mapping Detection:**
+- Parse merge contracts during resource loading
+- Check each property mapping against object type identifiability
+- Reject resources with invalid mappings rather than risk data corruption
+
+**Error Messages:**
+```
+Error: Property 'schema:keywords' uses OR-Set CRDT with non-identifiable blank node objects.
+Solution: Use IRIs for objects or switch to LWW-Register for atomic treatment.
+```
+
+## 5. Merge Process Details
+
+### 8.1. Full Merge Algorithm
 
 ```
 mergeResources(localResource, remoteResource):
-  1. loadMergeContract(localResource.sync:isGovernedBy)
+  1. loadMergeContract(document.sync:isGovernedBy)
   2. compareVectorClocks(local.clock, remote.clock)
   3. if local.clock == remote.clock:
        return local  // Identical state, no merge needed
@@ -242,7 +309,7 @@ mergeResources(localResource, remoteResource):
        return propertyLevelMerge(local, remote, mergeContract)
 ```
 
-### 4.2. Property-Level Merge
+### 8.2. Property-Level Merge
 
 ```
 propertyLevelMerge(local, remote, contract):
@@ -262,53 +329,53 @@ propertyLevelMerge(local, remote, contract):
   return result
 ```
 
-## 5. Edge Cases and Error Handling
+## 6. Edge Cases and Error Handling
 
-### 5.1. Missing Merge Contracts
-If a resource's `sync:isGovernedBy` link points to a merge contract that is unavailable (e.g., due to network failure, or the resource was deleted), the resource cannot be safely merged. 
+### 8.1. Missing Merge Contracts
+If a document's `sync:isGovernedBy` link points to a merge contract that is unavailable (e.g., due to network failure, or the resource was deleted), the document cannot be safely merged. 
 
 **Policy:**
-- **Resource-Level Failure:** If the merge contract for a resource is inaccessible, a client **MUST NOT** attempt to merge that resource. It should be treated as temporarily offline-only. The client should periodically retry fetching the contract.
-- **Property-Level Failure:** If a contract is successfully fetched but it does not contain a `sync:propertyMapping` for a specific property present in the resource, that property **MUST NOT** be merged. The client should preserve its local value for the unmapped property and may log a warning.
+- **Document-Level Failure:** If the merge contract for a document is inaccessible, a client **MUST NOT** attempt to merge that document. It should be treated as temporarily offline-only. The client should periodically retry fetching the contract.
+- **Property-Level Failure:** If a contract is successfully fetched but it does not contain a mapping rule for a specific predicate present in the document, that predicate **MUST NOT** be merged. The client should preserve its local value for the unmapped predicate and may log a warning.
 
-### 5.2. Partial Resource Synchronization
+### 8.2. Partial Resource Synchronization
 - **TODO: Handle cases where only some properties are available**
 - **FIXME: Vector clock semantics for partial updates**
 
-### 5.3. Client ID Conflicts
+### 6.3. Client ID Conflicts
 - **TODO: Handle duplicate client IDs (though cryptographically unlikely)**
 - **FIXME: Client ID verification and validation**
 
-### 5.4. Large Vector Clocks
+### 6.4. Large Vector Clocks
 For documents that are edited by a very large number of clients over a long period, the document-level vector clock can grow in size, potentially impacting performance and storage.
 
 **Policy:** Naive pruning of vector clock entries (e.g., removing the oldest entry) is **unsafe** as it destroys the causal history required for correct merging, and can lead to data divergence. 
 
 A robust, general-purpose, and safe clock pruning algorithm requires coordination between clients and is an advanced topic beyond the scope of this core specification. For use cases with an extremely high number of collaborators, developers should consider architectural solutions, such as splitting the document into smaller, more focused documents with independent clocks.
 
-## 6. Implementation Notes
+## 7. Implementation Notes
 
-### 6.1. Performance Optimizations
+### 8.1. Performance Optimizations
 - **Incremental Merging:** Instead of creating a new merged resource from scratch, a more memory-efficient approach is to calculate a diff or patch and apply it to the local resource. This is especially effective for large resources with small changes.
 - **Efficient Clock Representation:** Vector clocks can be stored in memory as sorted lists or maps for efficient lookups and comparisons. For persistence, client ID IRIs can be compressed using a local mapping (e.g., to integers) to reduce storage size.
 
-### 6.2. Concurrency Control
+### 8.2. Concurrency Control
 - **Atomic Updates:** The process of merging and persisting the new state MUST be atomic. An implementation should ensure that a failure during a write operation does not leave the local storage in an inconsistent state. A common pattern is to write the new resource to a temporary file and then atomically rename it to its final destination.
 - **Locking:** While the merge algorithm itself is deterministic, the process of reading the local state, merging, and writing it back should be treated as a single transaction to prevent race conditions with other local operations.
 
-## 7. Testing and Validation
+## 8. Testing and Validation
 
 A robust implementation of this specification requires a comprehensive test suite. The following strategies are recommended:
 
-### 7.1. Convergence Properties
+### 8.1. Convergence Properties
 - **Property-Based Testing:** Use property-based testing frameworks (like `QuickCheck` or `Hypothesis`) to generate long, random sequences of concurrent operations applied to multiple replicas. The test should assert that all replicas eventually converge to the identical state after all operations are merged.
 - **Formal Modeling:** For critical components, consider using a formal methods tool like TLA+ or Alloy to prove that the algorithms satisfy the required CRDT properties (associativity, commutativity, idempotence).
 
-### 7.2. Interoperability and Conformance
+### 8.2. Interoperability and Conformance
 - **Common Test Suite:** A shared conformance test suite should be developed. This suite would contain a set of reference resources, merge scenarios, and their expected outcomes. Different client implementations can run against this suite to ensure they are fully interoperable.
 - **Vocabulary Versioning:** The test suite must include scenarios for handling changes in the `crdt`, `sync`, and `idx` vocabularies, as well as in the application-specific merge contracts. This includes testing for both backward and forward compatibility where applicable.
 
-## 8. Open Questions
+## 9. Open Questions
 
 1. **Semantic Consistency**: How to handle semantic constraints that might be violated during merge?
 2. **Schema Evolution**: How to handle changes in merge contracts over time?

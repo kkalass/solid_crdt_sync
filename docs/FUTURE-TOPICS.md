@@ -2,40 +2,13 @@
 
 This document tracks substantial topics identified for future discussion and potential implementation. These represent areas where the current specification could be enhanced or optimized, but require deeper analysis and design work.
 
-## 1. Blank Nodes and CRDT
+## 1. Restore Consistency
 
-**Status**: Open Question  
-**Current Limitation**: Tombstone fragment identifier algorithm has FIXME for blank node subjects due to unstable serialization labels.
+The architecture has been growing a lot, and many good things were added or updated, but I think we have started losing consistency and started to contradict ourselves.
+I think that the most important upcoming topic is, to get back on track and try to get everything consistent and correct that we have defined so far, without
+really adding anything new to the spec.
 
-**Discussion Points**:
-- How to handle blank nodes as subjects in tombstones?
-- Should we define a stable blank node serialization approach?
-- Alternative approaches for CRDT operations on blank node graphs?
-- Impact on interoperability if we create framework-specific blank node handling?
-
-**Related**: CRDT-SPECIFICATION.md line 183 FIXME note
-
----
-
-## 2. Optimize CRDT Mappings Declaration
-
-**Status**: Open Question  
-**Current Issue**: Every document subject requires explicit `sync:isGovernedBy` reference, creating significant repetition.
-
-**Potential Optimizations**:
-- **Type-based Default Mappings**: Define mappings from RDF type to merge contract (e.g., `schema:Recipe` → `recipe-v1`)
-- **Default CRDT Strategy**: Consider LWW-Register as framework default for all unmapped properties
-- **Hierarchical Mappings**: Allow inheritance from more general to specific contracts
-
-**Risks to Discuss**:
-- LWW-Register as default could be dangerous for multi-value properties
-- Type-based mappings may reduce explicit control/transparency
-
-**Related**: Current verbose `sync:isGovernedBy` usage throughout examples
-
----
-
-## 3. Custom Tombstone Format vs RDF Reification
+## 2. Custom Tombstone Format vs RDF Reification
 
 **Status**: Open Question  
 **Current Approach**: Uses RDF Reification for semantic correctness but with significant overhead.
@@ -52,7 +25,7 @@ This document tracks substantial topics identified for future discussion and pot
 
 ---
 
-## 4. Vector Clock Optimization for Tombstones
+## 3. Vector Clock Optimization for Tombstones
 
 **Status**: Open Question  
 **Current Limitation**: Document-level vector clocks prevent tombstone compaction.
@@ -72,7 +45,7 @@ This document tracks substantial topics identified for future discussion and pot
 
 ---
 
-## 5. Hybrid Approach Specification
+## 4. Hybrid Approach Specification
 
 **Status**: Open Question  
 **Current Issue**: "Hybrid Approach" mentioned in compaction section but not fully specified.
@@ -93,7 +66,7 @@ This document tracks substantial topics identified for future discussion and pot
 
 ---
 
-## 6. RDF Collections and Extended CRDT Algorithms
+## 5. RDF Collections and Extended CRDT Algorithms
 
 **Status**: Open Question  
 **Current Gap**: Framework focuses on basic CRDT types but doesn't address complex RDF structures or additional CRDT algorithms.

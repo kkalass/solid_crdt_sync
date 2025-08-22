@@ -5,5 +5,5 @@
 
 mappings:shard-v1 a sync:ClassMapping;
    sync:appliesToClass idx:Shard;
-   sync:propertyMapping
+   sync:rule
      [ sync:property idx:containsEntry; crdt:mergeWith crdt:2P_Set ].
