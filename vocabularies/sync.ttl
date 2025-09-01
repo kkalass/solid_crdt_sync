@@ -12,6 +12,11 @@
 
 # --- Class Definitions ---
 
+sync:ManagedDocument a rdfs:Class;
+    rdfs:label "Managed Document";
+    rdfs:comment "A document that is managed by the CRDT sync framework, containing framework metadata and a primary resource topic.";
+    rdfs:subClassOf <http://xmlns.com/foaf/0.1/Document> .
+
 sync:Mapping a rdfs:Class;
     rdfs:label "Mapping";
     rdfs:comment "An abstract base class for a resource that defines a set of merge rules." .
@@ -57,23 +62,23 @@ sync:appliesToPredicate a rdf:Property;
     rdfs:range rdf:Property .
 
 
-sync:documentMapping a rdf:Property;
-    rdfs:label "document mapping";
-    rdfs:comment "Imports a complete DocumentMapping library, inheriting all its class and predicate mappings. Used for importing standard mapping libraries like CRDT or RDF vocabularies.";
+sync:imports a rdf:Property;
+    rdfs:label "imports";
+    rdfs:comment "An ordered list (rdf:List) of DocumentMapping libraries to import, inheriting all their class and predicate mappings. Precedence: Local ClassMapping > Local PredicateMapping > Imported DocumentMapping (list order). Used for importing standard mapping libraries like CRDT or RDF vocabularies.";
     rdfs:domain sync:DocumentMapping;
-    rdfs:range sync:DocumentMapping .
+    rdfs:range rdf:List .
 
 sync:classMapping a rdf:Property;
     rdfs:label "class mapping";
-    rdfs:comment "References a ClassMapping (either local or external) that defines merge behavior for a specific class of resources.";
+    rdfs:comment "An ordered list (rdf:List) of ClassMapping resources (either local or external) that define merge behavior for specific classes of resources. Precedence: Local ClassMapping > Local PredicateMapping > Imported DocumentMapping, with list order within each scope.";
     rdfs:domain sync:DocumentMapping;
-    rdfs:range sync:ClassMapping .
+    rdfs:range rdf:List .
 
 sync:predicateMapping a rdf:Property;
     rdfs:label "predicate mapping";
-    rdfs:comment "References a PredicateMappings resource (either local or external) that defines merge behavior for resources based on predicates.";
+    rdfs:comment "An ordered list (rdf:List) of PredicateMapping resources (either local or external) that define merge behavior for resources based on predicates. Precedence: Local ClassMapping > Local PredicateMapping > Imported DocumentMapping, with list order within each scope.";
     rdfs:domain sync:DocumentMapping;
-    rdfs:range sync:PredicateMapping .
+    rdfs:range rdf:List .
 
 sync:rule a rdf:Property;
     rdfs:label "mapping rule";
@@ -87,8 +92,14 @@ sync:predicate a rdf:Property;
     rdfs:domain sync:Rule;
     rdfs:range rdf:Property .
 
-sync:identifyingPredicate a rdf:Property;
-    rdfs:label "identifying predicate";
-    rdfs:comment "Declares that a specific predicate (or set of predicates) can be used to identify blank nodes within contexts. This enables context-based blank node identification for CRDT operations that require object identity (e.g., OR-Set, 2P-Set tombstone matching). Multiple predicates can be declared to create compound identification keys.";
-    rdfs:domain sync:Mapping;
-    rdfs:range rdf:Property .
+sync:isIdentifying a rdf:Property;
+    rdfs:label "is identifying";
+    rdfs:comment "A boolean flag used within sync:Rule to declare whether a specific predicate can be used to identify blank nodes within contexts. This enables context-based blank node identification for CRDT operations that require object identity (e.g., OR-Set, 2P-Set tombstone matching). When true, the predicate serves as part of a compound identification key along with other identifying predicates from any applicable mapping scope.";
+    rdfs:domain sync:Rule;
+    rdfs:range xsd:boolean .
+
+sync:managedResourceType a rdf:Property;
+    rdfs:label "managed resource type";
+    rdfs:comment "Links a Type Index registration for sync:ManagedDocument to the semantic RDF class of the resources being managed (e.g., schema:Recipe). Used in solid:TypeRegistration to enable framework apps to discover containers for specific semantic types while keeping managed resources hidden from non-framework applications.";
+    rdfs:domain <http://www.w3.org/ns/solid/terms#TypeRegistration>;
+    rdfs:range rdfs:Class .

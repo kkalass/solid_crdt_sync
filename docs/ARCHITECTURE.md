@@ -12,11 +12,11 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **Local-First:** The application must be fully functional offline, working primarily with data cached on the device. To ensure this principle remains practical for large datasets, the architecture supports optional partial sync strategies. This allows an application to work with a local, consistent cache of the *relevant* data, maintaining speed and offline availability without requiring a full data download.
 
-* **True Interoperability:** The data is clean, standard RDF. It becomes fully interoperable by linking to a public "ruleset" that defines how to collaborate on it.
+* **CRDT Interoperability:** The data is clean, standard RDF within CRDT-managed documents (`sync:ManagedDocument`). CRDT-enabled applications achieve interoperability by discovering managed resources via `sync:managedResourceType` and following the public merge contracts that define collaboration rules.
 
 * **Declarative Merge Behavior:** Developers define the merge behavior for each piece of data by declaratively linking its properties to well-defined **state-based** CRDT types (e.g., `LWW-Register`, `OR-Set`). This is done in a **public, discoverable rules file**, abstracting away the complexity of the underlying algorithms. This state-based approach is fundamental to the architecture's design as it works seamlessly with passive storage backends.
 
-* **Discoverability:** The system is designed to be self-describing. Applications can discover the location of data through the user's Solid Type Index. From a single data resource, a client can then discover its merge rules (`sync:isGovernedBy`) and the specific index shard it belongs to (`idx:belongsToIndexShard`), enabling any application to learn how to correctly and safely collaborate on the data without prior knowledge.
+* **Managed Resource Discoverability:** The system is designed to be self-describing for CRDT-enabled applications. Compatible applications can discover CRDT-managed resources through `sync:ManagedDocument` Type Index registrations with `sync:managedResourceType` filtering. From a managed resource, clients can discover merge rules (`sync:isGovernedBy`) and index shards (`idx:belongsToIndexShard`), enabling CRDT-enabled applications to collaborate safely while remaining invisible to incompatible applications.
 
 * **Decentralized & Server-Agnostic:** The Solid Pod acts as a simple, passive storage bucket. All synchronization logic resides within the client-side library.
 
@@ -51,129 +51,122 @@ The proposed solution addresses both challenges through a declarative, developer
 
 **The Key Insight:** Some blank nodes can become identifiable through the combination of context + properties, enabling safe CRDT operations within specific scopes.
 
-**The Mechanism:** Mapping documents can declare that specific properties serve as identifiers for blank nodes using `sync:identifyingPredicate`. This creates stable identity within a known context scope.
+**The Mechanism:** Mapping documents can declare that specific properties serve as identifiers for blank nodes using `sync:isIdentifying true` boolean flags within mapping rules (part of our `sync:` vocabulary for merge contracts). This creates stable identity within a known context scope.
 
-**Example - Vector Clock Entries:**
-```turtle
-# Data: These blank nodes can be identified via crdt:clientId within vector clock context
-<> crdt:hasClockEntry [
-    crdt:clientId <https://alice.../installation-123> ;  # Identifying property
-    crdt:clockValue "15"^^xsd:integer
-] .
-```
+**The Pattern:** `(context, identifying properties)` creates sufficient identity for safe merging within that scope. The context is the identifier of the subject containing the blank node, and identifying properties are the values of predicates with `sync:isIdentifying true` flags in their rules. With compound keys, the pattern becomes `(context, property1=value1, property2=value2, ...)`.
 
-**Mapping Declaration:** The identification pattern is declared in our standard mapping document `https://kkalass.github.io/solid_crdt_sync/mappings/crdt-v1` using predicate-based mapping (since vector clock entries are typically typeless blank nodes):
-```turtle
-# Standard mapping for vector clock entries (typeless blank nodes)  
-<#clock-mappings> a sync:PredicateMapping;
-   sync:identifyingPredicate crdt:clientId ;
-   sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
-```
+**Recursive Context Building:** Context identifiers can be built recursively - an identified blank node can serve as context for nested blank nodes:
+- **Base case:** IRI-identified resource (e.g., `<https://alice.podprovider.org/data/recipes/tomato-soup>`)  
+- **Recursive case:** Previously identified blank node (e.g., `(<https://alice.../recipes/tomato-soup>, clientId=<https://alice.../installation-123>)` identifies a clock entry)
+- **Nested example:** `((<https://alice.../recipes/tomato-soup>, clientId=<https://alice.../installation-123>), subProperty=value)` could identify a blank node within a clock entry
 
-**Compound Keys:** Multiple identifying properties can create compound identification:
-```turtle
-# Example with compound identification key for nutrition info
-mappings:nutrition-mappings-v1 a sync:PredicateMapping;
-   sync:identifyingPredicate schema:calories, schema:servingSize ;  # Compound key
-   sync:rule
-     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .
-```
+For example, vector clock entries are identified by `(document_IRI, crdt:clientId=<full_installation_IRI>)`, where `document_IRI` is the full document IRI context and `crdt:clientId=<full_installation_IRI>` are the identifying properties.
 
-**The Pattern:** `(identifying predicate, identifying properties)` creates sufficient identity for safe merging within that scope. With compound keys, the pattern becomes `(identifying predicate, property1=value1, property2=value2, ...)`. For example, vector clock entries are identified by `(crdt:hasClockEntry, crdt:clientId=value)`.
+**Implementation Details:** For detailed mapping syntax, complex identification scenarios, and implementation patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation). 
 
-**Multi-Subject References (Aliases):** When the same blank node is referenced by multiple subjects, it creates multiple identification paths - essentially aliases for the same entity:
+### 3.4. Resource Identity Taxonomy
 
-**Example - Multiple Identification Paths:**
-```turtle
-# This blank node can be identified through multiple paths
-:recipe1 schema:nutrition _:nutritionInfo .
-:recipe2 schema:nutrition _:nutritionInfo .
-_:nutritionInfo a schema:NutritionInformation ;
-    schema:calories 250 ; 
-    schema:servingSize "1 cup" .
-```
+**The Critical Three-Way Distinction:** Resources fall into three categories based on their identity characteristics:
 
-**Identification Aliases:** Using the predicate-based pattern with compound key `schema:calories, schema:servingSize`, this blank node has multiple valid identifications:
-- `(schema:nutrition, calories=250, servingSize="1 cup")` (from :recipe1)
-- `(schema:nutrition, calories=250, servingSize="1 cup")` (from :recipe2)
+**1. IRI-Identified Resources** (globally unique):
+- **Example:** `<https://alice.podprovider.org/data/recipes/tomato-soup>`
+- **Identity:** Globally unique, stable identifiers
+- **CRDT Compatibility:** Safe for all CRDT operations
 
-In this case, both paths result in the same identification, confirming it's the same entity.
+**2. Context-Identified Blank Nodes** (unique within context):
+- **Example:** `(<https://alice.../recipes/tomato-soup>, clientId=<https://alice.../installation-123>)`
+- **Identity:** Unique within specific context through identifying properties
+- **CRDT Compatibility:** Safe for all CRDT operations when properly identified
 
-**Matching Across Documents:** For two blank nodes from different documents to be considered the same entity, **at least one of their identification aliases must match**. An identification alias is the unique combination of `(identifying predicate, identifying properties)` derived from a path that references the blank node. If a blank node in Document A and a blank node in Document B share at least one identical identification alias, the framework treats them as the same resource, enabling their properties to be merged. 
-
-### 3.4. Identifiable vs Non-Identifiable Resources
-
-**The Critical Taxonomy:** Now that we understand the solution mechanism, we can categorize resources based on their identifiability:
-
-**Identifiable Resources** (safe for all CRDT operations):
-- **IRI-identified resources:** Have globally unique, stable identifiers
-- **Context-identified blank nodes:** Blank nodes with identifying properties declared via `sync:identifyingPredicate` in mapping documents within specific subject-predicate contexts
-
-**Non-Identifiable Resources** (limited to atomic operations):
-- **Standard blank nodes:** Document-scoped identifiers without declared identification patterns
+**3. Non-Identifiable Resources** (no stable identity):
+- **Example:** `[]` with no identifying properties or non-identifiable parent subject
+- **Identity:** Document-scoped identifiers without stable identification patterns
+- **CRDT Compatibility:** Limited to atomic operations (LWW-Register only)
 
 **Determining Identifiability:** A blank node becomes identifiable when:
-1. Its containing property has a mapping contract 
-2. That contract includes `sync:identifyingPredicate` declarations
-3. The blank node has the declared identifying property(ies)
-4. The identification occurs within the specified context scope
+1. A mapping rule declares some predicate as identifying (`sync:isIdentifying true`)  
+2. The blank node has that identifying predicate as one of its properties
+3. The subject that references the blank node is itself identifiable (IRI or previously identified blank node)
 
-### 3.5. When Identity-Dependent CRDTs Fail
+### 3.5. CRDT Compatibility Rules
 
-**The Technical Problem:** Identity-dependent CRDTs (OR-Set, 2P-Set) require comparing objects across documents to determine if a tombstone matches its target. With non-identifiable objects, this comparison fails.
+**The Critical Constraint:** Identity-dependent CRDTs (OR-Set, 2P-Set) require stable object identity to match tombstones with their targets across documents. Non-identifiable blank nodes cause these operations to fail.
 
-**Example - OR-Set with Non-Identifiable Objects:**
-```turtle
-# Document A: Contains blank node + its tombstone
-:recipe schema:keywords [rdfs:label "homemade"; custom:priority 1] .
-<#crdt-tombstone-a1b2c3d4> a rdf:Statement;
-  rdf:subject :recipe;
-  rdf:predicate schema:keywords;
-  rdf:object [rdfs:label "homemade"; custom:priority 1];
-  crdt:isDeleted true .
-
-# Document B: Contains similar but non-identical blank node  
-:recipe schema:keywords [rdfs:label "homemade"; custom:priority 2] .
-```
-
-**The Comparison Problem:** The tombstone in document A refers to `[rdfs:label "homemade"; custom:priority 1]` but document B contains `[rdfs:label "homemade"; custom:priority 2]`. Are these the same object that should be tombstoned, or different objects that should coexist?
-
-**Without Identity:** The framework cannot definitively answer this question. Different implementations might:
-- Compare structural equality (same properties/values)
-- Compare partial equality (ignore some properties)
-- Use heuristics based on processing order
-
-**Result:** Inconsistent merge behavior that violates CRDT convergence guarantees.
-
-**Why Not Structural Equality?** A tempting solution would be to declare two blank nodes equal if and only if all their properties are identical. However, this creates a subtle trap: if a blank node has naturally identifying properties (like `rdfs:label`) mixed with mutable properties (like `custom:priority`), then editing the mutable properties silently breaks tombstone matching. The deletion operation fails without error, creating hard-to-debug data inconsistencies. Therefore, this specification explicitly prohibits structural equality comparison and requires explicit identification patterns.
-
-**Solution Path:** This particular example could potentially be made identifiable by declaring `rdfs:label` as an identifying property using `sync:identifyingPredicate` in the mapping contract for `schema:keywords` properties. However, this only works when blank nodes have stable identifying properties that don't conflict across documents.
-
-### 3.6. CRDT Compatibility Rules
-
-**Mapping Validation Requirements:** Now that we understand identifiability, the framework must enforce these compatibility rules for **object values** in RDF triples:
-
+**Compatibility Matrix:**
 - **OR-Set, 2P-Set:** Can ONLY be used when object values are identifiable (IRIs, literals, or context-identified blank nodes)
 - **LWW-Register:** Can work with non-identifiable object values (treats them atomically)
 
-**Error Prevention:** Invalid mappings (e.g., OR-Set on non-identifiable blank nodes) must be detected during merge contract validation. Resources with invalid mappings are rejected at the resource level, allowing other resources of the same type to continue syncing. This provides users with a recovery path to locally edit or delete problematic properties before re-attempting synchronization.
+**Error Prevention:** Invalid mappings (e.g., OR-Set on non-identifiable blank nodes) must be detected during merge contract validation. Resources with invalid mappings are rejected at the resource level, allowing other resources of the same type to continue syncing.
 
-### 3.7. Development Implications
+**Detailed Examples:** For comprehensive examples of identification failures, structural equality problems, and solution patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation).
+
+### 3.6. Development Implications
 
 - **Data Modeling:** Prefer IRIs over blank nodes when identity-dependent CRDT operations are needed
-- **Mapping Design:** Understand identifiability requirements for each CRDT type and use `sync:identifyingPredicate` appropriately
+- **Mapping Design:** Understand identifiability requirements for each CRDT type and use `sync:isIdentifying` appropriately
 - **Validation:** Implement mapping validation to prevent invalid configurations
 - **Performance:** Flat resource processing enables parallel merging optimizations
 
+### 3.7. Implementation Consistency Checks
+
+**Recommended Practice:** Implementing libraries should perform consistency checks during mapping generation or validation, particularly when mappings are derived from code annotations:
+
+- **Blank Node Identification:** Verify that all blank nodes used with identity-dependent CRDTs (OR-Set, 2P-Set) have appropriate `sync:isIdentifying` declarations
+- **Mapping Completeness:** Ensure all properties of a class have corresponding merge rules in the mapping contract
+- **CRDT Compatibility:** Validate that each property's declared CRDT type is compatible with its object types (see section 4.2 in CRDT-SPECIFICATION.md)
+- **Generator Feedback:** When using code generation from annotations, provide clear error messages identifying specific properties or patterns that need correction
+
+**Example Generator Check:**
+```dart
+// Recipe class annotations
+@LWWRegister() // ✅ Valid - works with any object type
+String recipeName;
+
+@ORSet() // ✅ Valid because Ingredient class declares identifying properties
+List<Ingredient> ingredients; // Generator validates that Ingredient mapping exists
+
+// Ingredient class annotations (separate from Recipe)
+class Ingredient {
+  @LWWRegister() 
+  @IsIdentifying() // ✅ Declares this property as identifying
+  String name;
+  
+  @LWWRegister()
+  @IsIdentifying() // ✅ Compound key with name
+  String unit;
+  
+  @LWWRegister() // ✅ Regular property, not identifying
+  double amount;
+}
+
+// Generator produces mapping:
+// sync:rule [ sync:predicate my:name; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+//           [ sync:predicate my:unit; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+//           [ sync:predicate my:amount; crdt:mergeWith crdt:LWW_Register ]
+```
+
 This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
 
-## 4. Discovery Protocol
+## 4. Discovery Protocol and Application Isolation
 
-Applications discover data locations through the standard Solid discovery mechanism ([Solid Protocol](https://solidproject.org/TR/protocol)), extended with index-specific resolution:
+CRDT-managed resources contain synchronization metadata and follow structural conventions that traditional RDF applications don't understand, creating a risk of data corruption. This section describes how the architecture solves this problem through discovery isolation.
+
+CRDT-enabled applications use a modified Solid discovery approach that provides controlled access to managed resources while protecting them from incompatible applications. This isolation strategy prevents data corruption while maintaining standard Solid discoverability principles.
+
+### 4.1. Discovery Isolation Strategy
+
+**The Challenge:** Traditional Solid discovery would expose CRDT-managed data to all applications, risking corruption by applications that don't understand CRDT metadata or vector clocks.
+
+**The Solution:** CRDT-managed resources are registered under `sync:ManagedDocument` in the Type Index rather than their semantic types (e.g., `schema:Recipe`). The semantic type is preserved via `sync:managedResourceType` property.
+
+**Discovery Behavior:**
+- **CRDT-enabled apps:** Query for `sync:ManagedDocument` where `sync:managedResourceType schema:Recipe` → Find managed resources
+- **Traditional apps:** Query for `schema:Recipe` → Find nothing (managed data invisible)
+- **Legacy data:** Remains discoverable through traditional registrations until explicitly migrated
+
+This creates clean separation: compatible applications collaborate safely on managed data, while traditional apps work with unmanaged data, preventing cross-contamination.
+
+### 4.2. Managed Resource Discovery Protocol
 
 1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index ([Type Index](https://github.com/solid/type-indexes)):
 
@@ -184,7 +177,7 @@ Applications discover data locations through the standard Solid discovery mechan
 <#me> solid:publicTypeIndex </settings/publicTypeIndex.ttl> .
 ```
 
-2. **Index Resolution:** From the Type Index, resolve data type registrations to data containers:
+2. **Framework Resource Resolution:** From the Type Index, resolve `sync:ManagedDocument` registrations to data containers:
 
 ```turtle
 # In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
@@ -192,12 +185,14 @@ Applications discover data locations through the standard Solid discovery mechan
 @prefix schema: <https://schema.org/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
-<#recipes> a solid:TypeRegistration;
-   solid:forClass schema:Recipe;
+<#managed-recipes> a solid:TypeRegistration;
+   solid:forClass sync:ManagedDocument;
+   sync:managedResourceType schema:Recipe;
    solid:instanceContainer <../data/recipes/> .
 
-<#shopping-entries> a solid:TypeRegistration;
-   solid:forClass meal:ShoppingListEntry;
+<#managed-shopping-entries> a solid:TypeRegistration;
+   solid:forClass sync:ManagedDocument;
+   sync:managedResourceType meal:ShoppingListEntry;
    solid:instanceContainer <../data/shopping-entries/> .
 ```
 
@@ -223,13 +218,13 @@ Applications discover data locations through the standard Solid discovery mechan
    solid:instanceContainer <../installations/> .
 ```
 
-4. **Index Type Detection:** Applications query the Type Index for both data types (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:FullIndex`), enabling automatic discovery of the complete synchronization setup.
+4. **Managed Resource Discovery:** CRDT-enabled applications query the Type Index for `sync:ManagedDocument` registrations with specific `sync:managedResourceType` values (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:FullIndex`), enabling automatic discovery of the complete synchronization setup.
 
-**Advantages:** Using TypeRegistration for indices enables full discoverability - applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), making the architecture truly self-describing.
+**Advantages:** Using TypeRegistration with `sync:ManagedDocument` and `sync:managedResourceType` enables managed resource discovery while protecting managed resources from incompatible applications. CRDT-enabled applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), while traditional applications remain unaware of CRDT-managed data, preventing accidental corruption.
 
 ## 5. Architectural Layers
 
-The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
+Having established the discovery isolation strategy, we can now examine how CRDT-managed resources are structured and organized. The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
 
 ### 5.1. Layer 1: The Data Resource
 
@@ -264,7 +259,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
    schema:totalTime "PT30M" .
 
 # -- Pointers to Other Layers --
-<> a foaf:Document;
+<> a sync:ManagedDocument;
    foaf:primaryTopic :it;
    # Pointer to the Merge Contract (Layer 2) - imports CRDT library + app mappings
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
@@ -284,7 +279,7 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping, which imports the existing [`statement-v1.ttl`](../mappings/statement-v1.ttl) for tombstone handling and defines predicate-based mappings for vector clock entries.
 
 **Example: Application-Specific Rules File `recipe-v1`**
-This file, created by application developers, imports the CRDT library and adds application-specific mappings.
+This file, created by application developers (or better even: by some code generation tool based on annotations on the developer's classes, if such a tool is provided by e.g. the library authors), imports the CRDT library and adds application-specific mappings.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -293,11 +288,11 @@ This file, created by application developers, imports the CRDT library and adds 
 
 <> a sync:DocumentMapping;
    # Import standard CRDT library (gets statement and clock mappings automatically)
-   sync:documentMapping <https://kkalass.github.io/solid_crdt_sync/mappings/crdt-v1> ;
+   sync:imports ( <https://kkalass.github.io/solid_crdt_sync/mappings/crdt-v1> ) ;
    
-   # Define local application-specific mappings
-   sync:classMapping <#recipe> ;
-   sync:predicateMapping <#nutrition> .
+   # Define local application-specific mappings (ordered lists)
+   sync:classMapping ( <#recipe> ) ;
+   sync:predicateMapping ( <#nutrition> ) .
 
 <#recipe> a sync:ClassMapping;
    sync:appliesToClass schema:Recipe;
@@ -308,10 +303,9 @@ This file, created by application developers, imports the CRDT library and adds 
      [ sync:predicate schema:totalTime; crdt:mergeWith crdt:LWW_Register ] .
 
 <#nutrition> a sync:PredicateMapping;
-   sync:identifyingPredicate schema:calories, schema:servingSize ;
    sync:rule
-     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
      [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
@@ -320,7 +314,12 @@ This file, created by application developers, imports the CRDT library and adds 
 This shows the full recipe resource with the CRDT mechanics included.
 
 ```turtle
-# ... prefixes and primary data from Layer 1 ...
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix schema: <https://schema.org/> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix : <#> .
+# ... other prefixes and primary data from Layer 1 ...
 
 # -- CRDT Mechanics --
 <> crdt:hasClockEntry [
@@ -353,6 +352,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix meal: <https://example.org/vocab/meal#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix : <#> .
 
 # -- The Shopping List Entry (The Payload) --
@@ -366,7 +366,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    meal:requiredForDate "2024-08-15"^^xsd:date .
 
 # -- Pointers to Other Layers --
-<> a foaf:Document;
+<> a sync:ManagedDocument;
    foaf:primaryTopic :it;
    # Uses a different DocumentMapping for shopping list entries (imports CRDT library + shopping mappings)
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
@@ -498,6 +498,37 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Different contract versions use conservative merge approach
 - Framework vocabularies evolve through major version URI changes when needed
 
+#### 5.2.3. Property Mapping vs. Predicate Mapping Semantics
+
+**Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
+
+**Property Mapping (Class-Scoped Rules):**
+- Rules defined within `sync:ClassMapping` apply **only within that specific class context**
+- Example: In `mappings:statement-v1`, `rdf:subject` uses LWW_Register **only when within `rdf:Statement` resources**
+- **Use case:** Class-specific behavior where the same predicate may have different merge semantics in different contexts
+
+```turtle
+# Property mapping: rdf:subject behavior scoped to rdf:Statement context
+mappings:statement-v1 a sync:ClassMapping;
+   sync:appliesToClass rdf:Statement;
+   sync:rule
+     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+**Predicate Mapping (Global Rules):**
+- Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
+- Example: In `mappings:crdt-v1`, `crdt:clientId` **always** identifies blank nodes and **always** uses LWW_Register
+- **Use case:** Framework-level predicates with consistent behavior regardless of context
+
+```turtle
+# Predicate mapping: crdt:clientId behavior is global across all contexts
+<#clock-mappings> a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ] .
+```
+
+**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW_Register when within `schema:Recipe` resources but could theoretically use OR_Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:clientId` maintain consistent semantics everywhere.
+
 **Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
 ### 5.3. Layer 3: The Indexing Layer
@@ -554,11 +585,11 @@ Shard count changes are handled through lazy, client-side migration rather than 
 
 For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
 
-### 5.3.2. Multi-Application Coordination
+### 5.3.2. Compatible Application Coordination
 
-**Index Sharing and Compatibility:**
+**Index Sharing Among CRDT-Enabled Apps:**
 
-When multiple applications work with the same data type, they must coordinate their indexing strategies to maintain interoperability:
+When multiple CRDT-enabled applications work with the same managed resource type (e.g., both using `sync:managedResourceType schema:Recipe`), they must coordinate their indexing strategies to maintain interoperability:
 
 **Discovery-First Approach:**
 1. **Always discover first:** Applications query the Type Index to find existing indices before creating new ones
@@ -584,7 +615,7 @@ When multiple applications work with the same data type, they must coordinate th
 
 **Coordination Guidelines:**
 - **Minimize index proliferation:** Consider if existing indices can be extended rather than creating new ones
-- **Use minimal default indices:** Keep shared indices lightweight to reduce sync overhead for all applications
+- **Use minimal default indices:** Keep shared indices lightweight to reduce sync overhead for all compatible applications
 - **Document index purposes:** Use `rdfs:comment` to explain index design decisions
 
 ### 5.3.3. Index Creation and Bootstrap Process
@@ -628,10 +659,10 @@ When an application first encounters a Pod, it may need to configure the Type In
 
 **Comprehensive Setup Process:**
 1. Check WebID Profile Document for solid:publicTypeIndex
-2. If found, query Type Index for required data types (schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
+2. If found, query Type Index for required managed resource registrations (sync:ManagedDocument with sync:managedResourceType schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
 3. Collect all missing/required configuration:
    - Missing Type Index entirely
-   - Missing Type Registrations for data types
+   - Missing Type Registrations for managed data types (sync:ManagedDocument)
    - Missing Type Registrations for indices  
    - Missing Type Registrations for client installations
 4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
@@ -648,21 +679,21 @@ When an application first encounters a Pod, it may need to configure the Type In
 
 **Example Setup Flow:**
 ```
-1. Discover missing Type Index registrations for recipes
-2. Present setup dialog: "This app needs to configure recipe storage in your Pod"
+1. Discover missing Type Index registrations for sync:ManagedDocument with sync:managedResourceType schema:Recipe
+2. Present setup dialog: "This app needs to configure CRDT-managed recipe storage in your Pod"
 3. User selects "Automatic Setup"
-4. App creates Type Index entries for recipes, recipe index, client installations
+4. App creates Type Index entries for managed recipes, recipe index, client installations
 5. App proceeds with normal synchronization workflow
 ```
 
 ### 5.3.5. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
- *   **The "Default" Index:** For each class of data (e.g., `schema:Recipe`), there is a convention for a "default" index. Applications should first attempt to discover this default index (e.g., via the user's Solid Type Index). If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other applications that rely on its established structure and content.
+ *   **The "Default" Index:** For each managed resource type (e.g., `sync:managedResourceType schema:Recipe`), there is a convention for a "default" index among compatible applications. CRDT-enabled apps should first attempt to discover this default index via the Type Index. If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `idx:indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other compatible applications that rely on its established structure and content.
  
- *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of data resources. They should typically include only essential fields necessary for broad interoperability, such as `foaf:name` or `schema:name` (if at all), and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all applications that interact with that data type.
+ *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of managed data resources among compatible applications. They should typically include only essential fields necessary for broad interoperability, such as `schema:name` (if at all), and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all compatible applications that interact with that managed resource type.
 
- *   **Application-Specific Indices and "Good Citizenship":** Applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on *all* applications that interact with that data type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the entire ecosystem. 
+ *   **Application-Specific Indices and "Good Citizenship":** CRDT-enabled applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a managed data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on all compatible applications that interact with that managed resource type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the compatible application ecosystem. 
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index`**
 This resource is the "rulebook" for all shopping list entry groups in our meal planning application. Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only vector clock hashes for change detection.
@@ -798,7 +829,7 @@ This document contains entries for recipe resources. Since recipes are used with
 
 ### 5.4. Layer 4: The Sync Strategy
 
-This is the client-side layer where the application developer configures how to synchronize data. The framework balances **discovery** (finding existing Pod configuration) with **developer intent** (application requirements). Developers declare their preferred sync approach, and the framework either uses discovered compatible indices or creates new ones as needed.
+This is the client-side layer where the application developer configures how to synchronize data. The CRDT implementation balances **discovery** (finding existing Pod configuration) with **developer intent** (application requirements). Developers declare their preferred sync approach, and the implementation either uses discovered compatible indices or creates new ones as needed.
 
 #### 5.4.1. Decision 1: Index Structure
 
@@ -814,9 +845,9 @@ This decision determines how data is organized and indexed in the Pod.
 *   Good for unbounded or naturally-grouped data
 *   Examples: Shopping entries by month, financial transactions by year
 
-**Framework Discovery Process:**
+**Managed Resource Discovery Process:**
 1. **Developer declares data pattern:** "I have recipe data that needs to be searchable"
-2. **Framework discovers:** Checks Type Index for existing recipe indices  
+2. **Implementation discovers:** Checks Type Index for `sync:ManagedDocument` registrations with `sync:managedResourceType schema:Recipe` and corresponding recipe indices  
 3. **Compatibility evaluation:** Does discovered index structure meet data pattern needs?
 4. **Resolution:** Use compatible index OR create new index with appropriate structure
 
@@ -852,7 +883,7 @@ The named sync strategies combine the two decisions above:
 
 ## 6. Synchronization Workflow
 
-The synchronization process is governed by the **Sync Strategy** that the developer chooses.
+With the architectural layers defined, we can now examine how the synchronization process operates. The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
 1.  **Index Selection:** The application chooses which indices to sync based on its needs. For GroupedSync, this means subscribing to specific groups (e.g., "2024-08" for August shopping entries). For FullSync/OnDemandSync, this means syncing the entire FullIndex.
 2.  **Index Synchronization:** The library fetches the selected index, reads its `idx:hasShard` list, and synchronizes the active shards.
@@ -864,7 +895,7 @@ The synchronization process is governed by the **Sync Strategy** that the develo
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the **Merge Contract**, performs property-by-property merging, and returns the merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged object for local storage.
 
-### 5.1. Concrete Workflow Example
+### 6.1. Concrete Workflow Example
 
 **Scenario:** OnDemandSync for recipe collection
 
@@ -907,14 +938,14 @@ syncLibrary.onUpdate((mergedResource) => {
 
 Real-world synchronization faces numerous failure modes. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions.
 
-### 9.1. Failure Classification
+### 7.1. Failure Classification
 
 **Error Granularities:**
 - **Type-Level:** Entire data type cannot sync (missing merge contracts, authentication failures)
 - **Resource-Level:** Individual resource blocked (parse errors, access control changes)  
 - **Property-Level:** Specific property cannot sync (unknown CRDT types, schema violations)
 
-### 8.2. Core Resilience Strategies
+### 7.2. Core Resilience Strategies
 
 **Network Resilience:**
 - Distinguish between systemic failures (abort entire sync) vs. resource-specific failures (skip and continue)
@@ -931,7 +962,7 @@ Real-world synchronization faces numerous failure modes. The architecture provid
 - CRDT merge conflict resolution at property level
 - Vector clock anomaly detection and handling
 
-### 8.3. Graceful Degradation
+### 7.3. Graceful Degradation
 
 The system provides multiple operational modes based on error conditions:
 
@@ -944,7 +975,7 @@ For comprehensive implementation guidance including specific error scenarios, re
 
 ## 8. Performance Characteristics
 
-### 9.1. Sync Strategy Performance Trade-offs
+### 8.1. Sync Strategy Performance Trade-offs
 
 The choice of sync strategy fundamentally determines application performance characteristics:
 
@@ -1028,9 +1059,9 @@ For small collections (< 1000 resources), flat structure is acceptable:
 
 ## 10. Benefits of this Architecture
 
-* **True Interoperability:** By publishing the merge rules and linking to them from the data, any application can learn how to correctly and safely collaborate.
+* **CRDT Interoperability:** CRDT-enabled applications achieve safe collaboration by discovering CRDT-managed resources through `sync:ManagedDocument` registrations and following published merge contracts, while remaining protected from interference by incompatible applications.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
-* **Discoverability and Resilience:** The system is highly discoverable and resilient to changes in the indexing strategy over time.
+* **Controlled Discoverability:** The system is discoverable by CRDT-enabled applications while protecting CRDT-managed data from accidental modification by incompatible applications.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
 ## 11. Alignment with Standardization Efforts
@@ -1044,19 +1075,19 @@ This architecture aligns with the goals of the **W3C CRDT for RDF Community Grou
 ### 11.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
-* **Interoperability over Convenience:** The primary rule is that the data at rest in a Solid Pod must be clean, standard, and human-readable RDF.
+* **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
 ## 12. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
-* **Legacy Data Integration:** A background process to integrate existing Solid data that lacks CRDT metadata and index entries. This would:
-  - Detect existing data through Type Index that isn't in framework indices
-  - Initialize vector clocks for existing resources (using creation dates, file modification times)
-  - Migrate data into the indexing structure
-  - Add CRDT metadata to enable synchronization
-  - Provide user control over which existing data to integrate vs. leave untouched
+* **Legacy Data Import (Optional Extension):** A user-controlled import process to bring existing Solid data into framework management. This would be implemented as an optional library feature requiring explicit user consent and would include:
+  - Discovery of existing data through traditional Type Index registrations (e.g., `solid:forClass schema:Recipe`)
+  - One-time import creation of `sync:ManagedDocument` wrappers with `dct:source` links to preserve originals
+  - Import timestamp tracking in index entries to enable incremental re-imports
+  - User selection interface for choosing which legacy resources to import
+  - Clear separation between imported framework-managed data and original legacy files
 
 * **Proactive Access Control (WAC/ACP):** A mature version of this library should proactively check Solid's access control rules.
 * **Data Validation (SHACL):** By integrating SHACL, the library can validate the merged RDF graph against a predefined "shape" before uploading it.

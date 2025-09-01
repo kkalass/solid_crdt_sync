@@ -219,9 +219,97 @@ The final tombstone design addresses two key requirements:
 
 This approach prioritizes simplicity and interoperability over storage optimization, consistent with the framework's core principles.
 
-## 4. CRDT Mapping Validation
+## 4. CRDT Mapping Validation and Blank Node Implementation
 
 To prevent invalid configurations, implementations must validate CRDT mappings against resource identifiability requirements before allowing merge operations.
+
+### 4.0. Detailed Blank Node Identification Patterns
+
+This section provides comprehensive implementation guidance for the context-based identification mechanism outlined in ARCHITECTURE.md section 3.3.
+
+#### Vector Clock Entry Example
+
+**Data with Identifiable Blank Nodes:**
+```turtle
+# These blank nodes can be identified via crdt:clientId within document context
+<> crdt:hasClockEntry [
+    crdt:clientId <https://alice.../installation-123> ;  # Identifying property
+    crdt:clockValue "15"^^xsd:integer
+] .
+```
+
+**Predicate Mapping Declaration:**
+Since vector clock entries are typically typeless blank nodes, we use predicate-based mapping in our standard CRDT library:
+```turtle
+# Standard mapping for vector clock entries (typeless blank nodes)  
+<#clock-mappings> a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+#### Compound Key Example
+
+**Complex Blank Node with Multiple Identifying Properties:**
+```turtle
+# Example with compound identification key for nutrition info
+mappings:nutrition-mappings-v1 a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .  # Not identifying
+```
+
+#### Multi-Subject Reference Example
+
+**Same Blank Node Referenced by Multiple Subjects:**
+```turtle
+# This blank node can be identified through multiple paths
+:recipe1 schema:nutrition _:nutritionInfo .
+:recipe2 schema:nutrition _:nutritionInfo .
+_:nutritionInfo a schema:NutritionInformation ;
+    schema:calories 250 ; 
+    schema:servingSize "1 cup" .
+```
+
+**Identification Aliases:** Using the predicate-based pattern with compound key `schema:calories, schema:servingSize`, this blank node has multiple valid identifications:
+- `(:recipe1, calories=250, servingSize="1 cup")` (context from :recipe1)
+- `(:recipe2, calories=250, servingSize="1 cup")` (context from :recipe2)
+
+In this case, both paths result in equivalent identification since they have the same identifying property values.
+
+**Matching Across Documents:** For two blank nodes from different documents to be considered the same entity, **at least one of their identification aliases must match**. An identification alias is the unique combination of `(context, identifying properties)` where context is the subject identifier that references the blank node. If a blank node in Document A and a blank node in Document B share at least one identical identification alias, the framework treats them as the same resource, enabling their properties to be merged.
+
+#### When Identity-Dependent CRDTs Fail
+
+**The Technical Problem:** Identity-dependent CRDTs (OR-Set, 2P-Set) require comparing objects across documents to determine if a tombstone matches its target. With non-identifiable objects, this comparison fails.
+
+**Example - OR-Set with Non-Identifiable Objects:**
+```turtle
+# Document A: Contains blank node + its tombstone
+:recipe schema:keywords [rdfs:label "homemade"; custom:priority 1] .
+<#crdt-tombstone-a1b2c3d4> a rdf:Statement;
+  rdf:subject :recipe;
+  rdf:predicate schema:keywords;
+  rdf:object [rdfs:label "homemade"; custom:priority 1];
+  crdt:isDeleted true .
+
+# Document B: Contains similar but non-identical blank node  
+:recipe schema:keywords [rdfs:label "homemade"; custom:priority 2] .
+```
+
+**The Comparison Problem:** The tombstone in document A refers to `[rdfs:label "homemade"; custom:priority 1]` but document B contains `[rdfs:label "homemade"; custom:priority 2]`. Are these the same object that should be tombstoned, or different objects that should coexist?
+
+**Without Identity:** The framework cannot definitively answer this question. Different implementations might:
+- Compare structural equality (same properties/values)
+- Compare partial equality (ignore some properties)
+- Use heuristics based on processing order
+
+**Result:** Inconsistent merge behavior that violates CRDT convergence guarantees.
+
+**Why Not Structural Equality?** A tempting solution would be to declare two blank nodes equal if and only if all their properties are identical. However, this creates a subtle trap: if a blank node has naturally identifying properties (like `rdfs:label`) mixed with mutable properties (like `custom:priority`), then editing the mutable properties silently breaks tombstone matching. The deletion operation fails without error, creating hard-to-debug data inconsistencies. Therefore, this specification explicitly prohibits structural equality comparison and requires explicit identification patterns.
+
+**Solution Path:** This particular example could potentially be made identifiable by declaring `rdfs:label` as an identifying property using `sync:identifyingPredicate` in the mapping contract for `schema:keywords` properties. However, this only works when blank nodes have stable identifying properties that don't conflict across documents.
 
 ### 4.1. Identifiable vs Non-Identifiable Resources
 
@@ -253,17 +341,16 @@ validateMapping(property, crdtType, objectTypes):
   return valid
 ```
 
-### 4.4. Identifying Property Patterns
+### 4.4. Identifying Property Patterns and Precedence Rules
 
-**Context-Identified Blank Nodes:** Blank nodes can become identifiable when mapping documents declare identifying properties using `sync:identifyingPredicate`.
+**Context-Identified Blank Nodes:** Blank nodes can become identifiable when mapping documents declare identifying properties using `sync:identifyingPredicate true` flags within rules.
 
 **Example - Vector Clock Mapping:**
 ```turtle
 # Predicate-based mapping for vector clock entries (typeless blank nodes)
 mappings:clock-mappings-v1 a sync:PredicateMapping;
-   sync:identifyingPredicate crdt:clientId ;        # Identifying property
    sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:identifyingPredicate true ],
      [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
@@ -276,7 +363,49 @@ mappings:clock-mappings-v1 a sync:PredicateMapping;
 ] .
 ```
 
-**Validation Rule:** Implementations recognize blank node patterns as identifiable when `sync:identifyingPredicate` are declared in PredicateMappings, or when `sync:identifyingPredicate` is declared in ClassMappings for explicitly typed resources.
+**Complete Precedence Hierarchy:** When multiple mappings apply to the same predicate:
+
+1. **Scope Priority:** Local ClassMapping > Local PredicateMapping > Imported DocumentMapping  
+2. **List Order Priority:** Within same scope, first mapping in rdf:List wins for conflicting rules
+3. **Property-Level Override:** Each rule property (`crdt:mergeWith`, `sync:isIdentifying`) resolves independently
+4. **Inheritance Model:** Missing properties inherit from lower-priority scopes
+
+**Conflict Resolution Strategy:** When multiple mappings define conflicting rules for the same predicate:
+- **Deterministic Resolution:** First mapping in import order takes precedence
+- **Conflict Logging:** Log warning about conflicting mappings for debugging
+- **Continue Operation:** Use resolved rule and continue syncing (availability over strict validation)
+
+**Override Examples:**
+```turtle
+# Complete precedence example
+<> sync:imports ( 
+    <https://standard-crdt.org/mappings/v1>   # Lowest priority (imported)
+    <https://app-framework.org/mappings/v1>   
+  ) ;
+  sync:classMapping ( <#recipe-rules> ) ;     # Medium priority (local class)
+  sync:predicateMapping ( <#app-predicates> ) . # Highest priority (local predicate)
+
+# Local predicate mapping overrides everything
+<#app-predicates> a sync:PredicateMapping;
+   sync:rule [ sync:predicate my:customProp; crdt:mergeWith crdt:OR_Set; sync:isIdentifying true ] .
+
+# Local class mapping overrides imported libraries  
+<#recipe-rules> a sync:ClassMapping;
+   sync:appliesToClass schema:Recipe;
+   sync:rule [ sync:predicate schema:name; crdt:mergeWith crdt:OR_Set ] .
+   # Result: schema:name uses OR_Set here, even if imports say LWW_Register
+
+# Property-level inheritance example
+<#partial-override> a sync:ClassMapping;
+   sync:appliesToClass my:SpecialClass;
+   sync:rule [ sync:predicate crdt:clientId; sync:isIdentifying false ] .
+   # Result: keeps crdt:mergeWith from imported mappings, only changes identification
+```
+
+**Implementation Guidance:**
+- **Conflict Detection:** Compare rules across all imported mappings during contract loading
+- **Warning Messages:** Log specific conflicts with mapping URLs and predicate names for debugging
+- **Validation Rule:** Recognize blank node patterns as identifiable when the effective rule (after precedence resolution) declares `sync:isIdentifying true`
 
 ### 4.5. Error Handling
 

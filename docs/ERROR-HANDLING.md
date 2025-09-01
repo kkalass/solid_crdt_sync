@@ -34,15 +34,15 @@ During extended network unavailability:
 - **Local-Only Updates:** Continue incrementing vector clocks for local changes
 - **Sync Resume:** On reconnection, normal CRDT merge processes handle any conflicts from the partition period
 
-## 2. Resource Discovery Failures
+## 2. Managed Resource Discovery Failures
 
 ### Comprehensive Setup Process
 
 1. Check WebID Profile Document for solid:publicTypeIndex
-2. If found, query Type Index for required data types (schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
+2. If found, query Type Index for required managed resource registrations (sync:ManagedDocument with sync:managedResourceType schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
 3. Collect all missing/required configuration:
    - Missing Type Index entirely
-   - Missing Type Registrations for data types
+   - Missing Type Registrations for managed data types (sync:ManagedDocument)
    - Missing Type Registrations for indices  
    - Missing Type Registrations for client installations
 4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
@@ -108,7 +108,7 @@ When merge contract parsing fails:
   - If no local changes to property: Accept remote state ("trust remote")
   - If local changes exist: Skip property in merge, keep local value, continue syncing other properties
   - Log warning and recommend app update
-- **Missing Property Mappings:** Use LWW-Register fallback based on vector clocks, log warning
+- **Missing Predicate Mappings:** Use LWW-Register fallback based on vector clocks, log warning
 
 ### Version Conflicts
 
