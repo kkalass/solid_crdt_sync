@@ -72,7 +72,7 @@ During extended network unavailability:
 **Custom Setup Details (if chosen):**
 - Type Index Location: `/settings/publicTypeIndex.ttl`
 - Recipe Data: `/data/recipes/` [editable]
-- Recipe Index: `/indices/recipes/index` [editable]  
+- Recipe Index: `/indices/recipes/index-full-a1b2c3d4/index` [editable]  
 - Client Installations: `/installations/` [editable]
 - **Actions:** [Apply Changes] [Cancel]
 

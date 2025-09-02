@@ -181,19 +181,23 @@ This creates clean separation: compatible applications collaborate safely on man
 
 ```turtle
 # In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
 @prefix schema: <https://schema.org/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
-<#managed-recipes> a solid:TypeRegistration;
-   solid:forClass sync:ManagedDocument;
-   sync:managedResourceType schema:Recipe;
-   solid:instanceContainer <../data/recipes/> .
-
-<#managed-shopping-entries> a solid:TypeRegistration;
-   solid:forClass sync:ManagedDocument;
-   sync:managedResourceType meal:ShoppingListEntry;
-   solid:instanceContainer <../data/shopping-entries/> .
+<> a solid:TypeIndex;
+   solid:hasRegistration [
+      a solid:TypeRegistration;
+      solid:forClass sync:ManagedDocument;
+      sync:managedResourceType schema:Recipe;
+      solid:instanceContainer <../data/recipes/>
+   ], [
+      a solid:TypeRegistration;
+      solid:forClass sync:ManagedDocument;
+      sync:managedResourceType meal:ShoppingListEntry;
+      solid:instanceContainer <../data/shopping-entries/>
+   ] .
 ```
 
 3. **Specification Type Resolution:** Applications also register specification-defined types (indices and client installations) in the Type Index using the same mechanism:
@@ -203,19 +207,24 @@ This creates clean separation: compatible applications collaborate safely on man
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
 
-<#recipe-index> a solid:TypeRegistration;
-   solid:forClass idx:FullIndex;
-   solid:instance <../indices/recipes/index> ;
-   idx:indexesClass schema:Recipe .
-
-<#shopping-entries-index> a solid:TypeRegistration;
-   solid:forClass idx:GroupIndexTemplate;
-   solid:instance <../indices/shopping-entries/index> ;
-   idx:indexesClass meal:ShoppingListEntry .
-
-<#client-installations> a solid:TypeRegistration;
-   solid:forClass crdt:ClientInstallation;
-   solid:instanceContainer <../installations/> .
+<> solid:hasRegistration [
+      a solid:TypeRegistration;
+      solid:forClass idx:FullIndex;
+      solid:instanceContainer <../indices/recipes/>;
+      idx:indexesClass schema:Recipe
+   ], [
+      a solid:TypeRegistration;
+      solid:forClass idx:GroupIndexTemplate;
+      solid:instanceContainer <../indices/shopping-entries/>;
+      idx:indexesClass meal:ShoppingListEntry
+   ], [
+      a solid:TypeRegistration;
+      solid:forClass crdt:ClientInstallation;
+      solid:instanceContainer <../installations/>;
+      # Cleanup configuration (framework adds defaults if missing)
+      crdt:tombstoneRetentionPeriod "P1Y"^^xsd:duration;
+      crdt:enableAutomaticCleanup true
+   ] .
 ```
 
 4. **Managed Resource Discovery:** CRDT-enabled applications query the Type Index for `sync:ManagedDocument` registrations with specific `sync:managedResourceType` values (e.g., `schema:Recipe`) and their corresponding index types (e.g., `idx:FullIndex`), enabling automatic discovery of the complete synchronization setup.
@@ -264,16 +273,146 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
    # Pointer to the Merge Contract (Layer 2) - imports CRDT library + app mappings
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to
-   idx:belongsToIndexShard <../../indices/recipes/shard-mod-xxhash64-2-0-v1_0_0> .
+   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
 ```
 
 ### 5.2. Layer 2: The Merge Contract
 
 This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
 
+**Fundamental Principle:** All documents stored in user Pods by this framework are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed clients.
+
 * **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
 
 * **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **RDF Reification Tombstones** for managing deletions.
+
+#### 5.2.1. Client Installation Documents
+
+Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for vector clock entries, and collaborative lifecycle management across the distributed system.
+
+Like all framework documents, Client Installation Documents follow the CRDT merge mechanics with their own merge contract specification.
+
+**Discovery and Lifecycle:**
+1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
+2. **ID Generation:** Generate unique UUID v4 for each application installation
+3. **Registration:** Create installation document at discovered container location
+4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
+
+**Installation Lifecycle Properties:**
+```turtle
+<installation-uuid> a crdt:ClientInstallation;
+   crdt:belongsToWebID <../profile/card#me>;
+   crdt:applicationId <https://meal-planning-app.example.org/id>;
+   crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime;
+   crdt:lastActiveAt "2024-09-02T14:30:00Z"^^xsd:dateTime;
+   sync:isGovernedBy mappings:client-installation-v1 .
+```
+
+**Type Index Registration Example:**
+```turtle
+# In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+
+<> solid:hasRegistration [
+      a solid:TypeRegistration;
+      solid:forClass crdt:ClientInstallation;
+      solid:instanceContainer <../installations/>;
+      # Cleanup configuration (framework adds these with defaults if missing)
+      crdt:tombstoneRetentionPeriod "P1Y"^^xsd:duration;  # Keep tombstones 1 year
+      crdt:enableAutomaticCleanup true
+   ] .
+```
+
+**Type Index Cleanup Configuration:**
+
+The framework extends Type Index registrations with cleanup configuration properties:
+
+- **`crdt:tombstoneRetentionPeriod`:** Duration to retain tombstoned resources (ISO 8601 duration, default from framework config)
+- **`crdt:enableAutomaticCleanup`:** Whether to automatically clean up after retention period (default from framework config)
+
+**Framework Defaults Hierarchy:**
+1. **Type Index defaults:** `crdt:tombstoneRetentionPeriod` and `crdt:enableAutomaticCleanup` on the Type Index document itself
+2. **Type-specific overrides:** Individual registrations can override Type Index defaults  
+3. **User control:** Framework never overwrites existing user-configured values
+
+**Example with Type Index Defaults:**
+```turtle
+# Type Index with framework-wide defaults
+<> a solid:TypeIndex;
+   # Framework adds these defaults if missing
+   crdt:tombstoneRetentionPeriod "P1Y"^^xsd:duration;
+   crdt:enableAutomaticCleanup true;
+   solid:hasRegistration [
+      a solid:TypeRegistration;
+      solid:forClass crdt:ClientInstallation;
+      solid:instanceContainer <../installations/>
+      # Uses Type Index defaults
+   ], [
+      a solid:TypeRegistration;
+      solid:forClass sync:ManagedDocument;
+      sync:managedResourceType schema:Recipe;
+      solid:instanceContainer <../data/recipes/>;
+      # Override: Keep recipe tombstones longer
+      crdt:tombstoneRetentionPeriod "P3Y"^^xsd:duration
+   ] .
+```
+
+**Framework Behavior:**
+- **Discovery:** Check Type Index for cleanup configuration (document-level defaults, registration-level overrides)
+- **Missing properties:** Add Type Index defaults without overwriting user values
+- **Respect user settings:** Never modify existing user-configured cleanup settings
+- **Per-type flexibility:** Individual registrations can override Type Index defaults
+
+**Client ID Generation Process:**
+
+**Recommended Approach (UUID v4):**
+1. **Discover container:** Query Type Index for `crdt:ClientInstallation` container
+2. **Generate UUID:** Use UUID v4 for cryptographically strong uniqueness
+3. **Create IRI:** `{container-url}/{uuid}` 
+4. **Register installation:** POST installation document to container
+5. **Use in vector clocks:** Reference full installation IRI in `crdt:clientId`
+
+**Example Generation:**
+```
+1. Container: https://alice.podprovider.org/installations/
+2. UUID v4: 550e8400-e29b-41d4-a716-446655440000
+3. Installation IRI: https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000
+4. Vector clock usage: crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000>
+```
+
+**Benefits of This Approach:**
+- **Uniqueness:** UUID v4 provides collision-resistant identifiers
+- **Traceability:** Installation documents link clients to WebIDs and applications  
+- **No Coordination:** Each client generates IDs independently without coordination
+- **Interoperability:** Different applications can discover and understand each other's installations
+- **Lifecycle Management:** Enables collaborative lifecycle tracking and cleanup
+
+**Installation Lifecycle Management:**
+
+*Self-Managed Properties (Installation Should Only Update Its Own):*
+- **`crdt:lastActiveAt`:** Installation should only update its own activity timestamp
+  - **Update triggers:** Sync operations
+  - **Frequency:** Every sync cycle, limited to once per hour to prevent excessive updates
+  - **CRDT Algorithm:** `crdt:LWW_Register` (standard timestamp-based resolution)
+  - **Convention:** Applications should only update `lastActiveAt` for their own installation documents
+- **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (ISO 8601 duration, defaults to P6M)
+  - **CRDT Algorithm:** `crdt:LWW_Register` (allows threshold updates)
+  - **Convention:** Applications should only update their own installation's inactivity threshold
+
+*Identity Properties (Set Once at Creation):*
+- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable` (no updates after creation)
+
+**Installation Lifecycle and Cleanup:**
+
+Inactive installations are handled through regular tombstoning rather than special dormancy states:
+
+1. **Activity monitoring:** Other installations monitor `crdt:lastActiveAt` during collaborative operations
+2. **Tombstoning decision:** When an installation is inactive beyond its `crdt:maxInactivityPeriod` (or framework default), it gets tombstoned using standard framework mechanisms
+3. **Cleanup configuration:** Retention periods configured per-type in Type Index with framework defaults fallback
+4. **Garbage collection:** Tombstoned installations cleaned up according to Type Index configuration
+
+#### 5.2.2. Standard CRDT Library Examples
 
 **Example: Standard CRDT Library `crdt-v1`**
 This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping, which imports the existing [`statement-v1.ttl`](../mappings/statement-v1.ttl) for tombstone handling and defines predicate-based mappings for vector clock entries.
@@ -363,7 +502,8 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    # Links to the source recipe that generated this shopping item
    meal:derivedFrom <../../../../recipes/tomato-basil-soup> ;
    # Links to the meal plan date that requires this ingredient
-   meal:requiredForDate "2024-08-15"^^xsd:date .
+   meal:requiredForDate "2024-08-15"^^xsd:date ;
+   schema:dateCreated "2024-08-10T10:30:00Z"^^xsd:dateTime .
 
 # -- Pointers to Other Layers --
 <> a sync:ManagedDocument;
@@ -371,10 +511,10 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    # Uses a different DocumentMapping for shopping list entries (imports CRDT library + shopping mappings)
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
    # Points to index shard within the appropriate group
-   idx:belongsToIndexShard <../../../../../indices/shopping-entries/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
+   idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
 ```
 
-#### 5.2.1. CRDT Merge Mechanics
+#### 5.2.2. CRDT Merge Mechanics
 
 The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using **document-level vector clocks** for causality determination. Each resource document (e.g., a complete Recipe or Shopping List Entry) has a single vector clock that tracks changes to the entire document, keeping the original resource content clean.
 
@@ -415,61 +555,9 @@ This architecture uses **RDF Reification** to represent tombstones for deleted t
   crdt:vectorClockHash "xxh64:abcdef1234567890" .
 ```
 
-**Client Installation Documents**
+**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
-Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability and identity management for vector clock entries across the distributed system.
-
-**Discovery and Lifecycle:**
-1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
-2. **ID Generation:** Generate unique UUID v4 for each application installation
-3. **Registration:** Create installation document at discovered container location
-4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
-
-**Example client installation at `https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000`:**
-
-```turtle
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-
-<> a crdt:ClientInstallation;
-   crdt:belongsToWebID <../profile/card#me>;
-   crdt:applicationId <https://meal-planning-app.example.org/id>;
-   crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime .
-```
-
-**Type Index Registration Example:**
-```turtle
-# In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
-<#client-installations> a solid:TypeRegistration;
-   solid:forClass crdt:ClientInstallation;
-   solid:instanceContainer <../installations/> .
-```
-
-##### Client ID Generation Process
-
-**Recommended Approach (UUID v4):**
-1. **Discover container:** Query Type Index for `crdt:ClientInstallation` container
-2. **Generate UUID:** Use UUID v4 for cryptographically strong uniqueness
-3. **Create IRI:** `{container-url}/{uuid}` 
-4. **Register installation:** POST installation document to container
-5. **Use in vector clocks:** Reference full installation IRI in `crdt:clientId`
-
-**Example Generation:**
-```
-1. Container: https://alice.podprovider.org/installations/
-2. UUID v4: 550e8400-e29b-41d4-a716-446655440000
-3. Installation IRI: https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000
-4. Vector clock usage: crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000>
-```
-
-**Benefits of This Approach:**
-- **Uniqueness:** UUID v4 provides collision-resistant identifiers
-- **Traceability:** Installation documents link clients to WebIDs and applications  
-- **Discoverability:** Standard Type Index enables client validation and debugging
-- **No Coordination:** Each client generates IDs independently without coordination
-
-#### 5.2.2. Vocabulary Versioning and Evolution
+#### 5.2.3. Vocabulary Versioning and Evolution
 
 **Versioning Strategy:**
 
@@ -498,7 +586,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Different contract versions use conservative merge approach
 - Framework vocabularies evolve through major version URI changes when needed
 
-#### 5.2.3. Property Mapping vs. Predicate Mapping Semantics
+#### 5.2.4. Property Mapping vs. Predicate Mapping Semantics
 
 **Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
 
@@ -528,8 +616,6 @@ mappings:statement-v1 a sync:ClassMapping;
 ```
 
 **Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW_Register when within `schema:Recipe` resources but could theoretically use OR_Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:clientId` maintain consistent semantics everywhere.
-
-**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
 ### 5.3. Layer 3: The Indexing Layer
 
@@ -585,75 +671,203 @@ Shard count changes are handled through lazy, client-side migration rather than 
 
 For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
 
-### 5.3.2. Compatible Application Coordination
+### 5.3.2. Structure-Derived Index Naming and Collaborative Coordination
 
-**Index Sharing Among CRDT-Enabled Apps:**
+**Coordination-Free Index Convergence:**
 
-When multiple CRDT-enabled applications work with the same managed resource type (e.g., both using `sync:managedResourceType schema:Recipe`), they must coordinate their indexing strategies to maintain interoperability:
+Multiple CRDT-enabled applications automatically converge on shared indices through deterministic structure-derived naming, eliminating coordination overhead while ensuring compatibility.
 
-**Discovery-First Approach:**
-1. **Always discover first:** Applications query the Type Index to find existing indices before creating new ones
-2. **Compatibility check:** Evaluate if discovered index meets minimum requirements (FullIndex vs GroupIndexTemplate, required `idx:indexedProperty` fields)
-3. **Graceful coexistence:** If existing index is incompatible, create application-specific index without modifying the shared one
+**Deterministic Naming Pattern:**
+- **FullIndex:** `index-full-${SHA256(indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
+- **GroupIndexTemplate:** `index-grouped-${SHA256(sourcePropertyIRI|format|groupTemplate|indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
+- **Hash computation:** SHA256 with pipe separators (`|`) between all structural inputs
+- **Full IRI usage:** Hash computation uses complete IRIs, not prefixed forms
+- **Directory structure:** Hash-derived directory name + consistent `index` document
 
-**Index Naming Conventions:**
-- **Default index:** `/indices/{data-type}/index` (discovered via Type Index)
-- **Application-specific:** `/indices/{data-type}/{app-name}/index` (avoid namespace conflicts)
-
-**Example Coordination Scenario:**
+**Hash Computation Examples:**
 ```turtle
-# Recipe Manager App discovers this default index
-<#recipe-index> a solid:TypeRegistration;
-   solid:forClass idx:FullIndex; 
-   solid:instance <../indices/recipes/index> .
+# FullIndex for recipes
+# Input: "https://schema.org/Recipe|ModuloHashSharding|xxhash64"
+# Directory: /indices/recipes/index-full-a1b2c3d4/
+# Document: /indices/recipes/index-full-a1b2c3d4/index
 
-# Meal Planner App needs GroupIndexTemplate, so creates its own:
-<#meal-planner-recipe-index> a solid:TypeRegistration;
-   solid:forClass idx:GroupIndexTemplate;
-   solid:instance <../indices/recipes/meal-planner/index> .
+# GroupIndexTemplate for shopping entries  
+# Input: "https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
+# Directory: /indices/shopping-entries/index-grouped-e5f6g7h8/
+# Document: /indices/shopping-entries/index-grouped-e5f6g7h8/index
 ```
 
-**Coordination Guidelines:**
-- **Minimize index proliferation:** Consider if existing indices can be extended rather than creating new ones
-- **Use minimal default indices:** Keep shared indices lightweight to reduce sync overhead for all compatible applications
-- **Document index purposes:** Use `rdfs:comment` to explain index design decisions
+**Automatic Convergence Property:**
+Applications with identical structural requirements generate identical index names, enabling automatic collaboration without explicit coordination.
 
-### 5.3.3. Index Creation and Bootstrap Process
+**Discovery-First Bootstrap Flow:**
+1. **Discovery:** Query Type Index for existing indices of required type and class
+2. **Structural analysis:** Evaluate discovered indices for compatibility  
+3. **Join or create:** Add self as reader to compatible index OR create new index with structure-derived name
+4. **Collaborative population:** All installations participate in distributed population using populating shards and background processing
 
-**Cold Start Problem:**
+**Immutable vs Extendable Properties:**
 
-When an application first encounters a Pod with no existing indices for a data type, it must create the initial indexing structure:
+**Immutable (encoded in name, enforced by `crdt:Immutable`):**
+- Index type (FullIndex vs GroupIndexTemplate)
+- Indexed class (`idx:indexesClass`)
+- Grouping configuration (`idx:groupedBy` structure)
+- Base sharding algorithm (type and hash function, but not shard count)
+
+**Extendable (CRDT-managed, not in name):**
+- `idx:indexedProperty` with per-property `idx:readBy` tracking
+- Installation reader lists (`idx:readBy` on index level)
+- Shard count (auto-scaling based on volume)
+
+**Conflict Escalation:**
+When installations attempt to create indices with conflicting immutable properties, the conflict forces automatic creation of differently-named indices, preventing corruption while maintaining functionality.
+
+**Example Coordination Scenarios:**
+```turtle
+# App A and App B both need FullIndex for recipes with xxhash64
+# → Both generate identical name: index-full-a1b2c3d4
+# → Automatic sharing through convergent naming
+
+# App C needs GroupIndexTemplate for recipes with weekly grouping  
+# → Different structural hash: index-grouped-f9g0h1i2
+# → Separate index to avoid incompatible structural conflicts
+```
+
+**Performance Impact Management:**
+- **Write overhead awareness:** Every additional index increases write operation overhead for all installations
+- **Property-level optimization:** Remove unused `idx:indexedProperty` entries when last reader is tombstoned
+- **Reader list maintenance:** Tombstoned installations removed from `idx:readBy` lists, enabling index deprecation when no active readers remain
+
+### 5.3.3. Collaborative Bootstrap and Index Population
+
+**Coordination-Free Bootstrap Process:**
+
+Multiple installations automatically collaborate on index creation through structure-derived naming and CRDT-based document management.
 
 **Bootstrap Decision Flow:**
-1. **Discovery first:** Query Type Index for existing indices of the required type
-2. **If none found:** Application creates initial index based on its Sync Strategy requirements
-3. **Index creation:** Create appropriate index type (FullIndex or GroupIndexTemplate) 
-4. **Registration:** Add index to Type Index for future discoverability
-5. **Initial population:** Scan existing data containers and populate index with current resources
+1. **Discovery first:** Query Type Index for existing indices with compatible structural requirements
+2. **Structural compatibility:** Evaluate discovered indices for exact structural match
+3. **Join or create:** Add self as reader to compatible index OR create new index with deterministic name
+4. **Opportunistic population:** Installation that creates index populates it from existing data containers
 
-**Example Bootstrap Scenario:**
+**Structural Compatibility Rules:**
+- **Identical immutable properties:** Index type, class, grouping rule, base sharding algorithm must match exactly
+- **Extendable properties:** `idx:indexedProperty` can be extended through property-level reader tracking
+- **Automatic convergence:** Identical requirements generate identical names, enabling automatic sharing
+
+**Index Population Algorithm:**
+
+The framework uses a distributed population strategy for all index creation, providing collaborative processing and progressive availability:
+
+**Distributed Population Strategy:**
+
+**Universal Populating State:**
+When creating any new index, it enters "populating" state with appropriate population strategy based on dataset size:
+
 ```turtle
-# Application discovers no recipe index exists
-# Creates FullIndex for OnDemand recipe browsing
-# Registers in Type Index:
-<#recipe-index> a solid:TypeRegistration;
-   solid:forClass idx:FullIndex;
-   solid:instance <../indices/recipes/index> ;
-   idx:indexesClass schema:Recipe .
+<GroupIndexTemplate>
+   idx:populationState "populating";  # LWW_Register managed
+   idx:hasPopulatingShard <pop-mod-xxhash64-4-0-v1_0_0>, <pop-mod-xxhash64-4-1-v1_0_0>, 
+                          <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-**Who Creates Indices:**
-- **First application:** The first app to work with a data type creates the default index
-- **Subsequent applications:** Discover existing index and evaluate compatibility
-- **Setup process:** Applications can create indices during initial Pod configuration
-- **User control:** Setup dialogs allow users to approve index creation
+**Distributed Processing Algorithm:**
+1. **Directory scan:** GET data container → list all resource IRIs
+2. **Work distribution:** Each installation computes `hash(installationIRI + shardIRI)` for each populating shard
+3. **Priority ordering:** Sort shards by hash value (different order per installation)
+4. **Sequential processing:** Process shards in priority order until all complete
+5. **Collaborative completion:** Multiple installations work simultaneously, CRDT merge resolves conflicts
 
-**Bootstrap Timing:**
-- **During setup:** Indices created when configuring Pod for first time
-- **On first sync:** Indices created when first syncing a data type
-- **Lazy creation:** Indices created when first storing a resource of that type
+**Per-Shard Processing:**
+1. **Fetch current state:** GET populating shard from Pod  
+2. **CRDT merge:** Merge with local processing state
+3. **Check completeness:** Verify if shard needs processing
+4. **Population work:** Read resources, populate both temporary + target shards
+5. **Completion marking:** Set `crdt:tombstonedAt`, add to garbage collection index
+6. **Upload:** PUT updated shard to Pod
 
-### 5.3.4. Pod Setup and Configuration Process
+**State Transition to Active:**
+
+*LWW_Register State Machine for `idx:populationState`:*
+1. **Initial State:** Index created with `idx:populationState "populating"`
+2. **Completion Detection:** Installation detects all populating shards have `crdt:tombstonedAt` 
+3. **State Update:** Installation attempts `idx:populationState "active"` with current vector clock
+4. **Collaborative Resolution:** Multiple installations may attempt transition simultaneously
+   - LWW_Register ensures deterministic convergence to "active" state
+   - Vector clock comparison resolves concurrent updates
+5. **Cleanup Phase:** After state transition, remove `idx:hasPopulatingShard` entries using OR-Set removal
+
+*State Transition Requirements:*
+- Only transition to "active" when ALL populating shards are tombstoned
+- Use LWW_Register to prevent state regression (active → populating)
+- Cleanup populating shard references only after successful state transition
+
+**Background Population Requirements for All Index Types:**
+
+*Universal Requirements (All Index Types):*
+- **Non-blocking:** Population happens during background sync cycles, never blocks UI
+- **Local-first:** Applications remain functional with partially-populated indices  
+- **Mandatory progress:** Every sync cycle continues population until completion
+- **Cross-installation:** All installations participate in population until finished
+- **State management:** Use `idx:populationState` LWW_Register for collaborative state transitions
+
+*FullIndex Population:*
+- **Small datasets (< 1000 resources):** Direct creation and immediate state switch to "active"
+  - Create index with `idx:populationState "populating"`
+  - Populate target shards directly during creation
+  - Switch to `idx:populationState "active"` when complete (no populating shards needed)
+- **Large datasets (> 1000 resources):** Use distributed populating shards strategy
+  - Create populating shards using `pop-` prefix for collaborative processing
+  - Completion criteria: All populating shards tombstoned → state transition to "active"
+- **Threshold decision:** Framework automatically chooses strategy based on data container size scan
+
+*GroupIndexTemplate Population:*  
+- **Template-only:** GroupIndexTemplate itself never contains data entries
+- **State transition:** "populating" → "active" indicates template is ready for group creation
+- **No direct population:** Individual GroupIndex instances are populated separately as needed
+
+*GroupIndex Population:*
+- **Inherits strategy:** Uses same algorithm as FullIndex but scoped to specific group
+- **Group-scoped shards:** Populating shards process only resources belonging to the group
+- **Independent completion:** Each group index completes population independently
+
+### 5.3.4. Framework Garbage Collection Index
+
+**Purpose:** System-level index for tracking tombstoned populating shards to enable automated cleanup of temporary resources.
+
+**Structure-Derived Naming:**
+- **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-populating-shards")}/index`
+- **Type:** `idx:FullIndex` with `idx:indexesClass crdt:TombstonedShard`
+- **Registration:** Automatic Type Index registration by framework (not application-specific)
+
+**Index Configuration:**
+```turtle
+<gc-index-a1b2c3d4> a idx:FullIndex;
+   idx:indexesClass crdt:TombstonedShard;
+   idx:indexedProperty [
+     idx:property crdt:tombstonedAt;
+     idx:readBy <installation-1>, <installation-2>, <installation-3>
+   ] ;
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 1
+   ] ;
+   idx:readBy <installation-1>, <installation-2>, <installation-3> .
+```
+
+**Garbage Collection Process:**
+1. **Shard completion:** When populating shard is tombstoned, add entry to GC index
+2. **Periodic cleanup:** Background process scans GC index for tombstoned shards older than threshold (e.g., 30 days)
+3. **Safe deletion:** Remove shard files from Pod after ensuring no active population references
+4. **GC index maintenance:** Remove entries for deleted shards from GC index
+
+**Vector Clock Hash Tracking:**
+- GC index entries include vector clock hashes for tombstoned shards
+- Enables verification of shard state before deletion
+- Prevents accidental cleanup of shards that may have been updated
+
+### 5.3.5. Pod Setup and Configuration Process
 
 When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
 
@@ -686,17 +900,137 @@ When an application first encounters a Pod, it may need to configure the Type In
 5. App proceeds with normal synchronization workflow
 ```
 
-### 5.3.5. Indexing Conventions and Best Practices
+### 5.3.6. Collaborative Index Lifecycle Management
+
+**CRDT-Based Index Coordination:**
+
+All index lifecycle decisions are made collaboratively through CRDT-managed installation documents and index properties, eliminating single points of failure and coordination bottlenecks.
+
+**Property-Level Reader Tracking:**
+```turtle
+<> a idx:FullIndex;
+   idx:indexedProperty [
+     idx:property schema:name;
+     idx:readBy <installation-1>, <installation-2>  # OR-Set of active readers
+   ],
+   [
+     idx:property schema:keywords;
+     idx:readBy <installation-1>  # Only one reader remaining
+   ];
+   idx:readBy <installation-1>, <installation-2>, <installation-3> .  # Index-level readers
+```
+
+**Index Reader Management:**
+
+**Property Cleanup Process:**
+1. **Reader removal:** When installation is tombstoned, remove from all `idx:readBy` lists
+2. **Property removal:** When property has no active readers, remove from `idx:indexedProperty`
+3. **Index deprecation:** When index has no active readers, set `idx:deprecatedAt`
+4. **Garbage collection:** Deprecated indices stop receiving updates from write operations
+
+**Configurable CRDT Tie-Breaking Framework:**
+
+*Algorithm-Specific Behaviors:*
+- **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic client ID tie-breaking
+- **`crdt:Immutable`:** No updates allowed after creation
+
+*Framework Benefits:*
+- **Explicit semantics:** Each property declares its intended collaboration model
+- **Configurable per-property:** Different tie-breaking rules for different use cases
+- **Backward compatibility:** Existing `crdt:LWW_Register` maps to `crdt:TimestampLWW`
+- **Self-describing:** Merge behavior discoverable through vocabulary definitions
+
+*Installation Document Specific Rules:*
+- Installations control their own identity and activity metrics via `SelfOnlyLWW` and `SelfWinsLWW`
+- Collaborative dormancy detection enabled through `TimestampLWW` for dormancy properties
+- Framework prevents ownership conflicts while enabling collaborative lifecycle management
+
+### 5.3.7. Installation Document Scalability
+
+**Scalability Challenge:** When thousands of installations exist, validating dormancy and managing reader lists becomes computationally expensive.
+
+**Proposed Solutions:**
+
+*Option A: Sharded Installation Index*
+- Create `idx:FullIndex` for `crdt:ClientInstallation` with automatic sharding
+- Enable efficient lookup and batch lifecycle validation  
+- Index properties: `crdt:lastActiveAt`, `crdt:applicationId`
+- Trade-off: Additional index complexity for improved performance
+
+*Option B: Hierarchical Reader Lists*
+- Group installations by application ID in reader lists
+- Use nested OR-Sets: `idx:readBy` contains application IDs, applications contain installation lists
+- Enables app-level dormancy detection without individual installation lookup
+- Trade-off: More complex reader list management
+
+*Option C: Lazy Dormancy Detection*
+- Only validate installations when they appear in reader lists during normal operation
+- Skip global dormancy scans, rely on opportunistic cleanup
+- Use TTL-based caching to avoid repeated validation of same installation
+- Trade-off: Slower cleanup, potential stale reader list entries
+
+**Recommended Approach:** Start with Option C (lazy detection) for simplicity, migrate to Option A (sharded index) when installation counts exceed ~1000 per Pod.
+
+### 5.3.8. Complete Index Lifecycle Management
+
+**Index States and Transitions:**
+
+*Active State:*
+- **Properties:** `idx:populationState "active"`, non-empty `idx:readBy` list
+- **Behavior:** Receives write updates, participates in sync operations
+- **Reader management:** Installations can join/leave through `idx:readBy` OR-Set
+
+*Deprecated State:*
+- **Trigger:** Last active installation removed from `idx:readBy` (OR-Set becomes empty)
+- **Properties:** `idx:deprecatedAt` timestamp set, `idx:readBy` empty
+- **Behavior:** Stops receiving write updates, no active readers accessing it
+- **Persistence:** Index documents and shards remain in Pod but become stale over time
+
+*Tombstoned State (Proposed):*
+- **Trigger:** Deprecated for extended period (e.g., 1 year) with no reactivation
+- **Properties:** `crdt:tombstonedAt` timestamp set
+- **Behavior:** Marked for garbage collection, should not be reactivated
+- **Cleanup:** Framework GC index tracks for automated cleanup
+
+**Index Reactivation Policy:**
+
+*Deprecated Index Reactivation (Recommended):*
+- **Discovery:** New installation discovers deprecated index through Type Index
+- **Validation:** Check structural compatibility with current requirements
+- **Reactivation:** Add self to `idx:readBy`, remove `idx:deprecatedAt` timestamp
+- **Re-population required:** Index is stale, must re-enter populating state for update
+  - Set `idx:populationState "populating"`
+  - Create populating shards to scan for new/changed resources since deprecation
+  - Detect and handle tombstoned entries that may have been missed during deprecated period
+- **Stale data handling:** Deprecated period may have missed resource deletions and updates
+- **Tombstone detection algorithm:**
+  1. **Vector clock comparison:** Compare index entry vector clocks with actual resource vector clocks
+  2. **Resource availability check:** Verify that indexed resources still exist and are accessible
+  3. **Tombstone processing:** Apply any missed RDF reification tombstones from deprecation period
+  4. **Entry cleanup:** Remove stale entries for deleted or moved resources
+
+*Tombstoned Index Handling (Strict):*
+- **Discovery prevention:** Tombstoned indices should be hidden from Type Index
+- **Version increment required:** Must create new index with incremented version component
+- **Rationale:** Prevents conflicts with cleaned-up shard references
+
+*Tombstoned Index Discovery Prevention:*
+- **Type Index cleanup:** Remove tombstoned indices from Type Index registrations
+- **Version collision avoidance:** When creating new index, check if computed name conflicts with tombstoned version
+- **Automatic version increment:** If collision detected, increment version component until conflict-free name found
+- **Example:** If `index-full-a1b2c3d4` tombstoned, new index becomes `index-full-b2c3d4e5` with v1_0_1
+
+### 5.3.9. Indexing Conventions and Best Practices
 To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
 
- *   **The "Default" Index:** For each managed resource type (e.g., `sync:managedResourceType schema:Recipe`), there is a convention for a "default" index among compatible applications. CRDT-enabled apps should first attempt to discover this default index via the Type Index. If the discovered default index does not meet an application's specific requirements (e.g., it's a `FullIndex` but the app needs a `GroupIndexTemplate`, or it lacks necessary `idx:indexedProperty` fields), the application **MUST NOT** modify the existing default index. Instead, it should create its own application-specific index. Modifying a shared default index can inadvertently break other compatible applications that rely on its established structure and content.
+ *   **Structure-Based Convergence:** Applications with identical structural requirements automatically share indices through deterministic naming. Structure-derived names eliminate the "default index" concept - there's simply the index that matches your structural requirements.
  
- *   **Minimalism in Default Indices:** Default indices should be kept as minimal as possible. Their primary purpose is to enable basic discovery and synchronization of managed data resources among compatible applications. They should typically include only essential fields necessary for broad interoperability, such as `schema:name` (if at all), and the resource's IRI. Bloating the default index with application-specific or excessive fields increases synchronization overhead for all compatible applications that interact with that managed resource type.
+ *   **Collaborative Property Management:** Indices support collaborative property extension through `idx:indexedProperty` with per-property `idx:readBy` tracking. When installations need additional properties, they extend existing compatible indices rather than creating new ones, minimizing write overhead for all participants.
 
- *   **Application-Specific Indices and "Good Citizenship":** CRDT-enabled applications are free to create their own custom indices with additional `indexedProperty` fields to support specific UI needs, advanced search capabilities, or other application-specific functionalities. However, developers must be considerate ("good citizens") when doing so. Every time a managed data resource is updated, all indices that reference it must also be updated. Therefore, creating numerous application-specific indices, or indices with a large number of `indexedProperty` fields, significantly increases the synchronization burden on all compatible applications that interact with that managed resource type. Developers should carefully weigh the benefits of a custom index against the increased overhead for the compatible application ecosystem. 
+ *   **Performance-Conscious Citizenship:** Every additional index increases write overhead for all installations. Applications should prefer joining existing structurally-compatible indices over creating new ones. The property-level reader tracking enables automatic cleanup of unused properties when installations are tombstoned, keeping indices lean. 
 
-**Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index`**
-This resource is the "rulebook" for all shopping list entry groups in our meal planning application. Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only vector clock hashes for change detection.
+**Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/index`**
+This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only vector clock hashes for change detection.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -729,7 +1063,7 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
    ].
 ```
 
-**Example 2: A `GroupIndex` document at `https://alice.podprovider.org/indices/shopping-entries/groups/2024-08/index`**
+**Example 2: A `GroupIndex` document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/index`**
 This is a concrete index for shopping list entries from August 2024 meal plans.
 
 ```turtle
@@ -739,7 +1073,7 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
 <> a idx:GroupIndex;
    sync:isGovernedBy mappings:group-index-v1;
    # Back-link to the rulebook.
-   idx:basedOn <../../index>;
+   idx:basedOn <../../index-grouped-e5f6g7h8/index>;
    # Inherits configuration from GroupIndexTemplate:
    # - Sharding algorithm (ModuloHashSharding with xxhash64, 4 shards)
    # - Indexed properties (none defined, so minimal entries only)
@@ -751,7 +1085,7 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
                 <shard-mod-xxhash64-4-2-v1_0_0>, <shard-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
+**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
 This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and vector clock hash, no header properties).
 
 ```turtle
@@ -773,8 +1107,8 @@ This document contains entries pointing to shopping list data resources from Aug
    ].
 ```
 
-**Example: A Recipe Index for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index`**
-This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing.
+**Example: A Recipe Index for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index`**
+This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing. The name hash is derived from SHA256(https://schema.org/Recipe|ModuloHashSharding|xxhash64).
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -798,7 +1132,7 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
    idx:hasShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0> .
 ```
 
-**Example: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/shard-mod-xxhash64-2-0-v1_0_0`**
+**Example: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0`**
 This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header properties (schema:name, schema:keywords, etc.) as specified in the FullIndex's `idx:indexedProperty` list to support browsing without loading full recipe data.
 
 ```turtle
@@ -904,9 +1238,9 @@ With the architectural layers defined, we can now examine how the synchronizatio
 await syncLibrary.syncDataType('schema:Recipe', { strategy: 'OnDemandSync' });
 
 // 2. Index Synchronization: Library fetches recipe index and its shards
-// Internal: GET https://alice.podprovider.org/indices/recipes/index
-// Internal: GET https://alice.podprovider.org/indices/recipes/shard-mod-xxhash64-2-0-v1_0_0
-// Internal: GET https://alice.podprovider.org/indices/recipes/shard-mod-xxhash64-2-1-v1_0_0
+// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4
+// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0
+// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-1-v1_0_0
 
 // 3. App Notification: Library provides index headers for browsing
 syncLibrary.onIndexUpdate((headers) => {

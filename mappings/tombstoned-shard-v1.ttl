@@ -1,0 +1,12 @@
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+mappings:tombstoned-shard-v1 a sync:ClassMapping;
+   sync:appliesToClass crdt:TombstonedShard;
+   sync:rule
+     [ sync:predicate crdt:tombstonedAt; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate idx:vectorClockHash; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate idx:originalIndex; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate idx:shardPath; crdt:mergeWith crdt:Immutable ].

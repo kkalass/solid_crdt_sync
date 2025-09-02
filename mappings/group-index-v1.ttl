@@ -6,5 +6,7 @@
 mappings:group-index-v1 a sync:ClassMapping;
    sync:appliesToClass idx:GroupIndex;
    sync:rule
-     [ sync:property idx:basedOn; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:hasShard; crdt:mergeWith crdt:2P_Set ].
+     [ sync:predicate idx:basedOn; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate idx:hasShard; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate idx:readBy; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate idx:deprecatedAt; crdt:mergeWith crdt:LWW_Register ].

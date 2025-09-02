@@ -40,7 +40,7 @@ In Solid's decentralized context, users are not system administrators and cannot
 
 ```turtle
 # Index configuration shows current sharding algorithm  
-<https://alice.podprovider.org/indices/recipes/index>
+<https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index>
   idx:shardingAlgorithm [
     a idx:ModuloHashSharding ;
     idx:hashAlgorithm "xxhash64" ;
@@ -61,7 +61,7 @@ In Solid's decentralized context, users are not system administrators and cannot
 
 ```turtle
 # When library creates new index, explicitly write defaults:
-<https://alice.podprovider.org/indices/recipes/index>
+<https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index>
   idx:shardingAlgorithm [
     a idx:ModuloHashSharding ;
     idx:hashAlgorithm "xxhash64" ;

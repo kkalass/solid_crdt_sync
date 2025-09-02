@@ -144,3 +144,45 @@ idx:containsEntry a rdf:Property;
     rdfs:comment "Links a Shard to an entry, which points to a data resource and its associated metadata (e.g., vector clock hash)." ;
     rdfs:domain idx:Shard ;
     rdfs:range rdfs:Resource .
+
+idx:readBy a rdf:Property;
+    rdfs:label "read by";
+    rdfs:comment "An OR-Set of installation IRIs that actively read from this index or specific indexed property. Used for collaborative lifecycle management and property cleanup when readers are tombstoned.";
+    rdfs:domain [ a owl:Class; owl:unionOf (idx:Index rdfs:Resource) ];
+    rdfs:range rdfs:Resource .
+
+idx:deprecatedAt a rdf:Property;
+    rdfs:label "deprecated at";
+    rdfs:comment "Timestamp when this index was marked as deprecated. Presence of this property indicates deprecation status.";
+    rdfs:domain idx:Index;
+    rdfs:range xsd:dateTime .
+
+idx:populationState a rdf:Property;
+    rdfs:label "population state";
+    rdfs:comment "State of index population process. Values: 'populating' (initial background processing required), 'active' (ready for normal use). Uses LWW_Register for collaborative state transitions.";
+    rdfs:domain idx:Index;
+    rdfs:range xsd:string .
+
+idx:hasPopulatingShard a rdf:Property;
+    rdfs:label "has populating shard";
+    rdfs:comment "References temporary populating shards used during distributed index creation. These shards are tombstoned when population is complete. Uses OR-Set for collaborative shard management.";
+    rdfs:domain idx:Index;
+    rdfs:range rdfs:Resource .
+
+idx:vectorClockHash a rdf:Property;
+    rdfs:label "vector clock hash";
+    rdfs:comment "Hash of the vector clock state at time of tombstoning, used for verification during garbage collection.";
+    rdfs:domain crdt:TombstonedShard;
+    rdfs:range xsd:string .
+
+idx:originalIndex a rdf:Property;
+    rdfs:label "original index";
+    rdfs:comment "Reference to the index that this tombstoned shard was populating.";
+    rdfs:domain crdt:TombstonedShard;
+    rdfs:range idx:Index .
+
+idx:shardPath a rdf:Property;
+    rdfs:label "shard path";
+    rdfs:comment "Full IRI path of the tombstoned populating shard for cleanup purposes.";
+    rdfs:domain crdt:TombstonedShard;
+    rdfs:range xsd:anyURI .

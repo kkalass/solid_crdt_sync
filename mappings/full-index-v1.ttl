@@ -6,7 +6,9 @@
 mappings:full-index-v1 a sync:ClassMapping;
    sync:appliesToClass idx:FullIndex;
    sync:rule
-     [ sync:property idx:indexesClass; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:indexedProperty; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:property idx:hasShard; crdt:mergeWith crdt:2P_Set ],
-     [ sync:property idx:shardingAlgorithm; crdt:mergeWith crdt:LWW_Register ].
+     [ sync:predicate idx:indexesClass; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate idx:indexedProperty; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate idx:hasShard; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate idx:shardingAlgorithm; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate idx:readBy; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate idx:deprecatedAt; crdt:mergeWith crdt:LWW_Register ].

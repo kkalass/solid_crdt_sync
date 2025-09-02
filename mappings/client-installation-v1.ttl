@@ -1,0 +1,25 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+# Standard mapping for client installation documents
+# Enables collaborative lifecycle management and dormancy detection
+
+<> a sync:DocumentMapping;
+   # Import existing statement mapping for tombstones and clock mappings
+   sync:imports ( mappings:crdt-v1 ) ;
+   # Define specific mappings for client installation properties
+   sync:classMapping ( <#client-installation> ) .
+
+<#client-installation> a sync:ClassMapping;
+   sync:appliesToClass crdt:ClientInstallation;
+   sync:rule
+     [ sync:predicate crdt:belongsToWebID; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate crdt:applicationId; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate crdt:createdAt; crdt:mergeWith crdt:Immutable ],
+     [ sync:predicate crdt:lastActiveAt; crdt:mergeWith crdt:LWW_Register;
+       rdfs:comment "Convention: Only the installation itself should update its own activity timestamp" ],
+     [ sync:predicate crdt:maxInactivityPeriod; crdt:mergeWith crdt:LWW_Register;
+       rdfs:comment "Convention: Only the installation itself should update its own inactivity threshold" ] .

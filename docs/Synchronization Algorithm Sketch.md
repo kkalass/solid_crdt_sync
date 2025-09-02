@@ -32,9 +32,40 @@ This unified process handles first-time setup and ongoing discovery for each syn
       * If user cancels: Use hardcoded default paths, warn about reduced interoperability
       * The current sync attempt concludes here until setup is complete
 
-   2. **If configuration is complete:** Proceed to the sync process
+   2. **If configuration is complete:** Proceed to the management phase
 
-## **Phase 3: Index-Based Synchronization**
+## **Phase 3: Index Management and Consistency Checks**
+
+This phase performs maintenance operations and validates index consistency before synchronization.
+
+1. **Installation Lifecycle Management:**
+   1. **Self-activity update:** Update own `crdt:lastActiveAt` timestamp (limited to once per hour)
+   2. **Lazy dormancy validation process:**
+      * **Frequency:** Opportunistic validation during normal index operations
+      * **Scope:** Only validate installations encountered in current sync operations
+      * **Validation algorithm:**
+        1. For each installation in `idx:readBy` lists of accessed indices:
+           - Check local cache for recent validation (TTL: 24 hours)
+           - If cache miss: Fetch installation document and check `crdt:lastActiveAt`
+           - If inactive beyond threshold: Tombstone installation, remove from reader lists
+        2. Skip global scans to avoid performance impact with large installation counts
+      * **Batch optimization:** Group installation fetches to minimize HTTP requests
+      * **Scalability:** Performance independent of total installation count
+   3. **Collaborative cleanup:** Apply lifecycle-based reader list updates to all indices
+   4. **Index lifecycle:** Check for indices with no active readers and set `idx:deprecatedAt`
+
+2. **Index Consistency Validation:**
+   1. **Reader list verification:** Ensure all `idx:readBy` installations are still active
+   2. **Populating shard progress:** Check status of any ongoing population processes
+   3. **State validation:** Verify index `idx:populationState` matches actual shard availability
+   4. **Garbage collection:** Process framework GC index for cleanup of old tombstoned shards
+
+3. **Index Structure Conflicts:**
+   1. **Immutable property conflicts:** Detect and resolve structural conflicts (abort if unresolvable)
+   2. **Shard availability:** Validate all active shards in `idx:hasShard` are accessible
+   3. **Version conflicts:** Check for concurrent index structure changes requiring merge
+
+## **Phase 4: Index-Based Synchronization**
 
 This process synchronizes indices based on the configured Sync Strategies.
 
@@ -66,7 +97,7 @@ This process synchronizes indices based on the configured Sync Strategies.
    2. Notify registered IndexChangeListeners via `onIndexUpdate` callback
    3. Pass source ID (index path or group path) and headers list
 
-## **Phase 4: Data Synchronization**
+## **Phase 5: Data Synchronization**
 
 This phase handles actual data resource synchronization based on the sync strategy.
 
@@ -99,7 +130,7 @@ This phase handles actual data resource synchronization based on the sync strate
    1. Notify registered DataChangeListeners via `onUpdate` callback
    2. Pass the merged object for local storage/display
 
-## **Phase 5: Write Path (On store(object))**
+## **Phase 6: Write Path (On store(object))**
 
 This process is triggered when the application calls `store()` on an object.
 
@@ -128,7 +159,7 @@ This process is triggered when the application calls `store()` on an object.
       * Update all relevant index shards
       * Ensure vector clock consistency across all references
 
-## **Phase 6: Automatic Scaling Management**
+## **Phase 7: Automatic Scaling Management**
 
 This process handles automatic shard scaling when capacity thresholds are exceeded.
 
@@ -154,6 +185,40 @@ This process handles automatic shard scaling when capacity thresholds are exceed
    2. Auto-increment conflict component: `v1_1_0` → `v1_1_1`
    3. Retry with new conflict-free version
    4. All clients converge on same resolution deterministically
+
+## **Framework-Required Automatic Synchronization**
+
+The library automatically synchronizes specific document types that are essential for framework operation, regardless of application-configured sync strategies.
+
+**Mandatory Sync Documents:**
+
+1. **Installation Documents (`crdt:ClientInstallation`):**
+   - **Frequency:** Every sync cycle (background maintenance)
+   - **Scope:** All installations referenced in any `idx:readBy` list
+   - **Purpose:** Dormancy detection, lifecycle management, collaborative coordination
+   - **Strategy:** Always FullSync (small documents, critical for system health)
+
+2. **Index Documents (`idx:Index` subclasses):**
+   - **Frequency:** Every sync cycle before data synchronization
+   - **Scope:** All indices required by configured application sync strategies
+   - **Purpose:** Change detection, shard discovery, population status tracking
+   - **Strategy:** Index-specific (always download full index documents, conditionally sync shards)
+
+3. **Framework Garbage Collection Index:**
+   - **Frequency:** Weekly during management phase
+   - **Scope:** Framework-level GC index for tombstoned shard cleanup
+   - **Purpose:** Automated cleanup of temporary populating shards
+   - **Strategy:** FullSync (single system-wide index)
+
+**Application Document Sync:**
+- Data resources (e.g., `schema:Recipe`) sync according to application-configured strategies
+- Index shards sync based on change detection and strategy requirements
+- Merge contracts sync on-demand when referenced by data resources
+
+**Performance Considerations:**
+- Installation document sync scaled using lazy validation approach
+- Index documents are typically small and critical for system operation
+- GC index provides system-wide cleanup without per-application overhead
 
 ## **Error Handling Integration**
 

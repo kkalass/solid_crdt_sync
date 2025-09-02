@@ -4,6 +4,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix solid: <http://www.w3.org/ns/solid/terms#> .
 
 # --- Ontology Definition ---
 
@@ -73,8 +74,69 @@ crdt:vectorClockHash a rdf:Property;
     rdfs:domain rdfs:Resource;
     rdfs:range xsd:string .
 
+crdt:ClientInstallation a rdfs:Class;
+    rdfs:label "Client Installation";
+    rdfs:comment "A unique installation of a CRDT-enabled application, providing traceability and identity for vector clock entries across the distributed system." .
+
+crdt:Immutable a rdfs:Class;
+    rdfs:label "Immutable";
+    rdfs:comment "A CRDT algorithm for properties that must never change after creation. Sync fails if different values are encountered, forcing creation of new resource versions.";
+    rdfs:subClassOf crdt:Algorithm .
+
+
+
+# --- Property Definitions (continued) ---
+
+crdt:belongsToWebID a rdf:Property;
+    rdfs:label "belongs to WebID";
+    rdfs:comment "Links a client installation to the WebID that owns it.";
+    rdfs:domain crdt:ClientInstallation;
+    rdfs:range rdfs:Resource .
+
+crdt:applicationId a rdf:Property;
+    rdfs:label "application ID";
+    rdfs:comment "The unique identifier for the application that created this installation.";
+    rdfs:domain crdt:ClientInstallation;
+    rdfs:range rdfs:Resource .
+
+crdt:createdAt a rdf:Property;
+    rdfs:label "created at";
+    rdfs:comment "Timestamp when this client installation was first created.";
+    rdfs:domain crdt:ClientInstallation;
+    rdfs:range xsd:dateTime .
+
+crdt:lastActiveAt a rdf:Property;
+    rdfs:label "last active at";
+    rdfs:comment "Timestamp of the last activity from this installation. Updated collaboratively by other installations to track dormancy.";
+    rdfs:domain crdt:ClientInstallation;
+    rdfs:range xsd:dateTime .
+
+
+crdt:tombstoneRetentionPeriod a rdf:Property;
+    rdfs:label "tombstone retention period";
+    rdfs:comment "Duration to retain tombstoned resources before garbage collection. Expressed as ISO 8601 duration (e.g., 'P1Y' for 1 year). Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides).";
+    rdfs:domain [ a owl:Class; owl:unionOf (solid:TypeIndex solid:TypeRegistration) ];
+    rdfs:range xsd:duration .
+
+crdt:enableAutomaticCleanup a rdf:Property;
+    rdfs:label "enable automatic cleanup";
+    rdfs:comment "Boolean flag indicating whether the framework should automatically clean up tombstoned resources after the retention period. Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides).";
+    rdfs:domain [ a owl:Class; owl:unionOf (solid:TypeIndex solid:TypeRegistration) ];
+    rdfs:range xsd:boolean .
+
+
+crdt:maxInactivityPeriod a rdf:Property;
+    rdfs:label "maximum inactivity period";
+    rdfs:comment "Duration after which this installation should be considered for tombstoning if no activity is detected. Expressed as ISO 8601 duration (e.g., 'P6M' for 6 months). If not specified, uses framework default.";
+    rdfs:domain crdt:ClientInstallation;
+    rdfs:range xsd:duration .
+
 crdt:isDeleted a rdf:Property;
     rdfs:label "is deleted";
     rdfs:comment "A property used with RDF Reification to mark a reified statement as deleted, for use in set-based CRDTs. RDF Reification is the semantically correct approach for tombstones since it allows making statements about triples without asserting them (unlike RDF-Star which would assert the triple). Tombstones use the document-level vector clock for timing rather than storing their own vector clock, simplifying implementation at the cost of preventing compaction.";
     rdfs:domain rdf:Statement; # Applied to reified statements (rdf:Statement instances)
     rdfs:range xsd:boolean .
+
+crdt:TombstonedShard a rdfs:Class;
+    rdfs:label "Tombstoned Shard";
+    rdfs:comment "A populating shard that has completed its processing and is marked for garbage collection. Used in framework garbage collection indices to track temporary resources that can be safely deleted after a threshold period." .
