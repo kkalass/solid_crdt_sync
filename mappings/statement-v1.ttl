@@ -14,6 +14,6 @@ mappings:statement-v1 a sync:ClassMapping;
      [ sync:predicate rdf:predicate; crdt:mergeWith crdt:LWW_Register ],
      [ sync:predicate rdf:object; crdt:mergeWith crdt:LWW_Register ],
      
-     # The deletion marker uses LWW semantics - once deleted, stays deleted
-     # (Though in practice, tombstones rarely conflict since they're created atomically)
+     # The deletion marker uses LWW semantics for property tombstones
+     # Applied to reified statements to mark individual property values as deleted
      [ sync:predicate crdt:isDeleted; crdt:mergeWith crdt:LWW_Register ] .

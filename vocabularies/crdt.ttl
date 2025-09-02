@@ -133,9 +133,15 @@ crdt:maxInactivityPeriod a rdf:Property;
 
 crdt:isDeleted a rdf:Property;
     rdfs:label "is deleted";
-    rdfs:comment "A property used with RDF Reification to mark a reified statement as deleted, for use in set-based CRDTs. RDF Reification is the semantically correct approach for tombstones since it allows making statements about triples without asserting them (unlike RDF-Star which would assert the triple). Tombstones use the document-level vector clock for timing rather than storing their own vector clock, simplifying implementation at the cost of preventing compaction.";
-    rdfs:domain rdf:Statement; # Applied to reified statements (rdf:Statement instances)
+    rdfs:comment "A boolean property used with RDF Reification to mark individual property values as deleted in set-based CRDTs (OR-Set, 2P-Set). Applied to reified statements (rdf:Statement instances) to create property tombstones.";
+    rdfs:domain rdf:Statement;
     rdfs:range xsd:boolean .
+
+crdt:deletedAt a rdf:Property;
+    rdfs:label "deleted at";
+    rdfs:comment "Timestamp marking when a resource was deleted. Uses OR-Set semantics to support deletion/undeletion cycles for IRI reuse scenarios. Resource is considered deleted if this property has any values. For cleanup, use the latest timestamp plus retention period.";
+    rdfs:domain rdfs:Resource;
+    rdfs:range xsd:dateTime .
 
 crdt:TombstonedShard a rdfs:Class;
     rdfs:label "Tombstoned Shard";
