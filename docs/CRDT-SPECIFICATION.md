@@ -196,14 +196,26 @@ Since tombstones rely on the document-level vector clock rather than storing the
 - **Document-level clocks**: Simpler implementation, less storage overhead, but permanent tombstones
 - **Per-tombstone clocks**: More complex, higher storage cost, but allows compaction
 
+**Why Per-Tombstone Vector Clocks Don't Work:**
+
+Beyond storage overhead, per-tombstone vector clocks have a fundamental semantic flaw that makes them impractical for tombstone compaction:
+
+**The False Assumption:** "If client X has vector clock entry ≥ tombstone clock, then X has seen the deletion and the tombstone can be safely removed."
+
+**The Reality:** Vector clocks track **causality** (what changes have been integrated), not **active readership** (who currently needs the tombstone). This creates a fundamental problem:
+
+**The Scenario:** Active client stops syncing a resource but retains vector clock entry. Examples include changing sync patterns (only current month data), local storage cleanup, or switching to subset syncing (favorites only). Vector clock entry remains but client never contributes updates to that resource again.
+
+**The Core Problem:** Vector clock dominance requires that all referenced clients eventually contribute updates to surpass the tombstone's vector clock. But clients may stop reading the resource while still having vector clock entries, meaning the tombstone waits indefinitely for updates that will never happen.
+
 **Alternative Approaches for Large-Scale Use:**
 For applications where tombstone accumulation becomes problematic:
-1. **Resource Splitting**: Partition large multi-value properties into separate documents with independent clocks
-2. **Periodic Rebuilding**: Occasionally recreate documents with clean state (requires coordination)
-3. **Hybrid Approach**: Use per-tombstone clocks only for properties expected to have high churn
+1. **Time-based cleanup**: Use `crdt:deletedAt` timestamps for retention-based tombstone removal (safer than causality-based)
+2. **Resource splitting**: Partition large multi-value properties into separate documents with independent clocks
+3. **Periodic rebuilding**: Occasionally recreate documents with clean state (requires coordination)
 
 **Current Recommendation:**
-Accept the storage trade-off in favor of implementation simplicity. The document-level approach aligns with the passive storage philosophy and reduces the metadata burden on RDF data.
+Accept the storage trade-off in favor of implementation simplicity and correctness. Time-based cleanup using deletion timestamps provides practical garbage collection without the semantic problems of causality-based compaction.
 
 ### 3.4. RDF Reification Tombstone Design Summary
 
