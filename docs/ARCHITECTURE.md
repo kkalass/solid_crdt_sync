@@ -170,6 +170,8 @@ This creates clean separation: compatible applications collaborate safely on man
 
 1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index ([Type Index](https://github.com/solid/type-indexes)):
 
+**Note:** This framework currently uses only the **Public Type Index** for discoverability. This design choice enables inter-application collaboration and resource sharing but means all CRDT-managed resources are discoverable by other applications. See [FUTURE-TOPICS.md](FUTURE-TOPICS.md) for planned Private Type Index support.
+
 ```turtle
 # In Profile Document at https://alice.podprovider.org/profile/card#me
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .

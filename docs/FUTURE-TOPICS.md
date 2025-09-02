@@ -140,7 +140,34 @@ This would allow the vast majority of sync operations to only involve the small,
 * But ok, how do we get this list reduced later? Maybe by treating it as a LMW_Register? But that could cause data loss. Or putting this list into its own fragment identifier resource and then "forking" the list, using LMW_Register to determine who wins? OK, this still needs a lot of thoughts.
 
 ---
-## 7. Incorporate Gemini Pro's Feedback:
+
+## 7. Private Type Index Support
+
+**Status**: Future Enhancement  
+**Current Limitation**: Framework currently uses only the Public Type Index, making all CRDT-managed resources discoverable by other applications.
+
+**Privacy Use Cases**:
+- Personal data that shouldn't be discoverable (journals, private notes)
+- Application-specific resources not intended for collaboration  
+- Sensitive business data requiring access control
+- Development/testing resources separate from production data
+
+**Design Challenges**:
+- **Discovery mechanism**: How do applications find private CRDT resources without Type Index?
+- **Collaboration boundaries**: When private resources need selective sharing
+- **Mixed visibility**: Supporting both public collaborative and private isolated resources
+- **Migration paths**: Moving resources between public and private scopes
+
+**Potential Approaches**:
+- **Dual Type Index**: Use both public and private Type Index with clear scope boundaries
+- **Configurable visibility**: Per-container or per-resource visibility settings
+- **Application-specific discovery**: Direct path configuration for private resources
+
+**Related**: Current Public Type Index usage in ARCHITECTURE.md section 4.2
+
+---
+
+## 8. Incorporate Gemini Pro's Feedback:
 
 > ---
 > Points for Discussion and Consideration
