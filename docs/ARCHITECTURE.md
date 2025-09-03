@@ -780,98 +780,77 @@ When installations attempt to create indices with conflicting immutable properti
 - **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.3 for index lifecycle management)
 - **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.3)
 
-#### 4.3.3. Collaborative Bootstrap and Index Population
+#### 4.3.3. Index Population Mechanics
 
-**Coordination-Free Bootstrap Process:**
+Index population occurs in two scenarios: when creating a new index, or when syncing an existing index that is still in populating state.
 
-Multiple installations automatically collaborate on index creation through structure-derived naming and CRDT-based document management.
+**Population Variants Overview:**
 
-**Bootstrap Decision Flow:**
-1. **Discovery first:** Query Type Index for existing indices with compatible structural requirements
-2. **Structural compatibility:** Evaluate discovered indices for exact structural match
-3. **Join or create:** Add self as reader to compatible index OR create new index with deterministic name
-4. **Opportunistic population:** Installation that creates index populates it from existing data containers
+The framework uses two different approaches for population based on the index type:
 
-**Structural Compatibility Rules:**
-- **Identical immutable properties:** Index type, class, grouping rule, base sharding algorithm must match exactly
-- **Extendable properties:** `idx:indexedProperty` can be extended through property-level reader tracking
-- **Automatic convergence:** Identical requirements generate identical names, enabling automatic sharing
+**FullIndex Population:** Works directly on target shards that will be used for normal operations. The `idx:hasPopulatingShard` list contains the same shard names as `idx:hasShard`, enabling unified progress tracking.
 
-**Index Population Algorithm:**
+**GroupIndexTemplate Population:** Uses temporary coordination shards (`pop-` prefix) to distribute work across installations. These temporary shards coordinate creation of actual GroupIndex instances and are tombstoned when complete.
 
-The framework uses a distributed population strategy for all index creation, providing collaborative processing and progressive availability:
+**Unified Population Process:**
 
-**Distributed Population Strategy:**
-
-**Universal Populating State:**
-When creating any new index, it enters "populating" state with appropriate population strategy based on dataset size:
-
-```turtle
-<GroupIndexTemplate>
-   idx:populationState "populating";  # LWW-Register managed
-   idx:hasPopulatingShard <pop-mod-xxhash64-4-0-v1_0_0>, <pop-mod-xxhash64-4-1-v1_0_0>, 
-                          <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
-```
+**Index Creation Process:**
+1. **Directory scan:** Creating installation recursively lists all resource IRIs from data container and subfolders
+2. **Initial structure:** 
+   - **For FullIndex:** Create index and target shards with minimal entries (resource IRIs only), list target shards in both `idx:hasShard` and `idx:hasPopulatingShard`
+   - **For GroupIndexTemplate:** Create index and temporary populating shards for coordination work
+   (See [SHARDING.md](SHARDING.md) for shard count determination details)
 
 **Distributed Processing Algorithm:**
-1. **Directory scan:** GET data container → list all resource IRIs
-2. **Work distribution:** Each installation computes `hash(installationIRI + shardIRI)` for each populating shard
-3. **Priority ordering:** Sort shards by hash value (different order per installation)
-4. **Sequential processing:** Process shards in priority order until all complete
-5. **Collaborative completion:** Multiple installations work simultaneously, CRDT merge resolves conflicts
+When any installation encounters a populating index during sync:
+1. **Work distribution:** Each installation computes `hash(installationIRI + shardIRI)` for each shard in `idx:hasPopulatingShard`
+2. **Priority ordering:** Sort shards by hash value (different order per installation)
+3. **Sequential processing:** Process shards in priority order until all complete
+4. **Collaborative completion:** Multiple installations work simultaneously, CRDT merge resolves conflicts
 
 **Per-Shard Processing:**
-1. **Fetch current state:** GET populating shard from Pod  
+1. **Fetch current state:** GET populating shard from Pod
 2. **CRDT merge:** Merge with local processing state
 3. **Check completeness:** Verify if shard needs processing
-4. **Population work:** Read resources, populate both temporary + target shards
-5. **Completion marking:** Mark shard as completed in OR-Set
-6. **Upload:** PUT updated shard to Pod
+4. **Population work:** 
+   - **For FullIndex:** Read resources, add `idx:belongsToIndexShard` back-pointers, calculate HLC hashes, populate shard entries
+   - **For GroupIndexTemplate:** Read resources, determine group assignments, add `idx:belongsToIndexShard` back-pointers to GroupIndex shards, create GroupIndex instances, populate both populating shard and target group shards
+5. **Completion marking:** 
+   - **For FullIndex:** Remove shard from `idx:hasPopulatingShard` OR-Set
+   - **For GroupIndexTemplate:** Tombstone populating shard with `crdt:deletedAt` AND remove from `idx:hasPopulatingShard` OR-Set
+6. **Upload:** PUT updated shard and index to Pod
+   - **ETag optimization:** Store ETags from GET responses, use `If-Match` headers on PUT to detect concurrent modifications
+   - **On 412 Precondition Failed:** GET current state, perform CRDT merge with local changes, retry PUT with merged result
 
 **State Transition to Active:**
 
 *LWW-Register State Machine for `idx:populationState`:*
 1. **Initial State:** Index created with `idx:populationState "populating"`
-2. **Completion Detection:** Installation detects all populating shards are completed
+2. **Completion Detection:** Installation detects `idx:hasPopulatingShard` is empty (all shards completed)
 3. **State Update:** Installation attempts `idx:populationState "active"` with current Hybrid Logical Clock
 4. **Collaborative Resolution:** Multiple installations may attempt transition simultaneously
    - LWW-Register ensures deterministic convergence to "active" state
    - Hybrid Logical Clock comparison resolves concurrent updates
-5. **Cleanup Phase:** After state transition, remove `idx:hasPopulatingShard` entries using OR-Set removal
 
-*State Transition Requirements:*
-- Only transition to "active" when ALL populating shards are tombstoned
-- Use LWW-Register to prevent state regression (active → populating)
-- Cleanup populating shard references only after successful state transition
+**Concrete Examples:**
 
-**Background Population Requirements for All Index Types:**
+**FullIndex during population:**
+```turtle
+<FullIndex>
+   idx:populationState "populating";
+   idx:hasPopulatingShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0>;
+   # Target shards created with minimal entries (resource IRIs only)
+   idx:hasShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0> .
+```
 
-*Universal Requirements (All Index Types):*
-- **Non-blocking:** Population happens during background sync cycles, never blocks UI
-- **Local-first:** Applications remain functional with partially-populated indices  
-- **Mandatory progress:** Every sync cycle continues population until completion
-- **Cross-installation:** All installations participate in population until finished
-- **State management:** Use `idx:populationState` LWW-Register for collaborative state transitions
-
-*FullIndex Population:*
-- **Small datasets (< 1000 resources):** Direct creation and immediate state switch to "active"
-  - Create index with `idx:populationState "populating"`
-  - Populate target shards directly during creation
-  - Switch to `idx:populationState "active"` when complete (no populating shards needed)
-- **Large datasets (> 1000 resources):** Use distributed populating shards strategy
-  - Create populating shards using `pop-` prefix for collaborative processing
-  - Completion criteria: All populating shards tombstoned → state transition to "active"
-- **Threshold decision:** Framework automatically chooses strategy based on data container size scan
-
-*GroupIndexTemplate Population:*  
-- **Template-only:** GroupIndexTemplate itself never contains data entries
-- **State transition:** "populating" → "active" indicates template is ready for group creation
-- **No direct population:** Individual GroupIndex instances are populated separately as needed
-
-*GroupIndex Population:*
-- **Inherits strategy:** Uses same algorithm as FullIndex but scoped to specific group
-- **Group-scoped shards:** Populating shards process only resources belonging to the group
-- **Independent completion:** Each group index completes population independently
+**GroupIndexTemplate during population:**
+```turtle
+<GroupIndexTemplate>
+   idx:populationState "populating";
+   # Temporary coordination shards for distributed work
+   idx:hasPopulatingShard <pop-mod-xxhash64-4-0-v1_0_0>, <pop-mod-xxhash64-4-1-v1_0_0>, 
+                          <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
+```
 
 #### 4.3.4. Installation Index Management and Scalability
 
@@ -1117,7 +1096,24 @@ This decision determines when and how much data gets loaded from the Pod.
 *   Good for large datasets or browse-then-load workflows
 *   Examples: Large recipe collections, document libraries, photo albums
 
-#### 4.4.3. Common Strategies
+#### 4.4.3. HTTP-Level Optimizations
+
+**ETag-Based Conflict Detection:**
+
+Solid Pods support standard HTTP ETags for optimistic concurrency control:
+- **GET responses:** Include `ETag` header with resource version identifier
+- **PUT requests:** Include `If-Match` header with stored ETag to detect concurrent modifications  
+- **412 Precondition Failed:** Server rejects if ETag doesn't match current version
+
+**CRDT Integration Strategy:**
+Unlike traditional REST APIs that fail on conflicts, this framework leverages ETags as a performance optimization:
+1. **Optimistic path:** Most PUTs succeed immediately when no concurrent modifications occurred
+2. **Conflict resolution:** On 412 response, GET current state, perform CRDT merge with local changes, retry PUT
+3. **Eventual consistency:** CRDT merge semantics ensure convergence regardless of update order
+
+This approach provides both immediate conflict detection (via ETags) and robust conflict resolution (via CRDT merging), offering better performance than pure CRDT approaches while maintaining stronger consistency than traditional optimistic locking.
+
+#### 4.4.4. Common Strategies
 
 The named sync strategies combine the two decisions above:
 
