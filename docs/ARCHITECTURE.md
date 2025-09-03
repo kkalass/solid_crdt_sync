@@ -24,11 +24,64 @@ The proposed solution addresses both challenges through a declarative, developer
 
 The following sections establish the technical foundations that enable reliable CRDT synchronization in the Solid ecosystem, addressing core RDF challenges, integration requirements, and collaborative mechanisms.
 
-### 3.1. Core RDF Challenges
+### 3.1. CRDT Fundamentals
+
+Before examining RDF-specific challenges, it's essential to understand the core CRDT concepts that underpin this architecture. These data structures enable conflict-free merging of distributed data without requiring coordination between clients.
+
+#### 3.1.1. Core CRDT Types
+
+**LWW-Register (Last-Writer-Wins Register):**
+- Used for single-value properties where the most recent write should win
+- Examples: Recipe name, creation timestamp, status field
+- Conflict resolution: Compare timestamps, newer value wins
+- Compatible with any object type (IRIs, literals, blank nodes)
+
+**OR-Set (Observed-Remove Set):**
+- Used for multi-value properties where additions and removals must be tracked separately
+- Examples: Recipe keywords, ingredient lists, tag collections
+- Conflict resolution: Union of all additions, minus explicitly removed items
+- Requires stable object identity for tombstone matching across documents
+
+**2P-Set (Two-Phase Set):**
+- Add-only sets with tombstone-based removal (elements can be added and removed, but not re-added)
+- Used for properties where re-addition after removal should be prevented
+- Requires stable object identity for tombstone operations
+
+**Hybrid Logical Clock (HLC):**
+- Combines logical causality tracking with physical wall-clock timestamps
+- Provides tamper-resistant causality determination and intuitive tie-breaking
+- Each document maintains a clock that advances with each change
+- Enables "newer wins" semantics while protecting against clock manipulation
+
+#### 3.1.2. State-Based vs Operation-Based CRDTs
+
+This framework uses **state-based CRDTs** rather than operation-based approaches:
+
+**State-Based Approach (This Framework):**
+- Synchronizes complete document state between replicas
+- Compatible with passive storage backends like Solid Pods
+- Merge function operates on entire document states
+- Higher bandwidth but simpler implementation
+
+**Operation-Based Approach (Alternative):**
+- Synchronizes individual operations/changes between replicas
+- Requires active coordination and reliable message delivery
+- Lower bandwidth but requires more complex infrastructure
+- Examples: Yjs, Automerge operation streams
+
+#### 3.1.3. Framework Application
+
+The framework applies these CRDT types at the **property level** within RDF resources:
+- Each property in a resource is governed by a specific CRDT type
+- Merge contracts (`sync:` vocabulary) declaratively link properties to CRDT algorithms
+- Document-level Hybrid Logical Clocks coordinate the overall merge process
+- The result is deterministic, conflict-free merging of arbitrary RDF data
+
+### 3.2. Core RDF Challenges
 
 While the core principles above define the framework's goals, implementing reliable CRDT merging in RDF requires solving fundamental challenges around resource identity. The following sections explain how the framework ensures consistent, safe merging across distributed documents while maintaining RDF semantics.
 
-#### 3.1.1. The Blank Node Challenge
+#### 3.2.1. The Blank Node Challenge
 
 **The Fundamental RDF Constraint:** RDF blank nodes are document-instance-scoped by definition - their identifiers (like `_:b1`) only have meaning within a single document instance. The RDF specification allows different implementations to assign blank node labels arbitrarily, so the same semantic content might be labeled `_:b1` in one instance and `_:genid123` in another. When merging two document instances (e.g., local `recipe-123.ttl` and remote `recipe-123.ttl`), we cannot determine if `_:b1` in the local instance corresponds to `_:b1` in the remote instance - even if the labels match, this must be treated as incidental coincidence rather than semantic equivalence.
 
@@ -39,7 +92,7 @@ While the core principles above define the framework's goals, implementing relia
 
 **The Core Problem:** Without stable identity, we cannot reliably merge RDF graphs containing blank nodes, leading to data inconsistency and CRDT convergence failures.
 
-#### 3.1.2. Resource Merging vs Property Merging
+#### 3.2.2. Resource Merging vs Property Merging
 
 **Two Distinct Operations:** The framework performs two conceptually separate but coordinated operations:
 
@@ -53,7 +106,7 @@ While the core principles above define the framework's goals, implementing relia
 
 **Property Merging Impact:** When non-identifiable resources appear as object values, we cannot determine equality for CRDT operations that depend on identity. For example, OR-Set tombstones cannot match their target objects across documents because `[rdfs:label "homemade"]` in a tombstone cannot be reliably compared to `[rdfs:label "homemade"]` in the live data.
 
-#### 3.1.3. The Solution: Context-Based Identification
+#### 3.2.3. The Solution: Context-Based Identification
 
 **The Key Insight:** Some blank nodes can become identifiable through the combination of context + properties, enabling safe CRDT operations within specific scopes.
 
@@ -62,25 +115,25 @@ While the core principles above define the framework's goals, implementing relia
 **The Pattern:** `(context, identifying properties)` creates sufficient identity for safe merging within that scope. The context is the identifier of the subject containing the blank node, and identifying properties are the values of predicates with `sync:isIdentifying true` flags in their rules. With compound keys, the pattern becomes `(context, property1=value1, property2=value2, ...)`.
 
 **Recursive Context Building:** Context identifiers can be built recursively - an identified blank node can serve as context for nested blank nodes:
-- **Base case:** IRI-identified resource (e.g., `<https://alice.podprovider.org/data/recipes/tomato-soup>`)  
-- **Recursive case:** Previously identified blank node (e.g., `(<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>)` identifies a clock entry)
-- **Nested example:** `((<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>), subProperty=value)` could identify a blank node within a clock entry
+- **Base case:** IRI-identified resource (e.g., `<https://alice.podprovider.org/data/recipes/tomato-soup#it>`)  
+- **Recursive case:** Previously identified blank node (e.g., `(<https://alice.../recipes/tomato-soup#it>, installationId=<https://alice.../installation-123>)` identifies a clock entry)
+- **Nested example:** `((<https://alice.../recipes/tomato-soup#it>, installationId=<https://alice.../installation-123>), subProperty=value)` could identify a blank node within a clock entry
 
 For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt:installationId=<full_installation_IRI>)`, where `document_IRI` is the full document IRI context and `crdt:installationId=<full_installation_IRI>` are the identifying properties.
 
 **Implementation Details:** For detailed mapping syntax, complex identification scenarios, and implementation patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation). 
 
-#### 3.1.4. Resource Identity Taxonomy
+#### 3.2.4. Resource Identity Taxonomy
 
 **The Critical Three-Way Distinction:** Resources fall into three categories based on their identity characteristics:
 
 **1. IRI-Identified Resources** (globally unique):
-- **Example:** `<https://alice.podprovider.org/data/recipes/tomato-soup>`
+- **Example:** `<https://alice.podprovider.org/data/recipes/tomato-soup#it>`
 - **Identity:** Globally unique, stable identifiers
 - **CRDT Compatibility:** Safe for all CRDT operations
 
 **2. Context-Identified Blank Nodes** (unique within context):
-- **Example:** `(<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>)`
+- **Example:** `(<https://alice.../recipes/tomato-soup#it>, installationId=<https://alice.../installation-123>)`
 - **Identity:** Unique within specific context through identifying properties
 - **CRDT Compatibility:** Safe for all CRDT operations when properly identified
 
@@ -94,7 +147,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 2. The blank node has that identifying predicate as one of its properties
 3. The subject that references the blank node is itself identifiable (IRI or previously identified blank node)
 
-#### 3.1.5. CRDT Compatibility Rules
+#### 3.2.5. CRDT Compatibility Rules
 
 **The Critical Constraint:** Identity-dependent CRDTs (OR-Set, 2P-Set) require stable object identity to match tombstones with their targets across documents. Non-identifiable blank nodes cause these operations to fail.
 
@@ -106,14 +159,14 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 
 **Detailed Examples:** For comprehensive examples of identification failures, structural equality problems, and solution patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation).
 
-#### 3.1.6. Development Implications
+#### 3.2.6. Development Implications
 
 - **Data Modeling:** Prefer IRIs over blank nodes when identity-dependent CRDT operations are needed
 - **Mapping Design:** Understand identifiability requirements for each CRDT type and use `sync:isIdentifying` appropriately
 - **Validation:** Implement mapping validation to prevent invalid configurations
 - **Performance:** Flat resource processing enables parallel merging optimizations
 
-#### 3.1.7. Implementation Consistency Checks
+#### 3.2.7. Implementation Consistency Checks
 
 **Recommended Practice:** Implementing libraries should perform consistency checks during mapping generation or validation, particularly when mappings are derived from code annotations:
 
@@ -153,13 +206,13 @@ class Ingredient {
 
 This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
 
-### 3.2. Solid Discovery Integration
+### 3.3. Solid Discovery Integration
 
 CRDT-managed resources contain synchronization metadata and follow structural conventions that traditional RDF applications don't understand, creating a risk of data corruption. This section describes how the architecture solves this problem through discovery isolation.
 
 CRDT-enabled applications use a modified Solid discovery approach that provides controlled access to managed resources while protecting them from incompatible applications. This isolation strategy prevents data corruption while maintaining standard Solid discoverability principles.
 
-#### 3.2.1. Discovery Isolation Strategy
+#### 3.3.1. Discovery Isolation Strategy
 
 **The Challenge:** Traditional Solid discovery would expose CRDT-managed data to all applications, risking corruption by applications that don't understand CRDT metadata or Hybrid Logical Clocks.
 
@@ -172,7 +225,7 @@ CRDT-enabled applications use a modified Solid discovery approach that provides 
 
 This creates clean separation: compatible applications collaborate safely on managed data, while traditional apps work with unmanaged data, preventing cross-contamination.
 
-#### 3.2.2. Managed Resource Discovery Protocol
+#### 3.3.2. Managed Resource Discovery Protocol
 
 1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index ([Type Index](https://github.com/solid/type-indexes)):
 
@@ -236,11 +289,11 @@ This creates clean separation: compatible applications collaborate safely on man
 
 **Advantages:** Using TypeRegistration with `sync:ManagedDocument` and `sync:managedResourceType` enables managed resource discovery while protecting managed resources from incompatible applications. CRDT-enabled applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), while traditional applications remain unaware of CRDT-managed data, preventing accidental corruption.
 
-### 3.3. Identity and Lifecycle Management
+### 3.4. Identity and Lifecycle Management
 
 Before examining the architectural layers, we need to establish the fundamental concepts of identity management and resource lifecycle that underpin the entire framework. These concepts are used throughout all architectural layers.
 
-#### 3.3.1. Identity Management (Client Installation Documents)
+#### 3.4.1. Identity Management (Client Installation Documents)
 
 Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for Hybrid Logical Clock entries, and collaborative lifecycle management.
 
@@ -283,16 +336,16 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 - **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable`
 
 **Installation Cleanup:**
-Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations to make tombstoning decisions.
+Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations and make dormant installation tombstoning decisions as part of their sync management phase. For general tombstone mechanics, see Section 3.4.2 below.
 
-#### 3.3.2. Tombstoning Fundamentals
+#### 3.4.2. Tombstoning Fundamentals
 
 The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
 
 **Two Types of Tombstones:**
 
 **1. Resource Tombstones** (Entire Document Deletion):
-- **Purpose:** Mark complete resources as deleted (e.g., deleting an entire recipe)
+- **Purpose:** Mark complete resources as deleted (e.g., deleting an entire recipe or even installation document)
 - **Property:** `crdt:deletedAt` with OR-Set semantics
 - **Scope:** Applied to the document itself, affects the entire resource
 - **Use Case:** User deletes a recipe, shopping list entry, or other complete resource
@@ -384,13 +437,182 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
 
 This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
 
-**Fundamental Principle:** All documents stored in user Pods by this framework are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed installations.
+**Fundamental Principle:** All documents stored in user Pods by this framework (except for the standard solid type index which cannot be fully managed by us) are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed installations.
 
 * **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
 
 * **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Hybrid Logical Clocks** for versioning and **Resource Tombstones** for managing deletions.
 
-#### 4.2.1. Hybrid Logical Clock Mechanics
+#### 4.2.1. Merge Contract Fundamentals
+
+**What Are Merge Contracts?**
+
+Merge contracts are public RDF documents that define how to resolve conflicts when merging data from multiple sources. They act as "rule books" that ensure any two CRDT-enabled applications can merge the same data and arrive at identical results.
+
+**How Merge Contracts Work:**
+
+1. **Property-to-CRDT Mapping:** Each RDF property is linked to a specific CRDT algorithm (LWW-Register, OR-Set, etc.)
+2. **Public Discovery:** Resources point to their merge contract via `sync:isGovernedBy`
+3. **Deterministic Merging:** Applications follow the published rules to merge conflicting changes
+4. **Interoperability:** Different applications using the same contracts can safely collaborate
+
+**The Two Scoping Approaches:**
+
+The framework supports two different ways to define merge rules, each serving different purposes:
+
+**Property Mapping (Class-Scoped Rules):**
+- Rules defined within `sync:ClassMapping` apply **only within that specific class context**
+- Example: `rdf:subject` might use LWW-Register when within `rdf:Statement` resources, but different rules elsewhere
+- **Use case:** When the same predicate needs different merge behavior in different contexts
+
+```turtle
+# Property mapping: rdf:subject behavior scoped to rdf:Statement context
+mappings:statement-v1 a sync:ClassMapping;
+   sync:appliesToClass rdf:Statement;
+   sync:rule
+     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+**Predicate Mapping (Global Rules):**
+- Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
+- Example: `crdt:installationId` **always** uses LWW-Register regardless of which resource contains it
+- **Use case:** Framework-level predicates that need consistent behavior everywhere
+
+```turtle
+# Predicate mapping: Global behavior across all contexts
+<#clock-mappings> a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
+```
+
+**Why Both Are Needed:**
+
+- **Framework predicates** (like `crdt:installationId`, `crdt:deletedAt`) need consistent behavior across all resources → Global predicate mappings
+- **Application data** (like `schema:name`, `schema:keywords`) may need context-specific behavior → Class-scoped property mappings
+- **Hybrid approach** allows framework consistency while enabling application flexibility
+
+**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW-Register when within `schema:Recipe` resources but could theoretically use OR-Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:installationId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
+
+#### 4.2.2. Standard CRDT Library Examples
+
+This section provides concrete examples of how merge contracts work in practice, showing both the RDF data structure and the CRDT mapping rules that govern conflict resolution.
+
+**Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
+
+This resource uses semantic date-based organization, reflecting when the shopping list was created (an invariant property). It shows how shopping list entries are derived from recipes in the meal planning workflow.
+
+```turtle
+@prefix schema: <https://schema.org/> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix meal: <https://example.org/vocab/meal#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix : <#> .
+
+# -- The Shopping List Entry (The Payload) --
+:it a meal:ShoppingListEntry;
+   schema:name "2 lbs fresh tomatoes" ;
+   meal:quantity "2" ;
+   meal:unit "lbs" ;
+   # Links to the source recipe that generated this shopping item
+   meal:derivedFrom <../../../../recipes/tomato-basil-soup#it> ;
+   # Links to the meal plan date that requires this ingredient
+   meal:requiredForDate "2024-08-15"^^xsd:date ;
+   schema:dateCreated "2024-08-10T10:30:00Z"^^xsd:dateTime .
+
+# -- Pointers to Other Layers --
+<> a sync:ManagedDocument;
+   foaf:primaryTopic :it;
+   # Uses a different DocumentMapping for shopping list entries (imports CRDT library + shopping mappings)
+   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
+   # Points to index shard within the appropriate group
+   idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
+```
+
+**Following the Merge Contract Link: shopping-entry-v1**
+
+Now let's examine what the `shopping-entry-v1` merge contract actually contains. This shows how the framework imports standard CRDT mappings and defines application-specific rules:
+
+```turtle
+# At https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix schema: <https://schema.org/> .
+@prefix meal: <https://example.org/vocab/meal#> .
+
+<> a sync:DocumentMapping;
+   # Import the standard CRDT vocabulary mappings (framework-provided)
+   sync:imports mappings:crdt-v1;
+   
+   # Define shopping-specific property mappings
+   sync:hasMapping [
+     a sync:ClassMapping;
+     sync:appliesToClass meal:ShoppingListEntry;
+     sync:rule
+       [ sync:predicate schema:name; crdt:mergeWith crdt:LWW_Register ],
+       [ sync:predicate meal:quantity; crdt:mergeWith crdt:LWW_Register ],
+       [ sync:predicate meal:unit; crdt:mergeWith crdt:LWW_Register ],
+       [ sync:predicate meal:derivedFrom; crdt:mergeWith crdt:LWW_Register ],
+       [ sync:predicate meal:requiredForDate; crdt:mergeWith crdt:LWW_Register ],
+       [ sync:predicate schema:dateCreated; crdt:mergeWith crdt:LWW_Register ]
+   ] .
+```
+
+**How This Contract Works:**
+
+1. **Framework Import:** `sync:imports mappings:crdt-v1` brings in the standard CRDT framework mappings that define behavior for `crdt:installationId`, `crdt:deletedAt`, `crdt:logicalTime`, etc. These global predicate mappings work consistently across all resources.
+
+2. **Application Rules:** The `sync:ClassMapping` defines how shopping list entry properties should be merged. In this case, all properties use `crdt:LWW_Register` (Last Writer Wins) because shopping items are typically managed by a single user and conflicts are rare.
+
+3. **Layered Resolution:** When merging a shopping list entry, the framework first applies the global predicate mappings (for clock metadata) and then applies the class-scoped property mappings (for shopping data).
+
+This demonstrates the architecture's separation between framework concerns (managed globally) and application concerns (defined per class). The import mechanism allows applications to focus on their domain-specific rules while inheriting standard behavior for CRDT infrastructure.
+
+**Example: Class-Scoped Property Mapping**
+
+The following shows how `rdf:subject` uses LWW-Register **only when within `rdf:Statement` resources**:
+
+```turtle
+# Property mapping: rdf:subject behavior scoped to rdf:Statement context
+mappings:statement-v1 a sync:ClassMapping;
+   sync:appliesToClass rdf:Statement;
+   sync:rule
+     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
+```
+
+**Example: Global Predicate Mapping**
+
+Framework predicates maintain consistent behavior across all contexts through global predicate mappings:
+
+```turtle
+# Predicate mapping: Global behavior across all contexts
+<#clock-mappings> a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
+```
+
+**Example: OR-Set for Multi-Value Properties**
+
+Keywords in recipes use OR-Set semantics to allow multiple editors to add tags concurrently:
+
+```turtle
+mappings:recipe-v1 a sync:ClassMapping;
+   sync:appliesToClass schema:Recipe;
+   sync:rule
+     [ sync:predicate schema:name; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate schema:keywords; crdt:mergeWith crdt:OR_Set ],
+     [ sync:predicate schema:recipeIngredient; crdt:mergeWith crdt:OR_Set ] .
+```
+
+#### 4.2.3. Hybrid Logical Clock Mechanics
 
 The state-based merge process uses **document-level Hybrid Logical Clocks (HLC)** for causality determination and intuitive tie-breaking. Each resource document has a single HLC that tracks changes to the entire document using both logical time (causality) and physical time (wall-clock).
 
@@ -431,160 +653,6 @@ Hybrid Logical Clock entries are context-identified blank nodes using the patter
 - **Clock Skew Tolerance:** Physical time bias doesn't affect convergence, only fairness
 
 **Detailed Algorithms:** For comprehensive merge algorithms, Hybrid Logical Clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
-
-#### 4.2.2. Standard CRDT Library Examples
-
-**Example: Standard CRDT Library `crdt-v1`**
-This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping.
-
-**Key Global Predicate Mappings:**
-- **`crdt:installationId`:** Always uses LWW-Register and identifies blank nodes (Hybrid Logical Clock entries)
-- **`crdt:logicalTime`:** Always uses LWW-Register for logical time components
-- **`crdt:physicalTime`:** Always uses LWW-Register for physical time components
-- **`crdt:deletedAt`:** Always uses OR-Set semantics for both resource and property tombstones
-
-**Example: Application-Specific Rules File `recipe-v1`**
-
-```turtle
-@prefix schema: <https://schema.org/> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-
-<> a sync:DocumentMapping;
-   # Import standard CRDT library (gets statement and clock mappings automatically)
-   sync:imports ( <https://kkalass.github.io/solid_crdt_sync/mappings/crdt-v1> ) ;
-   
-   # Define local application-specific mappings (ordered lists)
-   sync:classMapping ( <#recipe> ) ;
-   sync:predicateMapping ( <#nutrition> ) .
-
-<#recipe> a sync:ClassMapping;
-   sync:appliesToClass schema:Recipe;
-   sync:rule
-     [ sync:predicate schema:name; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate schema:keywords; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate schema:recipeIngredient; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate schema:totalTime; crdt:mergeWith crdt:LWW_Register ] .
-
-<#nutrition> a sync:PredicateMapping;
-   sync:rule
-     [ sync:predicate schema:calories; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-     [ sync:predicate schema:servingSize; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-     [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .
-```
-
-**Example: Complete Resource with CRDT Mechanics**
-
-```turtle
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix schema: <https://schema.org/> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix : <#> .
-
-# -- The Recipe Data (Layer 1) --
-:it a schema:Recipe;
-   schema:name "Tomato Soup" ;
-   schema:keywords "vegan", "soup" ;
-   schema:recipeIngredient "2 lbs fresh tomatoes", "1 cup fresh basil" ;
-   schema:totalTime "PT30M" .
-
-# -- Document Metadata --
-<> a sync:ManagedDocument;
-   foaf:primaryTopic :it;
-   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
-   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
-
-# -- Hybrid Logical Clock (Layer 2 Mechanics) --
-<> crdt:hasClockEntry [
-    crdt:installationId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
-    crdt:logicalTime "15"^^xsd:long ;
-    crdt:physicalTime "1693824600000"^^xsd:long
-  ] ,
-  [
-    crdt:installationId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
-    crdt:logicalTime "8"^^xsd:long ;
-    crdt:physicalTime "1693824550000"^^xsd:long
-  ] ;
-  crdt:clockHash "xxh64:abcdef1234567890" .
-
-# -- Property Tombstone Example --
-<#crdt-tombstone-f8e4d2b1> a rdf:Statement;
-  rdf:subject :it;
-  rdf:predicate schema:keywords;
-  rdf:object "quick";
-  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
-```
-
-**Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
-This resource uses semantic date-based organization, reflecting when the shopping list was created (an invariant property). It shows how shopping list entries are derived from recipes in the meal planning workflow.
-
-```turtle
-@prefix schema: <https://schema.org/> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix meal: <https://example.org/vocab/meal#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix : <#> .
-
-# -- The Shopping List Entry (The Payload) --
-:it a meal:ShoppingListEntry;
-   schema:name "2 lbs fresh tomatoes" ;
-   meal:quantity "2" ;
-   meal:unit "lbs" ;
-   # Links to the source recipe that generated this shopping item
-   meal:derivedFrom <../../../../recipes/tomato-basil-soup> ;
-   # Links to the meal plan date that requires this ingredient
-   meal:requiredForDate "2024-08-15"^^xsd:date ;
-   schema:dateCreated "2024-08-10T10:30:00Z"^^xsd:dateTime .
-
-# -- Pointers to Other Layers --
-<> a sync:ManagedDocument;
-   foaf:primaryTopic :it;
-   # Uses a different DocumentMapping for shopping list entries (imports CRDT library + shopping mappings)
-   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
-   # Points to index shard within the appropriate group
-   idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
-```
-
-#### 4.2.3. Property Mapping vs. Predicate Mapping Semantics
-
-**Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
-
-**Property Mapping (Class-Scoped Rules):**
-- Rules defined within `sync:ClassMapping` apply **only within that specific class context**
-- Example: In `mappings:statement-v1`, `rdf:subject` uses LWW-Register **only when within `rdf:Statement` resources**
-- **Use case:** Class-specific behavior where the same predicate may have different merge semantics in different contexts
-
-```turtle
-# Property mapping: rdf:subject behavior scoped to rdf:Statement context
-mappings:statement-v1 a sync:ClassMapping;
-   sync:appliesToClass rdf:Statement;
-   sync:rule
-     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
-```
-
-**Predicate Mapping (Global Rules):**
-- Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
-- Example: In `mappings:crdt-v1`, `crdt:installationId` **always** identifies blank nodes and **always** uses LWW-Register
-- Example: In `mappings:crdt-v1`, `crdt:deletedAt` **always** uses OR-Set semantics for both resource and property tombstones
-- **Use case:** Framework-level predicates with consistent behavior regardless of context
-
-```turtle
-# Predicate mapping: Global behavior across all contexts
-<#clock-mappings> a sync:PredicateMapping;
-   sync:rule
-     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
-```
-
-**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW-Register when within `schema:Recipe` resources but could theoretically use OR-Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:installationId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
 
 #### 4.2.4. Vocabulary Versioning and Evolution
 
