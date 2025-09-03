@@ -314,6 +314,7 @@ Resources are marked as deleted using the `crdt:deletedAt` property with OR-Set 
 - **State Determination:** A resource is considered deleted if `crdt:deletedAt` set is non-empty, undeleted if set is empty
 - **Merge Behavior:** OR-Set union across all replicas - timestamps can be added (delete) or removed (undelete)
 - **Cleanup Timing:** Use `max(crdt:deletedAt)` plus configured retention period for garbage collection
+- **Efficient Cleanup:** Tombstoned resources are tracked in the Framework Garbage Collection Index (see Section 5.3.4) for efficient discovery by cleanup processes
 - **Undeletion:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
 
 **Trade-offs:** This approach allows "late deletions" to affect recreated content. If Client A deletes and recreates a resource, but Client B's deletion syncs afterward, the resource may appear deleted despite new content being present. This is an acceptable trade-off for supporting semantic IRI reuse patterns.
@@ -903,19 +904,29 @@ When creating any new index, it enters "populating" state with appropriate popul
 
 ### 5.3.4. Framework Garbage Collection Index
 
-**Purpose:** System-level index for tracking tombstoned populating shards to enable automated cleanup of temporary resources.
+**Purpose:** System-level index for tracking all tombstoned resources to enable efficient automated cleanup. This includes both temporary framework resources (populating shards) and user data resources marked for deletion.
+
+**Centralized Cleanup Strategy:** Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, all entities marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
 
 **Structure-Derived Naming:**
-- **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-populating-shards")}/index`
-- **Type:** `idx:FullIndex` with `idx:indexesClass crdt:TombstonedShard`
+- **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-resources")}/index`
+- **Type:** `idx:FullIndex` with multiple indexed classes
 - **Registration:** Automatic Type Index registration by framework (not application-specific)
+
+**Indexed Resource Types:**
+- **User Data Resources:** Any `sync:ManagedDocument` with `crdt:deletedAt` timestamps
+- **Framework Resources:** `crdt:TombstonedShard` from completed populating operations
+- **Client Installations:** `crdt:ClientInstallation` marked for cleanup after inactivity periods
 
 **Index Configuration:**
 ```turtle
 <gc-index-a1b2c3d4> a idx:FullIndex;
-   idx:indexesClass crdt:TombstonedShard;
+   # Index covers all tombstoned resource types
    idx:indexedProperty [
-     idx:property crdt:tombstonedAt;
+     idx:property crdt:deletedAt;          # Deletion timestamps for all resources
+     idx:readBy <installation-1>, <installation-2>, <installation-3>
+   ], [
+     idx:property rdf:type;                # Resource type for cleanup process routing  
      idx:readBy <installation-1>, <installation-2>, <installation-3>
    ] ;
    idx:shardingAlgorithm [
@@ -927,15 +938,17 @@ When creating any new index, it enters "populating" state with appropriate popul
 ```
 
 **Garbage Collection Process:**
-1. **Shard completion:** When populating shard is tombstoned, add entry to GC index
-2. **Periodic cleanup:** Background process scans GC index for tombstoned shards older than threshold (e.g., 30 days)
-3. **Safe deletion:** Remove shard files from Pod after ensuring no active population references
-4. **GC index maintenance:** Remove entries for deleted shards from GC index
+1. **Automatic Registration:** When any resource receives `crdt:deletedAt` timestamp, automatically add entry to GC index
+2. **Periodic Cleanup:** Background processes scan GC index for tombstoned resources older than configured retention periods
+3. **Type-Specific Cleanup:** Route different resource types to appropriate cleanup logic based on `rdf:type`
+4. **Safe Deletion:** Remove resource files from Pod after verifying retention period has passed
+5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
 
-**Vector Clock Hash Tracking:**
-- GC index entries include vector clock hashes for tombstoned shards
-- Enables verification of shard state before deletion
-- Prevents accidental cleanup of shards that may have been updated
+**Cleanup Efficiency Benefits:**
+- **No Container Scanning:** Cleanup processes never need to scan entire data containers
+- **Batch Operations:** Process multiple tombstoned resources in single operation
+- **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
+- **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
 
 ### 5.3.5. Pod Setup and Configuration Process
 
