@@ -20,9 +20,15 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **Decentralized & Server-Agnostic:** The Solid Pod acts as a simple, passive storage bucket. All synchronization logic resides within the client-side library.
 
-## 3. Fundamental Constraints: Resource Identity and CRDT Compatibility
+## 3. Foundations
 
-### 3.1. The Blank Node Challenge
+The following sections establish the technical foundations that enable reliable CRDT synchronization in the Solid ecosystem, addressing core RDF challenges, integration requirements, and collaborative mechanisms.
+
+### 3.1. Core RDF Challenges
+
+While the core principles above define the framework's goals, implementing reliable CRDT merging in RDF requires solving fundamental challenges around resource identity. The following sections explain how the framework ensures consistent, safe merging across distributed documents while maintaining RDF semantics.
+
+#### 3.1.1. The Blank Node Challenge
 
 **The Fundamental RDF Constraint:** RDF blank nodes are document-instance-scoped by definition - their identifiers (like `_:b1`) only have meaning within a single document instance. The RDF specification allows different implementations to assign blank node labels arbitrarily, so the same semantic content might be labeled `_:b1` in one instance and `_:genid123` in another. When merging two document instances (e.g., local `recipe-123.ttl` and remote `recipe-123.ttl`), we cannot determine if `_:b1` in the local instance corresponds to `_:b1` in the remote instance - even if the labels match, this must be treated as incidental coincidence rather than semantic equivalence.
 
@@ -33,7 +39,7 @@ The proposed solution addresses both challenges through a declarative, developer
 
 **The Core Problem:** Without stable identity, we cannot reliably merge RDF graphs containing blank nodes, leading to data inconsistency and CRDT convergence failures.
 
-### 3.2. Resource Merging vs Property Merging
+#### 3.1.2. Resource Merging vs Property Merging
 
 **Two Distinct Operations:** The framework performs two conceptually separate but coordinated operations:
 
@@ -47,7 +53,7 @@ The proposed solution addresses both challenges through a declarative, developer
 
 **Property Merging Impact:** When non-identifiable resources appear as object values, we cannot determine equality for CRDT operations that depend on identity. For example, OR-Set tombstones cannot match their target objects across documents because `[rdfs:label "homemade"]` in a tombstone cannot be reliably compared to `[rdfs:label "homemade"]` in the live data.
 
-### 3.3. The Solution: Context-Based Identification
+#### 3.1.3. The Solution: Context-Based Identification
 
 **The Key Insight:** Some blank nodes can become identifiable through the combination of context + properties, enabling safe CRDT operations within specific scopes.
 
@@ -64,7 +70,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 
 **Implementation Details:** For detailed mapping syntax, complex identification scenarios, and implementation patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation). 
 
-### 3.4. Resource Identity Taxonomy
+#### 3.1.4. Resource Identity Taxonomy
 
 **The Critical Three-Way Distinction:** Resources fall into three categories based on their identity characteristics:
 
@@ -88,7 +94,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 2. The blank node has that identifying predicate as one of its properties
 3. The subject that references the blank node is itself identifiable (IRI or previously identified blank node)
 
-### 3.5. CRDT Compatibility Rules
+#### 3.1.5. CRDT Compatibility Rules
 
 **The Critical Constraint:** Identity-dependent CRDTs (OR-Set, 2P-Set) require stable object identity to match tombstones with their targets across documents. Non-identifiable blank nodes cause these operations to fail.
 
@@ -100,14 +106,14 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 
 **Detailed Examples:** For comprehensive examples of identification failures, structural equality problems, and solution patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation).
 
-### 3.6. Development Implications
+#### 3.1.6. Development Implications
 
 - **Data Modeling:** Prefer IRIs over blank nodes when identity-dependent CRDT operations are needed
 - **Mapping Design:** Understand identifiability requirements for each CRDT type and use `sync:isIdentifying` appropriately
 - **Validation:** Implement mapping validation to prevent invalid configurations
 - **Performance:** Flat resource processing enables parallel merging optimizations
 
-### 3.7. Implementation Consistency Checks
+#### 3.1.7. Implementation Consistency Checks
 
 **Recommended Practice:** Implementing libraries should perform consistency checks during mapping generation or validation, particularly when mappings are derived from code annotations:
 
@@ -147,13 +153,13 @@ class Ingredient {
 
 This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
 
-## 4. Discovery Protocol and Application Isolation
+### 3.2. Solid Discovery Integration
 
 CRDT-managed resources contain synchronization metadata and follow structural conventions that traditional RDF applications don't understand, creating a risk of data corruption. This section describes how the architecture solves this problem through discovery isolation.
 
 CRDT-enabled applications use a modified Solid discovery approach that provides controlled access to managed resources while protecting them from incompatible applications. This isolation strategy prevents data corruption while maintaining standard Solid discoverability principles.
 
-### 4.1. Discovery Isolation Strategy
+#### 3.2.1. Discovery Isolation Strategy
 
 **The Challenge:** Traditional Solid discovery would expose CRDT-managed data to all applications, risking corruption by applications that don't understand CRDT metadata or Hybrid Logical Clocks.
 
@@ -166,7 +172,7 @@ CRDT-enabled applications use a modified Solid discovery approach that provides 
 
 This creates clean separation: compatible applications collaborate safely on managed data, while traditional apps work with unmanaged data, preventing cross-contamination.
 
-### 4.2. Managed Resource Discovery Protocol
+#### 3.2.2. Managed Resource Discovery Protocol
 
 1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index ([Type Index](https://github.com/solid/type-indexes)):
 
@@ -230,11 +236,11 @@ This creates clean separation: compatible applications collaborate safely on man
 
 **Advantages:** Using TypeRegistration with `sync:ManagedDocument` and `sync:managedResourceType` enables managed resource discovery while protecting managed resources from incompatible applications. CRDT-enabled applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), while traditional applications remain unaware of CRDT-managed data, preventing accidental corruption.
 
-## 5. Identity and Lifecycle Management
+### 3.3. Identity and Lifecycle Management
 
 Before examining the architectural layers, we need to establish the fundamental concepts of identity management and resource lifecycle that underpin the entire framework. These concepts are used throughout all architectural layers.
 
-### 5.1. Identity Management (Client Installation Documents)
+#### 3.3.1. Identity Management (Client Installation Documents)
 
 Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for Hybrid Logical Clock entries, and collaborative lifecycle management.
 
@@ -279,7 +285,7 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 **Installation Cleanup:**
 Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations to make tombstoning decisions.
 
-### 5.2. Tombstoning Fundamentals
+#### 3.3.2. Tombstoning Fundamentals
 
 The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
 
@@ -329,11 +335,11 @@ Individual values within multi-value properties are deleted using RDF Reificatio
 
 **RDF Reification Choice:** RDF Reification is semantically correct for tombstones because we need to mark statements as deleted without asserting them. RDF-Star syntax would incorrectly assert the triple.
 
-## 6. Architectural Data Layers
+## 4. Architectural Data Layers
 
 Having established the fundamental concepts of identity and lifecycle management, we can now examine how CRDT-managed resources are structured and organized. The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
 
-### 6.1. Layer 1: The Data Resource
+### 4.1. Layer 1: The Data Resource
 
 This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" using standard vocabularies.
 
@@ -374,7 +380,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
    idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
 ```
 
-### 6.2. Layer 2: The Merge Contract
+### 4.2. Layer 2: The Merge Contract
 
 This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
 
@@ -384,7 +390,7 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 * **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Hybrid Logical Clocks** for versioning and **Resource Tombstones** for managing deletions.
 
-#### 6.2.1. Hybrid Logical Clock Mechanics
+#### 4.2.1. Hybrid Logical Clock Mechanics
 
 The state-based merge process uses **document-level Hybrid Logical Clocks (HLC)** for causality determination and intuitive tie-breaking. Each resource document has a single HLC that tracks changes to the entire document using both logical time (causality) and physical time (wall-clock).
 
@@ -426,7 +432,7 @@ Hybrid Logical Clock entries are context-identified blank nodes using the patter
 
 **Detailed Algorithms:** For comprehensive merge algorithms, Hybrid Logical Clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
-#### 6.2.2. Standard CRDT Library Examples
+#### 4.2.2. Standard CRDT Library Examples
 
 **Example: Standard CRDT Library `crdt-v1`**
 This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping.
@@ -545,7 +551,7 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
 ```
 
-#### 6.2.3. Property Mapping vs. Predicate Mapping Semantics
+#### 4.2.3. Property Mapping vs. Predicate Mapping Semantics
 
 **Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
 
@@ -580,7 +586,7 @@ mappings:statement-v1 a sync:ClassMapping;
 
 **Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW-Register when within `schema:Recipe` resources but could theoretically use OR-Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:installationId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
 
-#### 6.2.4. Vocabulary Versioning and Evolution
+#### 4.2.4. Vocabulary Versioning and Evolution
 
 **Versioning Strategy:**
 
@@ -609,7 +615,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Different contract versions use conservative merge approach
 - Framework vocabularies evolve through major version URI changes when needed
 
-### 6.3. Layer 3: The Indexing Layer
+### 4.3. Layer 3: The Indexing Layer
 
 This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only Hybrid Logical Clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
@@ -646,7 +652,7 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 **Application Vocabulary:**
 Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the specification vocabulary but work within the specification's structure.
 
-#### 6.3.1. Sharding Overview
+#### 4.3.1. Sharding Overview
 
 **Resource Assignment:**
 
@@ -663,7 +669,7 @@ Shard count changes are handled through lazy, client-side migration rather than 
 
 For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
 
-#### 6.3.2. Structure-Derived Index Naming
+#### 4.3.2. Structure-Derived Index Naming
 
 **Coordination-Free Index Convergence:**
 
@@ -730,7 +736,7 @@ When installations attempt to create indices with conflicting immutable properti
 - **Property-level optimization:** Remove unused `idx:indexedProperty` entries when last reader is tombstoned
 - **Reader list maintenance:** Tombstoned installations removed from `idx:readBy` lists, enabling index deprecation when no active readers remain
 
-#### 6.3.3. Collaborative Bootstrap and Index Population
+#### 4.3.3. Collaborative Bootstrap and Index Population
 
 **Coordination-Free Bootstrap Process:**
 
@@ -823,7 +829,7 @@ When creating any new index, it enters "populating" state with appropriate popul
 - **Group-scoped shards:** Populating shards process only resources belonging to the group
 - **Independent completion:** Each group index completes population independently
 
-#### 6.3.4. Installation Index Management and Scalability
+#### 4.3.4. Installation Index Management and Scalability
 
 **Scalability Challenge:** When thousands of installations exist, validating dormancy and managing reader lists becomes computationally expensive.
 
@@ -849,7 +855,7 @@ When creating any new index, it enters "populating" state with appropriate popul
 
 **Recommended Approach:** Start with Option C (lazy detection) for simplicity, migrate to Option A (sharded index) when installation counts exceed ~1000 per Pod.
 
-#### 6.3.5. Pod Setup and Configuration Process
+#### 4.3.5. Pod Setup and Configuration Process
 
 When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
 
@@ -1014,11 +1020,11 @@ This document contains entries for recipe resources. Since recipes are used with
    ].
 ```
 
-### 6.4. Layer 4: The Sync Strategy
+### 4.4. Layer 4: The Sync Strategy
 
 This is the client-side layer where the application developer configures how to synchronize data. The CRDT implementation balances **discovery** (finding existing Pod configuration) with **developer intent** (application requirements). Developers declare their preferred sync approach, and the implementation either uses discovered compatible indices or creates new ones as needed.
 
-#### 6.4.1. Decision 1: Index Structure
+#### 4.4.1. Decision 1: Index Structure
 
 This decision determines how data is organized and indexed in the Pod.
 
@@ -1038,7 +1044,7 @@ This decision determines how data is organized and indexed in the Pod.
 3. **Compatibility evaluation:** Does discovered index structure meet data pattern needs?
 4. **Resolution:** Use compatible index OR create new index with appropriate structure
 
-#### 6.4.2. Decision 2: Sync Timing
+#### 4.4.2. Decision 2: Sync Timing
 
 This decision determines when and how much data gets loaded from the Pod.
 
@@ -1053,7 +1059,7 @@ This decision determines when and how much data gets loaded from the Pod.
 *   Good for large datasets or browse-then-load workflows
 *   Examples: Large recipe collections, document libraries, photo albums
 
-#### 6.4.3. Common Strategies
+#### 4.4.3. Common Strategies
 
 The named sync strategies combine the two decisions above:
 
@@ -1068,11 +1074,11 @@ The named sync strategies combine the two decisions above:
 *   **GroupedSync:** Shopping entries, activity logs → GroupIndexTemplate + immediate data for subscribed groups  
 *   **OnDemandSync:** Recipe collections, document libraries → Any index + headers-only until requested
 
-## 7. Advanced Lifecycle Management
+## 5. Advanced Lifecycle Management
 
 Having established the architectural layers, we now examine advanced topics that span across multiple layers and deal with the complete lifecycle management of resources, indices, and installations.
 
-### 7.1. Framework Garbage Collection Index
+### 5.1. Framework Garbage Collection Index
 
 **Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
@@ -1121,7 +1127,7 @@ Having established the architectural layers, we now examine advanced topics that
 - **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
 - **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
 
-### 7.2. Retention Policies and Cleanup Configuration
+### 5.2. Retention Policies and Cleanup Configuration
 
 The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
 
@@ -1181,7 +1187,7 @@ The framework provides configurable retention policies for tombstoned resources,
 4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
 5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
 
-### 7.3. Collaborative Index Lifecycle Management
+### 5.3. Collaborative Index Lifecycle Management
 
 **CRDT-Based Index Coordination:**
 
@@ -1267,7 +1273,7 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 - Collaborative dormancy detection enabled through `TimestampLWW` for dormancy properties
 - Framework prevents ownership conflicts while enabling collaborative lifecycle management
 
-## 8. Synchronization Workflow
+## 6. Synchronization Workflow
 
 With the architectural layers defined, we can now examine how the synchronization process operates. The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
@@ -1281,7 +1287,7 @@ With the architectural layers defined, we can now examine how the synchronizatio
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the **Merge Contract**, performs property-by-property merging, and returns the merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged object for local storage.
 
-### 8.1. Concrete Workflow Example
+### 6.1. Concrete Workflow Example
 
 **Scenario:** OnDemandSync for recipe collection
 
@@ -1320,18 +1326,18 @@ syncLibrary.onUpdate((mergedResource) => {
 });
 ```
 
-## 9. Error Handling and Resilience
+## 7. Error Handling and Resilience
 
 While the synchronization workflow provides the ideal path for data consistency, real-world distributed systems face numerous failure modes that can disrupt this process. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions, ensuring the system remains robust across network failures, server outages, access control changes, and data corruption scenarios.
 
-### 9.1. Failure Classification
+### 7.1. Failure Classification
 
 **Error Granularities:**
 - **Type-Level:** Entire data type cannot sync (missing merge contracts, authentication failures)
 - **Resource-Level:** Individual resource blocked (parse errors, access control changes)  
 - **Property-Level:** Specific property cannot sync (unknown CRDT types, schema violations)
 
-### 9.2. Core Resilience Strategies
+### 7.2. Core Resilience Strategies
 
 **Network Resilience:**
 - Distinguish between systemic failures (abort entire sync) vs. resource-specific failures (skip and continue)
@@ -1348,7 +1354,7 @@ While the synchronization workflow provides the ideal path for data consistency,
 - CRDT merge conflict resolution at property level
 - Hybrid Logical Clock anomaly detection and handling
 
-### 9.3. Graceful Degradation
+### 7.3. Graceful Degradation
 
 The system provides multiple operational modes based on error conditions:
 
@@ -1359,7 +1365,7 @@ The system provides multiple operational modes based on error conditions:
 
 For comprehensive implementation guidance including specific error scenarios, recovery procedures, and user interface recommendations, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
-## 10. Performance Characteristics
+## 8. Performance Characteristics
 
 ### 10.1. Sync Strategy Performance Trade-offs
 
@@ -1397,7 +1403,7 @@ The architecture's index-based approach provides efficient incremental synchroni
 
 For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
 
-## 11. Data Organization Principles
+## 9. Data Organization Principles
 
 ### 11.1. Resource IRI Design and Pod Performance
 
@@ -1443,14 +1449,14 @@ For small collections (< 1000 resources), flat structure is acceptable:
 - **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
 - **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
 
-## 12. Benefits of this Architecture
+## 10. Benefits of this Architecture
 
 * **CRDT Interoperability:** CRDT-enabled applications achieve safe collaboration by discovering CRDT-managed resources through `sync:ManagedDocument` registrations and following published merge contracts, while remaining protected from interference by incompatible applications.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Controlled Discoverability:** The system is discoverable by CRDT-enabled applications while protecting CRDT-managed data from accidental modification by incompatible applications.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 13. Alignment with Standardization Efforts
+## 11. Alignment with Standardization Efforts
 
 ### 13.1. Community Alignment
 
@@ -1464,7 +1470,7 @@ This architecture aligns with the goals of the **W3C CRDT for RDF Community Grou
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 14. Outlook: Future Enhancements
+## 12. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
