@@ -165,8 +165,8 @@ When resource permissions change between syncs:
 ### Vector Clock Anomalies
 
 - **Clock Regression:** Detect and log impossible clock decreases, reject such updates
-- **Unknown Client IDs:** Preserve unknown entries as-is (no need to validate existence)
-- **Massive Clock Skew:** Log warning about potential client ID collision or corruption
+- **Unknown Installation IDs:** Preserve unknown entries as-is (no need to validate existence)
+- **Massive Clock Skew:** Log warning about potential installation ID collision or corruption
 
 ### RDF Parse Errors
 

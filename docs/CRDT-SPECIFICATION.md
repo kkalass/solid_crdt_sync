@@ -17,14 +17,14 @@ This specification defines how to implement conflict-free replicated data types 
 
 ### 2.1. Vector Clock Structure
 
-Vector clocks track causality between client operations using structured entries:
+Vector clocks track causality between installation operations using structured entries:
 
 ```turtle
 <> crdt:hasClockEntry [
-     crdt:clientId <https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz>;
+     crdt:installationId <https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz>;
      crdt:clockValue "3"^^xsd:integer
    ], [
-     crdt:clientId <https://bob.podprovider.org/installations/desktop-recipe-app-2024-08-15-abc>;
+     crdt:installationId <https://bob.podprovider.org/installations/desktop-recipe-app-2024-08-15-abc>;
      crdt:clockValue "1"^^xsd:integer
    ];
    crdt:vectorClockHash "xxh64:abc123" .
@@ -33,8 +33,8 @@ Vector clocks track causality between client operations using structured entries
 ### 2.2. Causality Determination
 
 **Clock Comparison Rules:**
-- Clock A **dominates** Clock B if A[i] ≥ B[i] for all clients i, and A[j] > B[j] for at least one client j
-- If A[i] == B[i] for all clients i, the clocks are **identical** (no merge needed)
+- Clock A **dominates** Clock B if A[i] ≥ B[i] for all installations i, and A[j] > B[j] for at least one installation j
+- If A[i] == B[i] for all installations i, the clocks are **identical** (no merge needed)
 - If neither dominates, the changes are **concurrent** and require property-level merge resolution
 
 ### 2.3. Vector Clock Operations
@@ -45,8 +45,8 @@ Vector clocks track causality between client operations using structured entries
 3. Apply changes to resource
 
 **On Merge:**
-1. Create result clock: `result[i] = max(A[i], B[i])` for each client i
-2. Increment merging client's entry: `result[mergingClient]++`
+1. Create result clock: `result[i] = max(A[i], B[i])` for each installation i
+2. Increment merging installation's entry: `result[mergingInstallation]++`
 3. Update hash: `crdt:vectorClockHash = hash(result)`
 
 ### 2.4. Vector Clocks vs Timestamps: Distinct Roles
@@ -81,8 +81,8 @@ merge(A, B):
     return B.value
   else: // Concurrent change
     // Deterministic tie-breaking is required for concurrent updates.
-    // The value from the client with the lexicographically greater client ID wins.
-    if A.clientId > B.clientId:
+    // The value from the installation with the lexicographically greater installation ID wins.
+    if A.installationId > B.installationId:
         return A.value
     else:
         return B.value
@@ -147,10 +147,10 @@ An element's presence is determined by comparing the causality information of it
 
 # The causality of this tombstone (for merge conflicts) is determined by the document-level vector clock:
 <> crdt:hasClockEntry [
-    crdt:clientId <client-that-deleted>;
+    crdt:installationId <installation-that-deleted>;
     crdt:clockValue "5"^^xsd:integer
   ], [
-    crdt:clientId <other-client>;
+    crdt:installationId <other-installation>;
     crdt:clockValue "8"^^xsd:integer
   ] .
 ```
@@ -166,7 +166,7 @@ For each element `e`:
     3. If `add_clock` dominates `remove_clock`, the add is newer. The element is kept and the tombstone is discarded.
     4. If `remove_clock` dominates `add_clock`, the remove is newer. The element is removed.
     5. If the clocks are concurrent, the conflict must be resolved deterministically. **The recommended policy is Add-Wins**, meaning the element is kept. This ensures that if two users concurrently add and remove the same item, it is preserved.
-- The final document-level vector clock of the merged document is the standard clock merge (max of each client's counter).
+- The final document-level vector clock of the merged document is the standard clock merge (max of each installation's counter).
 
 This Add-Wins approach provides the desired OR-Set semantics (elements can be re-added) without requiring complex tags on every set element, thus preserving the clean, interoperable nature of the RDF data.
 
@@ -235,7 +235,7 @@ The OR-Set semantics for `crdt:deletedAt` enables undeletion through tombstone-o
 
 **Deterministic Tombstone Fragment Identifier Algorithm:**
 
-Since tombstones use RDF Reification, they integrate seamlessly with our standard CRDT merge algorithms via the `statement-v1` merge contract. To enable collaborative tombstone creation when multiple clients independently create tombstones for the same triple, we use deterministic identifier generation that ensures they target the same fragment identifier.
+Since tombstones use RDF Reification, they integrate seamlessly with our standard CRDT merge algorithms via the `statement-v1` merge contract. To enable collaborative tombstone creation when multiple installations independently create tombstones for the same triple, we use deterministic identifier generation that ensures they target the same fragment identifier.
 
 **Algorithm Specification:**
 
@@ -273,13 +273,13 @@ Since tombstones store `crdt:deletedAt` timestamps, we can implement time-based 
 
 Beyond storage overhead, per-tombstone vector clocks have a fundamental semantic flaw that makes them impractical for tombstone compaction:
 
-**The False Assumption:** "If client X has vector clock entry ≥ tombstone clock, then X has seen the deletion and the tombstone can be safely removed."
+**The False Assumption:** "If installation X has vector clock entry ≥ tombstone clock, then X has seen the deletion and the tombstone can be safely removed."
 
 **The Reality:** Vector clocks track **causality** (what changes have been integrated), not **active readership** (who currently needs the tombstone). This creates a fundamental problem:
 
-**The Scenario:** Active client stops syncing a resource but retains vector clock entry. Examples include changing sync patterns (only current month data), local storage cleanup, or switching to subset syncing (favorites only). Vector clock entry remains but client never contributes updates to that resource again.
+**The Scenario:** Active installation stops syncing a resource but retains vector clock entry. Examples include changing sync patterns (only current month data), local storage cleanup, or switching to subset syncing (favorites only). Vector clock entry remains but installation never contributes updates to that resource again.
 
-**The Core Problem:** Vector clock dominance requires that all referenced clients eventually contribute updates to surpass the tombstone's vector clock. But clients may stop reading the resource while still having vector clock entries, meaning the tombstone waits indefinitely for updates that will never happen.
+**The Core Problem:** Vector clock dominance requires that all referenced installations eventually contribute updates to surpass the tombstone's vector clock. But installations may stop reading the resource while still having vector clock entries, meaning the tombstone waits indefinitely for updates that will never happen.
 
 **Alternative Approaches for Large-Scale Use:**
 For applications where tombstone accumulation becomes problematic:
@@ -317,9 +317,9 @@ This section provides comprehensive implementation guidance for the context-base
 
 **Data with Identifiable Blank Nodes:**
 ```turtle
-# These blank nodes can be identified via crdt:clientId within document context
+# These blank nodes can be identified via crdt:installationId within document context
 <> crdt:hasClockEntry [
-    crdt:clientId <https://alice.../installation-123> ;  # Identifying property
+    crdt:installationId <https://alice.../installation-123> ;  # Identifying property
     crdt:clockValue "15"^^xsd:integer
 ] .
 ```
@@ -330,7 +330,7 @@ Since vector clock entries are typically typeless blank nodes, we use predicate-
 # Standard mapping for vector clock entries (typeless blank nodes)  
 <#clock-mappings> a sync:PredicateMapping;
    sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
      [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
@@ -436,7 +436,7 @@ validateMapping(property, crdtType, objectTypes):
 # Predicate-based mapping for vector clock entries (typeless blank nodes)
 mappings:clock-mappings-v1 a sync:PredicateMapping;
    sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
      [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
@@ -444,7 +444,7 @@ mappings:clock-mappings-v1 a sync:PredicateMapping;
 ```turtle
 # These blank nodes are now identifiable via declared pattern
 <> crdt:hasClockEntry [
-    crdt:clientId <https://alice.../installation-123> ;  # Identifying property
+    crdt:installationId <https://alice.../installation-123> ;  # Identifying property
     crdt:clockValue "15"^^xsd:integer
 ] .
 ```
@@ -484,7 +484,7 @@ mappings:clock-mappings-v1 a sync:PredicateMapping;
 # Property-level inheritance example
 <#partial-override> a sync:ClassMapping;
    sync:appliesToClass my:SpecialClass;
-   sync:rule [ sync:predicate crdt:clientId; sync:isIdentifying false ] .
+   sync:rule [ sync:predicate crdt:installationId; sync:isIdentifying false ] .
    # Result: keeps crdt:mergeWith from imported mappings, only changes identification
 ```
 
@@ -557,22 +557,22 @@ If a document's `sync:isGovernedBy` link points to a merge contract that is unav
 - **TODO: Handle cases where only some properties are available**
 - **FIXME: Vector clock semantics for partial updates**
 
-### 6.3. Client ID Conflicts
-- **TODO: Handle duplicate client IDs (though cryptographically unlikely)**
-- **FIXME: Client ID verification and validation**
+### 6.3. Installation ID Conflicts
+- **TODO: Handle duplicate installation IDs (though cryptographically unlikely)**
+- **FIXME: Installation ID verification and validation**
 
 ### 6.4. Large Vector Clocks
-For documents that are edited by a very large number of clients over a long period, the document-level vector clock can grow in size, potentially impacting performance and storage.
+For documents that are edited by a very large number of installations over a long period, the document-level vector clock can grow in size, potentially impacting performance and storage.
 
 **Policy:** Naive pruning of vector clock entries (e.g., removing the oldest entry) is **unsafe** as it destroys the causal history required for correct merging, and can lead to data divergence. 
 
-A robust, general-purpose, and safe clock pruning algorithm requires coordination between clients and is an advanced topic beyond the scope of this core specification. For use cases with an extremely high number of collaborators, developers should consider architectural solutions, such as splitting the document into smaller, more focused documents with independent clocks.
+A robust, general-purpose, and safe clock pruning algorithm requires coordination between installations and is an advanced topic beyond the scope of this core specification. For use cases with an extremely high number of collaborators, developers should consider architectural solutions, such as splitting the document into smaller, more focused documents with independent clocks.
 
 ## 7. Implementation Notes
 
 ### 7.1. Performance Optimizations
 - **Incremental Merging:** Instead of creating a new merged resource from scratch, a more memory-efficient approach is to calculate a diff or patch and apply it to the local resource. This is especially effective for large resources with small changes.
-- **Efficient Clock Representation:** Vector clocks can be stored in memory as sorted lists or maps for efficient lookups and comparisons. For persistence, client ID IRIs can be compressed using a local mapping (e.g., to integers) to reduce storage size.
+- **Efficient Clock Representation:** Vector clocks can be stored in memory as sorted lists or maps for efficient lookups and comparisons. For persistence, installation ID IRIs can be compressed using a local mapping (e.g., to integers) to reduce storage size.
 
 ### 7.2. Concurrency Control
 - **Atomic Updates:** The process of merging and persisting the new state MUST be atomic. An implementation should ensure that a failure during a write operation does not leave the local storage in an inconsistent state. A common pattern is to write the new resource to a temporary file and then atomically rename it to its final destination.

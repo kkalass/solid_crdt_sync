@@ -109,7 +109,7 @@ In Solid's decentralized context, users are not system administrators and cannot
 ### Client-Side Constraints
 
 - **Limited execution time:** Migration happens in small batches to respect mobile background limits
-- **Concurrent access:** Multiple clients may migrate simultaneously - use CRDT merge rules for conflicts
+- **Concurrent access:** Multiple installations may migrate simultaneously - use CRDT merge rules for conflicts
 - **Never "finished":** Accept that some entries may remain in non-current shards indefinitely  
 - **Graceful lookup:** Check all active shards in `idx:hasShard` list (empty shards are automatically tombstoned)
 

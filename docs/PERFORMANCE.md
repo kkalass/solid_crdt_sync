@@ -117,7 +117,7 @@ Performance estimates include both index synchronization and data synchronizatio
 ### 4.2. Merge Computation
 
 - **Property-by-Property:** O(p) where p = number of properties
-- **Vector Clock Comparison:** O(c) where c = number of clients
+- **Vector Clock Comparison:** O(c) where c = number of installations
 - **Typically Fast:** Modern devices handle 100+ resources/second
 
 ### 4.3. Pod Server Limits
@@ -206,7 +206,7 @@ Performance estimates include both index synchronization and data synchronizatio
 
 - **Synthetic Load:** Generate test datasets of varying sizes
 - **Network Conditions:** Test on different connection speeds and latencies
-- **Concurrent Users:** Multiple clients syncing simultaneously
+- **Concurrent Users:** Multiple installations syncing simultaneously
 - **Failure Conditions:** Network interruptions and server errors
 
 ### 9.2. Measurement Tools

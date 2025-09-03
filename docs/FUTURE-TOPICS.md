@@ -98,23 +98,23 @@ really adding anything new to the spec.
 
 **Status:** Future Topic (Advanced Research)
 
-**Current Limitation:** In long-running systems with many participants, a single resource's vector clock and tombstone set can grow indefinitely. This impacts storage and sync performance, as all clients must download and process the entire metadata set on every sync.
+**Current Limitation:** In long-running systems with many participants, a single resource's vector clock and tombstone set can grow indefinitely. This impacts storage and sync performance, as all installations must download and process the entire metadata set on every sync.
 
 #### Proposed Solution: Hot/Cold Metadata Partitioning
 This proposal introduces a library-level, transparent mechanism to partition CRDT metadata into "hot" (active) and "cold" (inactive/stable) sets, keeping the primary data resource lean and sync operations fast.
 
-* **Primary Document ("Hot"):** The main data resource would only contain metadata for recently active clients and tombstones for recent deletions.
+* **Primary Document ("Hot"):** The main data resource would only contain metadata for recently active installations and tombstones for recent deletions.
 
-* **Metadata Documents ("Cold"):** Linked, separate documents would archive vector clock entries for inactive clients and "stable" tombstones (those acknowledged by all active clients). The primary document would only store a link and a hash for these cold documents.
+* **Metadata Documents ("Cold"):** Linked, separate documents would archive vector clock entries for inactive installations and "stable" tombstones (those acknowledged by all active installations). The primary document would only store a link and a hash for these cold documents.
 
 This would allow the vast majority of sync operations to only involve the small, "hot" document.
 
 #### High-Level Workflow
-1. **Standard Sync:** Active clients sync only the "hot" document, verifying the hashes of the linked "cold" documents. As long as the hashes are unchanged, the cold documents are not fetched.
+1. **Standard Sync:** Active installations sync only the "hot" document, verifying the hashes of the linked "cold" documents. As long as the hashes are unchanged, the cold documents are not fetched.
 
-2. **Hot-to-Cold Transition (Demotion):** The library would follow a deterministic, specified rule to decide when metadata becomes "cold." For example, after a client has been inactive for a certain number of sync cycles, any client can perform the housekeeping task of moving its clock entry to the "cold" document and updating the hashes. This is a special, non-CRDT "compaction" operation.
+2. **Hot-to-Cold Transition (Demotion):** The library would follow a deterministic, specified rule to decide when metadata becomes "cold." For example, after an installation has been inactive for a certain number of sync cycles, any installation can perform the housekeeping task of moving its clock entry to the "cold" document and updating the hashes. This is a special, non-CRDT "compaction" operation.
 
-3. **Cold-to-Hot Transition (Promotion):** When an inactive client comes back online, it will perform an initial sync of both the hot and cold documents. Discovering its clientId in the cold document, it will initiate a CRDT-based transaction to:
+3. **Cold-to-Hot Transition (Promotion):** When an inactive installation comes back online, it will perform an initial sync of both the hot and cold documents. Discovering its installationId in the cold document, it will initiate a CRDT-based transaction to:
 
     - Remove its entry from the cold document.
 
@@ -127,13 +127,13 @@ This would allow the vast majority of sync operations to only involve the small,
 #### Open Questions and Design Challenges
 * **Deterministic Demotion Rule:** Defining a robust, deterministic, and coordination-free rule for moving metadata from hot to cold is the primary challenge. This cannot be a standard CRDT merge and requires careful specification.
 
-* **Initial Sync Cost:** While avoiding continuous overhead, the one-time cost for a returning client to download and process the cold metadata still exists. For extremely large archives, this could be a bottleneck.
+* **Initial Sync Cost:** While avoiding continuous overhead, the one-time cost for a returning installation to download and process the cold metadata still exists. For extremely large archives, this could be a bottleneck.
 
 * **Concurrency on Metadata Archives:** While standard CRDT merging should handle concurrent "promotion" events, the interaction between CRDT operations and the special "demotion" rule needs to be formally proven to be safe under all conditions.
 
 #### Ideas for improvements
-* If the "cold state" of a client is global and recorded in its instance identification document, we could probably get around the need to sync the cold data initially. Only if a client learns that he is cold will he have to do this extra work - and only this client has to do it. All others never need to touch the cold document unless they want to move someone from hot to cold. 
-* For the question who does the demotion when: We could state that a client that adds himself to a clock needs to check if he can demote another client.
+* If the "cold state" of an installation is global and recorded in its instance identification document, we could probably get around the need to sync the cold data initially. Only if an installation learns that it is cold will it have to do this extra work - and only this installation has to do it. All others never need to touch the cold document unless they want to move someone from hot to cold. 
+* For the question who does the demotion when: We could state that an installation that adds itself to a clock needs to check if it can demote another installation.
 * And for really extreme cases, we could even think about sharding of the cold metadata
 * Instead of real tombstones, when moving a tombstone to cold, we could maybe att its fragment identifier to some list and record a vector clock in cold, so that we can reduce this list after some time? 
 * Could we also do a similar approach of highly optimized pseudo tombstones in the main document for vector clock entries to signal during merge that an item was "tombstoned" (e.g. moved to cold) and should be removed safely? 

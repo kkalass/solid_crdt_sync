@@ -40,7 +40,7 @@ crdt:Sequence a rdfs:Class;
 
 crdt:ClockEntry a rdfs:Class;
     rdfs:label "Clock Entry";
-    rdfs:comment "A single entry in a Vector Clock, mapping a client ID to its version number." .
+    rdfs:comment "A single entry in a Vector Clock, mapping an installation ID to its version number." .
 
 # --- Property Definitions ---
 
@@ -64,7 +64,7 @@ crdt:installationId a rdf:Property;
 
 crdt:clockValue a rdf:Property;
     rdfs:label "clock value";
-    rdfs:comment "The version number (counter) for a client within a Vector Clock entry.";
+    rdfs:comment "The version number (counter) for an installation within a Vector Clock entry.";
     rdfs:domain crdt:ClockEntry;
     rdfs:range xsd:integer .
 
@@ -89,19 +89,19 @@ crdt:Immutable a rdfs:Class;
 
 crdt:belongsToWebID a rdf:Property;
     rdfs:label "belongs to WebID";
-    rdfs:comment "Links a client installation to the WebID that owns it.";
+    rdfs:comment "Links an installation to the WebID that owns it.";
     rdfs:domain crdt:ClientInstallation;
     rdfs:range rdfs:Resource .
 
 crdt:applicationId a rdf:Property;
     rdfs:label "application ID";
-    rdfs:comment "The unique identifier for the application that created this installation.";
+    rdfs:comment "The unique identifier for the application that created this installation - the Client ID in Solid OIDC Terms.";
     rdfs:domain crdt:ClientInstallation;
     rdfs:range rdfs:Resource .
 
 crdt:createdAt a rdf:Property;
     rdfs:label "created at";
-    rdfs:comment "Timestamp when this client installation was first created.";
+    rdfs:comment "Timestamp when this installation was created.";
     rdfs:domain crdt:ClientInstallation;
     rdfs:range xsd:dateTime .
 

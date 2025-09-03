@@ -378,7 +378,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
 
 This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
 
-**Fundamental Principle:** All documents stored in user Pods by this framework are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed clients.
+**Fundamental Principle:** All documents stored in user Pods by this framework are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed installations.
 
 * **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
 
@@ -636,7 +636,7 @@ Applications define their own domain-specific vocabularies (e.g., `meal:Shopping
 
 **Resource Assignment:**
 
-Resources are assigned to shards using a deterministic hash algorithm, ensuring even distribution and consistent assignment across clients.
+Resources are assigned to shards using a deterministic hash algorithm, ensuring even distribution and consistent assignment across installations.
 
 **Key Concepts:**
 - **Automatic Scaling:** System increases shard count when size thresholds are exceeded (default: 1000 entries per shard)
@@ -846,7 +846,7 @@ When an application first encounters a Pod, it may need to configure the Type In
    - Missing Type Index entirely
    - Missing Type Registrations for managed data types (sync:ManagedDocument)
    - Missing Type Registrations for indices  
-   - Missing Type Registrations for client installations
+   - Missing Type Registrations for installations
 4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
 5. User chooses approach:
    1. **"Automatic Setup"** - Configure Pod with standard paths automatically
@@ -1240,7 +1240,7 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 **Configurable CRDT Tie-Breaking Framework:**
 
 *Algorithm-Specific Behaviors:*
-- **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic client ID tie-breaking
+- **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic installation ID tie-breaking
 - **`crdt:Immutable`:** No updates allowed after creation
 
 *Framework Benefits:*
