@@ -413,18 +413,20 @@ Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyon
 
 #### 5.2.4. Cleanup Configuration
 
-The framework provides configurable retention policies for tombstoned resources, recognizing their different risk profiles.
+The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
 
 **Cleanup Configuration Properties:**
 
 **Resource Tombstone Configuration:**
 - **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
 - **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
+- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 5.3.4)
 - **Risk:** Zombie deletions can affect recreated resources with same IRI
 
 **Property Tombstone Configuration:**
 - **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
 - **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
+- **Cleanup Strategy:** Sync-time cleanup during document processing (not tracked in GC index)
 - **Risk:** Deleted property values may reappear, but resource remains intact
 
 **Configuration Hierarchy:**
@@ -454,10 +456,20 @@ The framework provides configurable retention policies for tombstoned resources,
    ] .
 ```
 
-**Cleanup Process:**
-1. **Cleanup Timing:** Use `max(crdt:deletedAt)` plus configured retention period for garbage collection
-2. **Efficient Discovery:** Tombstoned resources are tracked in the Framework Garbage Collection Index (see Section 5.3.4)
-3. **Trade-offs:** This approach allows "late deletions" to affect recreated content, but supports semantic IRI reuse patterns
+**Cleanup Strategies:**
+
+**Resource Tombstone Cleanup (Proactive):**
+1. **Registration:** Complete tombstoned resources automatically registered in Framework Garbage Collection Index
+2. **Discovery:** Cleanup processes scan GC index for resources older than retention period
+3. **Processing:** Remove entire resource files from Pod after verifying retention requirements
+4. **Efficiency:** No need to scan data containers for tombstoned resources
+
+**Property Tombstone Cleanup (Sync-Time):**
+1. **Integration:** Property tombstone cleanup happens during normal document synchronization
+2. **Detection:** When syncing a document, check all property tombstones against retention configuration
+3. **Local Processing:** Clean expired property tombstones as part of document merge process
+4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
+5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
 
 #### 5.2.5. Standard CRDT Library Examples
 
@@ -853,9 +865,9 @@ When creating any new index, it enters "populating" state with appropriate popul
 
 ### 5.3.4. Framework Garbage Collection Index
 
-**Purpose:** System-level index for tracking all tombstoned resources to enable efficient automated cleanup. This includes both temporary framework resources (populating shards) and user data resources marked for deletion.
+**Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
-**Centralized Cleanup Strategy:** Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, all entities marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
+**Centralized Resource Cleanup Strategy:** Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, complete resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
 
 **Structure-Derived Naming:**
 - **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-resources")}/index`
@@ -886,12 +898,14 @@ When creating any new index, it enters "populating" state with appropriate popul
    idx:readBy <installation-1>, <installation-2>, <installation-3> .
 ```
 
-**Garbage Collection Process:**
-1. **Automatic Registration:** When any resource receives `crdt:deletedAt` timestamp, automatically add entry to GC index
+**Resource Garbage Collection Process:**
+1. **Automatic Registration:** When complete resources (documents) receive `crdt:deletedAt` timestamp, automatically add entry to GC index
 2. **Periodic Cleanup:** Background processes scan GC index for tombstoned resources older than configured retention periods
 3. **Type-Specific Cleanup:** Route different resource types to appropriate cleanup logic based on `rdf:type`
-4. **Safe Deletion:** Remove resource files from Pod after verifying retention period has passed
+4. **Safe Deletion:** Remove entire resource files from Pod after verifying retention period has passed
 5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
+
+**Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
 
 **Cleanup Efficiency Benefits:**
 - **No Container Scanning:** Cleanup processes never need to scan entire data containers
