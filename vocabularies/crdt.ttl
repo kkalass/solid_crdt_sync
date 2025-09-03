@@ -56,9 +56,9 @@ crdt:hasClockEntry a rdf:Property;
     rdfs:domain rdfs:Resource;
     rdfs:range crdt:ClockEntry .
 
-crdt:clientId a rdf:Property;
-    rdfs:label "client ID";
-    rdfs:comment "The unique identifier for a client within a Vector Clock entry.";
+crdt:installationId a rdf:Property;
+    rdfs:label "installation ID";
+    rdfs:comment "The unique identifier for a client installation within a Vector Clock entry. Corresponds to 'client ID' in CRDT literature, but uses 'installation' to avoid confusion with Solid OIDC client identifiers.";
     rdfs:domain crdt:ClockEntry;
     rdfs:range rdfs:Resource . # Should be an IRI
 

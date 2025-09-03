@@ -14,7 +14,7 @@ The proposed solution addresses both challenges through a declarative, developer
 
 * **CRDT Interoperability:** The data is clean, standard RDF within CRDT-managed documents (`sync:ManagedDocument`). CRDT-enabled applications achieve interoperability by discovering managed resources via `sync:managedResourceType` and following the public merge contracts that define collaboration rules.
 
-* **Declarative Merge Behavior:** Developers define the merge behavior for each piece of data by declaratively linking its properties to well-defined **state-based** CRDT types (e.g., `LWW-Register`, `OR-Set`). This is done in a **public, discoverable rules file**, abstracting away the complexity of the underlying algorithms. This state-based approach is fundamental to the architecture's design as it works seamlessly with passive storage backends.
+* **Declarative Merge Behavior:** Developers define the merge behavior for each piece of data by declaratively linking its properties to well-defined **state-based** CRDT types (e.g., `LWW-Register`, `OR-Set`). This is done in a **public, discoverable rules file**, abstracting away the complexity of the underlying algorithms. The framework supports both class-scoped rules (property mappings) and global rules (predicate mappings) to provide flexibility in defining merge semantics. This state-based approach is fundamental to the architecture's design as it works seamlessly with passive storage backends.
 
 * **Managed Resource Discoverability:** The system is designed to be self-describing for CRDT-enabled applications. Compatible applications can discover CRDT-managed resources through `sync:ManagedDocument` Type Index registrations with `sync:managedResourceType` filtering. From a managed resource, clients can discover merge rules (`sync:isGovernedBy`) and index shards (`idx:belongsToIndexShard`), enabling CRDT-enabled applications to collaborate safely while remaining invisible to incompatible applications.
 
@@ -57,10 +57,10 @@ The proposed solution addresses both challenges through a declarative, developer
 
 **Recursive Context Building:** Context identifiers can be built recursively - an identified blank node can serve as context for nested blank nodes:
 - **Base case:** IRI-identified resource (e.g., `<https://alice.podprovider.org/data/recipes/tomato-soup>`)  
-- **Recursive case:** Previously identified blank node (e.g., `(<https://alice.../recipes/tomato-soup>, clientId=<https://alice.../installation-123>)` identifies a clock entry)
-- **Nested example:** `((<https://alice.../recipes/tomato-soup>, clientId=<https://alice.../installation-123>), subProperty=value)` could identify a blank node within a clock entry
+- **Recursive case:** Previously identified blank node (e.g., `(<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>)` identifies a clock entry)
+- **Nested example:** `((<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>), subProperty=value)` could identify a blank node within a clock entry
 
-For example, vector clock entries are identified by `(document_IRI, crdt:clientId=<full_installation_IRI>)`, where `document_IRI` is the full document IRI context and `crdt:clientId=<full_installation_IRI>` are the identifying properties.
+For example, vector clock entries are identified by `(document_IRI, crdt:installationId=<full_installation_IRI>)`, where `document_IRI` is the full document IRI context and `crdt:installationId=<full_installation_IRI>` are the identifying properties.
 
 **Implementation Details:** For detailed mapping syntax, complex identification scenarios, and implementation patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation). 
 
@@ -74,7 +74,7 @@ For example, vector clock entries are identified by `(document_IRI, crdt:clientI
 - **CRDT Compatibility:** Safe for all CRDT operations
 
 **2. Context-Identified Blank Nodes** (unique within context):
-- **Example:** `(<https://alice.../recipes/tomato-soup>, clientId=<https://alice.../installation-123>)`
+- **Example:** `(<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>)`
 - **Identity:** Unique within specific context through identifying properties
 - **CRDT Compatibility:** Safe for all CRDT operations when properly identified
 
@@ -230,62 +230,56 @@ This creates clean separation: compatible applications collaborate safely on man
 
 **Advantages:** Using TypeRegistration with `sync:ManagedDocument` and `sync:managedResourceType` enables managed resource discovery while protecting managed resources from incompatible applications. CRDT-enabled applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), while traditional applications remain unaware of CRDT-managed data, preventing accidental corruption.
 
-## 5. Architectural Layers
+## 5. Identity and Lifecycle Management
 
-Having established the discovery isolation strategy, we can now examine how CRDT-managed resources are structured and organized. The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
+Before examining the architectural layers, we need to establish the fundamental concepts of identity management and resource lifecycle that underpin the entire framework. These concepts are used throughout all architectural layers.
 
-### 5.1. Layer 1: The Data Resource
+### 5.1. Identity Management (Client Installation Documents)
 
-This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" using standard vocabularies.
+Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for vector clock entries, and collaborative lifecycle management.
 
-* **Format:** Data is stored as a single RDF resource. It uses a fragment identifier (e.g., `#it`) to distinguish the "thing" being described from the document that describes it.
+**Discovery and Lifecycle:**
+1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
+2. **ID Generation:** Generate unique UUID v4 for each application installation
+3. **Registration:** Create installation document at discovered container location
+4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
 
-* **Vocabulary:** The primary data uses well-known public or custom vocabularies (e.g., `schema.org`).
-
-* **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
-
-#### Example Application Context
-
-The following examples demonstrate the architecture using a **meal planning application** that manages recipes, meal plans, and automatically generates shopping lists from planned meals. This integrated workflow shows how different data types can reference each other while maintaining clean separation of concerns.
-
-**Example: A recipe resource at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`**
-
-This resource uses a semantic IRI based on the recipe name. The resource describes a recipe and contains metadata linking it to other architectural layers.
+**Installation Document Structure:**
 
 ```turtle
-@prefix schema: <https://schema.org/> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix : <#> .
-
-# -- The "Thing" Itself (The Payload) --
-:it a schema:Recipe;
-   schema:name "Tomato Soup" ;
-   schema:keywords "vegan", "soup" ;
-   schema:recipeIngredient "2 lbs fresh tomatoes", "1 cup fresh basil" ;
-   schema:totalTime "PT30M" .
-
-# -- Pointers to Other Layers --
-<> a sync:ManagedDocument;
-   foaf:primaryTopic :it;
-   # Pointer to the Merge Contract (Layer 2) - imports CRDT library + app mappings
-   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
-   # Pointer to the specific index shard this resource belongs to
-   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
+<installation-uuid> a crdt:ClientInstallation;
+   crdt:belongsToWebID <../profile/card#me>;
+   crdt:applicationId <https://meal-planning-app.example.org/id>;
+   crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime;
+   crdt:lastActiveAt "2024-09-02T14:30:00Z"^^xsd:dateTime;
+   sync:isGovernedBy mappings:client-installation-v1 .
 ```
 
-### 5.2. Layer 2: The Merge Contract
+**Installation ID Generation Process:**
 
-This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
+**Recommended Approach (UUID v4):**
+1. **Discover container:** Query Type Index for `crdt:ClientInstallation` container
+2. **Generate UUID:** Use UUID v4 for cryptographically strong uniqueness
+3. **Create IRI:** `{container-url}/{uuid}` 
+4. **Register installation:** POST installation document to container
+5. **Use in vector clocks:** Reference full installation IRI in `crdt:installationId`
 
-**Fundamental Principle:** All documents stored in user Pods by this framework are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed clients.
+**Installation Lifecycle Management:**
 
-* **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
+*Self-Managed Properties (Installation Should Only Update Its Own):*
+- **`crdt:lastActiveAt`:** Installation updates its own activity timestamp
+  - **Update triggers:** Sync operations
+  - **Frequency:** Limited to once per hour to prevent excessive updates
+  - **CRDT Algorithm:** `crdt:LWW_Register`
+- **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (defaults to P6M)
 
-* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **Resource Tombstones** for managing deletions.
+*Identity Properties (Set Once at Creation):*
+- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable`
 
-#### 5.2.1. Deletion Mechanisms
+**Installation Cleanup:**
+Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations to make tombstoning decisions.
+
+### 5.2. Tombstoning Fundamentals
 
 The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
 
@@ -335,7 +329,62 @@ Individual values within multi-value properties are deleted using RDF Reificatio
 
 **RDF Reification Choice:** RDF Reification is semantically correct for tombstones because we need to mark statements as deleted without asserting them. RDF-Star syntax would incorrectly assert the triple.
 
-#### 5.2.2. Vector Clock Mechanics
+## 6. Architectural Data Layers
+
+Having established the fundamental concepts of identity and lifecycle management, we can now examine how CRDT-managed resources are structured and organized. The architecture is composed of four distinct layers, moving from the fundamental structure of the data to the high-level strategies used by an application.
+
+### 6.1. Layer 1: The Data Resource
+
+This layer defines the atomic unit of data: a single, self-contained RDF resource. Its primary purpose is to describe a "thing" using standard vocabularies.
+
+* **Format:** Data is stored as a single RDF resource. It uses a fragment identifier (e.g., `#it`) to distinguish the "thing" being described from the document that describes it.
+
+* **Vocabulary:** The primary data uses well-known public or custom vocabularies (e.g., `schema.org`).
+
+* **Structure:** The resource is clean and focused on the data's payload. It contains pointers to the other architectural layers. For a clean separation of concerns, it is recommended to store data and indices in separate top-level containers (e.g., `/data/` and `/indices/`). However, a compliant client must always use the Solid Type Index as the definitive source for discovering these locations, as a user may choose to configure different paths.
+
+#### Example Application Context
+
+The following examples demonstrate the architecture using a **meal planning application** that manages recipes, meal plans, and automatically generates shopping lists from planned meals. This integrated workflow shows how different data types can reference each other while maintaining clean separation of concerns.
+
+**Example: A recipe resource at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`**
+
+This resource uses a semantic IRI based on the recipe name. The resource describes a recipe and contains metadata linking it to other architectural layers.
+
+```turtle
+@prefix schema: <https://schema.org/> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix : <#> .
+
+# -- The "Thing" Itself (The Payload) --
+:it a schema:Recipe;
+   schema:name "Tomato Soup" ;
+   schema:keywords "vegan", "soup" ;
+   schema:recipeIngredient "2 lbs fresh tomatoes", "1 cup fresh basil" ;
+   schema:totalTime "PT30M" .
+
+# -- Pointers to Other Layers --
+<> a sync:ManagedDocument;
+   foaf:primaryTopic :it;
+   # Pointer to the Merge Contract (Layer 2) - imports CRDT library + app mappings
+   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
+   # Pointer to the specific index shard this resource belongs to
+   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
+```
+
+### 6.2. Layer 2: The Merge Contract
+
+This layer defines the "how" of data integrity. It is a public, application-agnostic contract that ensures any two applications can merge the same data and arrive at the same result. It consists of two parts: the high-level rules and the low-level mechanics.
+
+**Fundamental Principle:** All documents stored in user Pods by this framework are designed to be merged using the CRDT mechanics described in this layer. This ensures deterministic conflict resolution and maintains data consistency across distributed clients.
+
+* **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
+
+* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **Resource Tombstones** for managing deletions.
+
+#### 6.2.1. Vector Clock Mechanics
 
 The state-based merge process uses **document-level vector clocks** for causality determination. Each resource document has a single vector clock that tracks changes to the entire document.
 
@@ -343,21 +392,23 @@ The state-based merge process uses **document-level vector clocks** for causalit
 
 ```turtle
 <> crdt:hasClockEntry [
-    crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
+    crdt:installationId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
     crdt:clockValue "15"^^xsd:integer
   ] ,
   [
-    crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
+    crdt:installationId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
     crdt:clockValue "8"^^xsd:integer
   ] ;
   # Pre-calculated hash for efficient index operations
   crdt:vectorClockHash "xxh64:abcdef1234567890" .
 ```
 
+**CRDT Literature Mapping:** The `crdt:installationId` property corresponds to what CRDT literature typically calls "client ID" or "node ID." We use "installation" to distinguish from Solid OIDC client identifiers, which identify applications rather than specific installation instances.
+
 **Clock Entry Identification:**
 
 Vector clock entries are context-identified blank nodes using the pattern:
-`(document_IRI, crdt:clientId=<installation_IRI>)`
+`(document_IRI, crdt:installationId=<installation_IRI>)`
 
 **Merge Process:**
 1. **Causality Determination:** Compare vector clocks to determine document causality relationships
@@ -366,119 +417,14 @@ Vector clock entries are context-identified blank nodes using the pattern:
 
 **Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
-#### 5.2.3. Client Installation Documents
-
-Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for vector clock entries, and collaborative lifecycle management.
-
-**Discovery and Lifecycle:**
-1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
-2. **ID Generation:** Generate unique UUID v4 for each application installation
-3. **Registration:** Create installation document at discovered container location
-4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
-
-**Installation Document Structure:**
-
-```turtle
-<installation-uuid> a crdt:ClientInstallation;
-   crdt:belongsToWebID <../profile/card#me>;
-   crdt:applicationId <https://meal-planning-app.example.org/id>;
-   crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime;
-   crdt:lastActiveAt "2024-09-02T14:30:00Z"^^xsd:dateTime;
-   sync:isGovernedBy mappings:client-installation-v1 .
-```
-
-**Client ID Generation Process:**
-
-**Recommended Approach (UUID v4):**
-1. **Discover container:** Query Type Index for `crdt:ClientInstallation` container
-2. **Generate UUID:** Use UUID v4 for cryptographically strong uniqueness
-3. **Create IRI:** `{container-url}/{uuid}` 
-4. **Register installation:** POST installation document to container
-5. **Use in vector clocks:** Reference full installation IRI in `crdt:clientId`
-
-**Installation Lifecycle Management:**
-
-*Self-Managed Properties (Installation Should Only Update Its Own):*
-- **`crdt:lastActiveAt`:** Installation updates its own activity timestamp
-  - **Update triggers:** Sync operations
-  - **Frequency:** Limited to once per hour to prevent excessive updates
-  - **CRDT Algorithm:** `crdt:LWW_Register`
-- **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (defaults to P6M)
-
-*Identity Properties (Set Once at Creation):*
-- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable`
-
-**Installation Cleanup:**
-Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations to make tombstoning decisions.
-
-#### 5.2.4. Cleanup Configuration
-
-The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
-
-**Cleanup Configuration Properties:**
-
-**Resource Tombstone Configuration:**
-- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
-- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
-- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 5.3.4)
-- **Risk:** Zombie deletions can affect recreated resources with same IRI
-
-**Property Tombstone Configuration:**
-- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
-- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
-- **Cleanup Strategy:** Sync-time cleanup during document processing (not tracked in GC index)
-- **Risk:** Deleted property values may reappear, but resource remains intact
-
-**Configuration Hierarchy:**
-
-**Framework Defaults Hierarchy:**
-1. **Type Index defaults:** Cleanup properties on the Type Index document itself
-2. **Type-specific overrides:** Individual registrations can override Type Index defaults  
-3. **User control:** Framework never overwrites existing user-configured values
-
-**Example Type Index Configuration:**
-```turtle
-# Type Index with framework-wide defaults
-<> a solid:TypeIndex;
-   # Framework adds these defaults if missing
-   crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
-   crdt:enableResourceTombstoneCleanup true;
-   crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
-   crdt:enablePropertyTombstoneCleanup true;
-   solid:hasRegistration [
-      a solid:TypeRegistration;
-      solid:forClass sync:ManagedDocument;
-      sync:managedResourceType schema:Recipe;
-      solid:instanceContainer <../data/recipes/>;
-      # Override: Keep recipe resource tombstones longer
-      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration;
-      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration
-   ] .
-```
-
-**Cleanup Strategies:**
-
-**Resource Tombstone Cleanup (Proactive):**
-1. **Registration:** Complete tombstoned resources automatically registered in Framework Garbage Collection Index
-2. **Discovery:** Cleanup processes scan GC index for resources older than retention period
-3. **Processing:** Remove entire resource files from Pod after verifying retention requirements
-4. **Efficiency:** No need to scan data containers for tombstoned resources
-
-**Property Tombstone Cleanup (Sync-Time):**
-1. **Integration:** Property tombstone cleanup happens during normal document synchronization
-2. **Detection:** When syncing a document, check all property tombstones against retention configuration
-3. **Local Processing:** Clean expired property tombstones as part of document merge process
-4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
-5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
-
-#### 5.2.5. Standard CRDT Library Examples
+#### 6.2.2. Standard CRDT Library Examples
 
 **Example: Standard CRDT Library `crdt-v1`**
 This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping.
 
 **Key Global Predicate Mappings:**
-- **`crdt:clientId`:** Always uses LWW_Register and identifies blank nodes (vector clock entries)
-- **`crdt:clockValue`:** Always uses LWW_Register for clock values
+- **`crdt:installationId`:** Always uses LWW-Register and identifies blank nodes (vector clock entries)
+- **`crdt:clockValue`:** Always uses LWW-Register for clock values
 - **`crdt:deletedAt`:** Always uses OR-Set semantics for both resource and property tombstones
 
 **Example: Application-Specific Rules File `recipe-v1`**
@@ -538,11 +484,11 @@ This library, published at a public URL by the specification authors, defines st
 
 # -- Vector Clock (Layer 2 Mechanics) --
 <> crdt:hasClockEntry [
-    crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
+    crdt:installationId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
     crdt:clockValue "15"^^xsd:integer
   ] ,
   [
-    crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
+    crdt:installationId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
     crdt:clockValue "8"^^xsd:integer
   ] ;
   crdt:vectorClockHash "xxh64:abcdef1234567890" .
@@ -587,13 +533,13 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
 ```
 
-#### 5.2.6. Property Mapping vs. Predicate Mapping Semantics
+#### 6.2.3. Property Mapping vs. Predicate Mapping Semantics
 
 **Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
 
 **Property Mapping (Class-Scoped Rules):**
 - Rules defined within `sync:ClassMapping` apply **only within that specific class context**
-- Example: In `mappings:statement-v1`, `rdf:subject` uses LWW_Register **only when within `rdf:Statement` resources**
+- Example: In `mappings:statement-v1`, `rdf:subject` uses LWW-Register **only when within `rdf:Statement` resources**
 - **Use case:** Class-specific behavior where the same predicate may have different merge semantics in different contexts
 
 ```turtle
@@ -606,7 +552,7 @@ mappings:statement-v1 a sync:ClassMapping;
 
 **Predicate Mapping (Global Rules):**
 - Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
-- Example: In `mappings:crdt-v1`, `crdt:clientId` **always** identifies blank nodes and **always** uses LWW_Register
+- Example: In `mappings:crdt-v1`, `crdt:installationId` **always** identifies blank nodes and **always** uses LWW-Register
 - Example: In `mappings:crdt-v1`, `crdt:deletedAt` **always** uses OR-Set semantics for both resource and property tombstones
 - **Use case:** Framework-level predicates with consistent behavior regardless of context
 
@@ -614,13 +560,13 @@ mappings:statement-v1 a sync:ClassMapping;
 # Predicate mapping: Global behavior across all contexts
 <#clock-mappings> a sync:PredicateMapping;
    sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
      [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
 ```
 
-**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW_Register when within `schema:Recipe` resources but could theoretically use OR_Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:clientId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
+**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW-Register when within `schema:Recipe` resources but could theoretically use OR-Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:installationId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
 
-#### 5.2.7. Vocabulary Versioning and Evolution
+#### 6.2.4. Vocabulary Versioning and Evolution
 
 **Versioning Strategy:**
 
@@ -649,7 +595,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Different contract versions use conservative merge approach
 - Framework vocabularies evolve through major version URI changes when needed
 
-### 5.3. Layer 3: The Indexing Layer
+### 6.3. Layer 3: The Indexing Layer
 
 This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only vector clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
@@ -686,7 +632,7 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 **Application Vocabulary:**
 Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the specification vocabulary but work within the specification's structure.
 
-### 5.3.1. Sharding Overview
+#### 6.3.1. Sharding Overview
 
 **Resource Assignment:**
 
@@ -703,7 +649,7 @@ Shard count changes are handled through lazy, client-side migration rather than 
 
 For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
 
-### 5.3.2. Structure-Derived Index Naming and Collaborative Coordination
+#### 6.3.2. Structure-Derived Index Naming
 
 **Coordination-Free Index Convergence:**
 
@@ -770,7 +716,7 @@ When installations attempt to create indices with conflicting immutable properti
 - **Property-level optimization:** Remove unused `idx:indexedProperty` entries when last reader is tombstoned
 - **Reader list maintenance:** Tombstoned installations removed from `idx:readBy` lists, enabling index deprecation when no active readers remain
 
-### 5.3.3. Collaborative Bootstrap and Index Population
+#### 6.3.3. Collaborative Bootstrap and Index Population
 
 **Coordination-Free Bootstrap Process:**
 
@@ -798,7 +744,7 @@ When creating any new index, it enters "populating" state with appropriate popul
 
 ```turtle
 <GroupIndexTemplate>
-   idx:populationState "populating";  # LWW_Register managed
+   idx:populationState "populating";  # LWW-Register managed
    idx:hasPopulatingShard <pop-mod-xxhash64-4-0-v1_0_0>, <pop-mod-xxhash64-4-1-v1_0_0>, 
                           <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
 ```
@@ -820,18 +766,18 @@ When creating any new index, it enters "populating" state with appropriate popul
 
 **State Transition to Active:**
 
-*LWW_Register State Machine for `idx:populationState`:*
+*LWW-Register State Machine for `idx:populationState`:*
 1. **Initial State:** Index created with `idx:populationState "populating"`
 2. **Completion Detection:** Installation detects all populating shards have `crdt:tombstonedAt` 
 3. **State Update:** Installation attempts `idx:populationState "active"` with current vector clock
 4. **Collaborative Resolution:** Multiple installations may attempt transition simultaneously
-   - LWW_Register ensures deterministic convergence to "active" state
+   - LWW-Register ensures deterministic convergence to "active" state
    - Vector clock comparison resolves concurrent updates
 5. **Cleanup Phase:** After state transition, remove `idx:hasPopulatingShard` entries using OR-Set removal
 
 *State Transition Requirements:*
 - Only transition to "active" when ALL populating shards are tombstoned
-- Use LWW_Register to prevent state regression (active → populating)
+- Use LWW-Register to prevent state regression (active → populating)
 - Cleanup populating shard references only after successful state transition
 
 **Background Population Requirements for All Index Types:**
@@ -841,7 +787,7 @@ When creating any new index, it enters "populating" state with appropriate popul
 - **Local-first:** Applications remain functional with partially-populated indices  
 - **Mandatory progress:** Every sync cycle continues population until completion
 - **Cross-installation:** All installations participate in population until finished
-- **State management:** Use `idx:populationState` LWW_Register for collaborative state transitions
+- **State management:** Use `idx:populationState` LWW-Register for collaborative state transitions
 
 *FullIndex Population:*
 - **Small datasets (< 1000 resources):** Direct creation and immediate state switch to "active"
@@ -863,57 +809,33 @@ When creating any new index, it enters "populating" state with appropriate popul
 - **Group-scoped shards:** Populating shards process only resources belonging to the group
 - **Independent completion:** Each group index completes population independently
 
-### 5.3.4. Framework Garbage Collection Index
+#### 6.3.4. Installation Index Management and Scalability
 
-**Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
+**Scalability Challenge:** When thousands of installations exist, validating dormancy and managing reader lists becomes computationally expensive.
 
-**Centralized Resource Cleanup Strategy:** Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, complete resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
+**Proposed Solutions:**
 
-**Structure-Derived Naming:**
-- **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-resources")}/index`
-- **Type:** `idx:FullIndex` with multiple indexed classes
-- **Registration:** Automatic Type Index registration by framework (not application-specific)
+*Option A: Sharded Installation Index*
+- Create `idx:FullIndex` for `crdt:ClientInstallation` with automatic sharding
+- Enable efficient lookup and batch lifecycle validation  
+- Index properties: `crdt:lastActiveAt`, `crdt:applicationId`
+- Trade-off: Additional index complexity for improved performance
 
-**Indexed Resource Types:**
-- **User Data Resources:** Any `sync:ManagedDocument` with `crdt:deletedAt` timestamps
-- **Framework Resources:** `crdt:TombstonedShard` from completed populating operations
-- **Client Installations:** `crdt:ClientInstallation` marked for cleanup after inactivity periods
+*Option B: Hierarchical Reader Lists*
+- Group installations by application ID in reader lists
+- Use nested OR-Sets: `idx:readBy` contains application IDs, applications contain installation lists
+- Enables app-level dormancy detection without individual installation lookup
+- Trade-off: More complex reader list management
 
-**Index Configuration:**
-```turtle
-<gc-index-a1b2c3d4> a idx:FullIndex;
-   # Index covers all tombstoned resource types
-   idx:indexedProperty [
-     idx:property crdt:deletedAt;          # Deletion timestamps for all resources
-     idx:readBy <installation-1>, <installation-2>, <installation-3>
-   ], [
-     idx:property rdf:type;                # Resource type for cleanup process routing  
-     idx:readBy <installation-1>, <installation-2>, <installation-3>
-   ] ;
-   idx:shardingAlgorithm [
-     a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";
-     idx:numberOfShards 1
-   ] ;
-   idx:readBy <installation-1>, <installation-2>, <installation-3> .
-```
+*Option C: Lazy Dormancy Detection*
+- Only validate installations when they appear in reader lists during normal operation
+- Skip global dormancy scans, rely on opportunistic cleanup
+- Use TTL-based caching to avoid repeated validation of same installation
+- Trade-off: Slower cleanup, potential stale reader list entries
 
-**Resource Garbage Collection Process:**
-1. **Automatic Registration:** When complete resources (documents) receive `crdt:deletedAt` timestamp, automatically add entry to GC index
-2. **Periodic Cleanup:** Background processes scan GC index for tombstoned resources older than configured retention periods
-3. **Type-Specific Cleanup:** Route different resource types to appropriate cleanup logic based on `rdf:type`
-4. **Safe Deletion:** Remove entire resource files from Pod after verifying retention period has passed
-5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
+**Recommended Approach:** Start with Option C (lazy detection) for simplicity, migrate to Option A (sharded index) when installation counts exceed ~1000 per Pod.
 
-**Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
-
-**Cleanup Efficiency Benefits:**
-- **No Container Scanning:** Cleanup processes never need to scan entire data containers
-- **Batch Operations:** Process multiple tombstoned resources in single operation
-- **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
-- **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
-
-### 5.3.5. Pod Setup and Configuration Process
+#### 6.3.5. Pod Setup and Configuration Process
 
 When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
 
@@ -945,135 +867,6 @@ When an application first encounters a Pod, it may need to configure the Type In
 4. App creates Type Index entries for managed recipes, recipe index, client installations
 5. App proceeds with normal synchronization workflow
 ```
-
-### 5.3.6. Collaborative Index Lifecycle Management
-
-**CRDT-Based Index Coordination:**
-
-All index lifecycle decisions are made collaboratively through CRDT-managed installation documents and index properties, eliminating single points of failure and coordination bottlenecks.
-
-**Property-Level Reader Tracking:**
-```turtle
-<> a idx:FullIndex;
-   idx:indexedProperty [
-     idx:property schema:name;
-     idx:readBy <installation-1>, <installation-2>  # OR-Set of active readers
-   ],
-   [
-     idx:property schema:keywords;
-     idx:readBy <installation-1>  # Only one reader remaining
-   ];
-   idx:readBy <installation-1>, <installation-2>, <installation-3> .  # Index-level readers
-```
-
-**Index Reader Management:**
-
-**Property Cleanup Process:**
-1. **Reader removal:** When installation is tombstoned, remove from all `idx:readBy` lists
-2. **Property removal:** When property has no active readers, remove from `idx:indexedProperty`
-3. **Index deprecation:** When index has no active readers, set `idx:deprecatedAt`
-4. **Garbage collection:** Deprecated indices stop receiving updates from write operations
-
-**Configurable CRDT Tie-Breaking Framework:**
-
-*Algorithm-Specific Behaviors:*
-- **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic client ID tie-breaking
-- **`crdt:Immutable`:** No updates allowed after creation
-
-*Framework Benefits:*
-- **Explicit semantics:** Each property declares its intended collaboration model
-- **Configurable per-property:** Different tie-breaking rules for different use cases
-- **Backward compatibility:** Existing `crdt:LWW_Register` maps to `crdt:TimestampLWW`
-- **Self-describing:** Merge behavior discoverable through vocabulary definitions
-
-*Installation Document Specific Rules:*
-- Installations control their own identity and activity metrics via `SelfOnlyLWW` and `SelfWinsLWW`
-- Collaborative dormancy detection enabled through `TimestampLWW` for dormancy properties
-- Framework prevents ownership conflicts while enabling collaborative lifecycle management
-
-### 5.3.7. Installation Document Scalability
-
-**Scalability Challenge:** When thousands of installations exist, validating dormancy and managing reader lists becomes computationally expensive.
-
-**Proposed Solutions:**
-
-*Option A: Sharded Installation Index*
-- Create `idx:FullIndex` for `crdt:ClientInstallation` with automatic sharding
-- Enable efficient lookup and batch lifecycle validation  
-- Index properties: `crdt:lastActiveAt`, `crdt:applicationId`
-- Trade-off: Additional index complexity for improved performance
-
-*Option B: Hierarchical Reader Lists*
-- Group installations by application ID in reader lists
-- Use nested OR-Sets: `idx:readBy` contains application IDs, applications contain installation lists
-- Enables app-level dormancy detection without individual installation lookup
-- Trade-off: More complex reader list management
-
-*Option C: Lazy Dormancy Detection*
-- Only validate installations when they appear in reader lists during normal operation
-- Skip global dormancy scans, rely on opportunistic cleanup
-- Use TTL-based caching to avoid repeated validation of same installation
-- Trade-off: Slower cleanup, potential stale reader list entries
-
-**Recommended Approach:** Start with Option C (lazy detection) for simplicity, migrate to Option A (sharded index) when installation counts exceed ~1000 per Pod.
-
-### 5.3.8. Complete Index Lifecycle Management
-
-**Index States and Transitions:**
-
-*Active State:*
-- **Properties:** `idx:populationState "active"`, non-empty `idx:readBy` list
-- **Behavior:** Receives write updates, participates in sync operations
-- **Reader management:** Installations can join/leave through `idx:readBy` OR-Set
-
-*Deprecated State:*
-- **Trigger:** Last active installation removed from `idx:readBy` (OR-Set becomes empty)
-- **Properties:** `idx:deprecatedAt` timestamp set, `idx:readBy` empty
-- **Behavior:** Stops receiving write updates, no active readers accessing it
-- **Persistence:** Index documents and shards remain in Pod but become stale over time
-
-*Tombstoned State (Proposed):*
-- **Trigger:** Deprecated for extended period (e.g., 1 year) with no reactivation
-- **Properties:** `crdt:tombstonedAt` timestamp set
-- **Behavior:** Marked for garbage collection, should not be reactivated
-- **Cleanup:** Framework GC index tracks for automated cleanup
-
-**Index Reactivation Policy:**
-
-*Deprecated Index Reactivation (Recommended):*
-- **Discovery:** New installation discovers deprecated index through Type Index
-- **Validation:** Check structural compatibility with current requirements
-- **Reactivation:** Add self to `idx:readBy`, remove `idx:deprecatedAt` timestamp
-- **Re-population required:** Index is stale, must re-enter populating state for update
-  - Set `idx:populationState "populating"`
-  - Create populating shards to scan for new/changed resources since deprecation
-  - Detect and handle tombstoned entries that may have been missed during deprecated period
-- **Stale data handling:** Deprecated period may have missed resource deletions and updates
-- **Tombstone detection algorithm:**
-  1. **Vector clock comparison:** Compare index entry vector clocks with actual resource vector clocks
-  2. **Resource availability check:** Verify that indexed resources still exist and are accessible
-  3. **Tombstone processing:** Apply any missed RDF reification tombstones from deprecation period
-  4. **Entry cleanup:** Remove stale entries for deleted or moved resources
-
-*Tombstoned Index Handling (Strict):*
-- **Discovery prevention:** Tombstoned indices should be hidden from Type Index
-- **Version increment required:** Must create new index with incremented version component
-- **Rationale:** Prevents conflicts with cleaned-up shard references
-
-*Tombstoned Index Discovery Prevention:*
-- **Type Index cleanup:** Remove tombstoned indices from Type Index registrations
-- **Version collision avoidance:** When creating new index, check if computed name conflicts with tombstoned version
-- **Automatic version increment:** If collision detected, increment version component until conflict-free name found
-- **Example:** If `index-full-a1b2c3d4` tombstoned, new index becomes `index-full-b2c3d4e5` with v1_0_1
-
-### 5.3.9. Indexing Conventions and Best Practices
-To ensure interoperability, performance, and good citizenship within the Solid ecosystem, applications should adhere to the following conventions when working with indices:
-
- *   **Structure-Based Convergence:** Applications with identical structural requirements automatically share indices through deterministic naming. Structure-derived names eliminate the "default index" concept - there's simply the index that matches your structural requirements.
- 
- *   **Collaborative Property Management:** Indices support collaborative property extension through `idx:indexedProperty` with per-property `idx:readBy` tracking. When installations need additional properties, they extend existing compatible indices rather than creating new ones, minimizing write overhead for all participants.
-
- *   **Performance-Conscious Citizenship:** Every additional index increases write overhead for all installations. Applications should prefer joining existing structurally-compatible indices over creating new ones. The property-level reader tracking enables automatic cleanup of unused properties when installations are tombstoned, keeping indices lean. 
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/index`**
 This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only vector clock hashes for change detection.
@@ -1207,11 +1000,11 @@ This document contains entries for recipe resources. Since recipes are used with
    ].
 ```
 
-### 5.4. Layer 4: The Sync Strategy
+### 6.4. Layer 4: The Sync Strategy
 
 This is the client-side layer where the application developer configures how to synchronize data. The CRDT implementation balances **discovery** (finding existing Pod configuration) with **developer intent** (application requirements). Developers declare their preferred sync approach, and the implementation either uses discovered compatible indices or creates new ones as needed.
 
-#### 5.4.1. Decision 1: Index Structure
+#### 6.4.1. Decision 1: Index Structure
 
 This decision determines how data is organized and indexed in the Pod.
 
@@ -1231,7 +1024,7 @@ This decision determines how data is organized and indexed in the Pod.
 3. **Compatibility evaluation:** Does discovered index structure meet data pattern needs?
 4. **Resolution:** Use compatible index OR create new index with appropriate structure
 
-#### 5.4.2. Decision 2: Sync Timing
+#### 6.4.2. Decision 2: Sync Timing
 
 This decision determines when and how much data gets loaded from the Pod.
 
@@ -1246,7 +1039,7 @@ This decision determines when and how much data gets loaded from the Pod.
 *   Good for large datasets or browse-then-load workflows
 *   Examples: Large recipe collections, document libraries, photo albums
 
-#### 5.4.3. Common Strategies
+#### 6.4.3. Common Strategies
 
 The named sync strategies combine the two decisions above:
 
@@ -1261,7 +1054,207 @@ The named sync strategies combine the two decisions above:
 *   **GroupedSync:** Shopping entries, activity logs → GroupIndexTemplate + immediate data for subscribed groups  
 *   **OnDemandSync:** Recipe collections, document libraries → Any index + headers-only until requested
 
-## 6. Synchronization Workflow
+## 7. Advanced Lifecycle Management
+
+Having established the architectural layers, we now examine advanced topics that span across multiple layers and deal with the complete lifecycle management of resources, indices, and installations.
+
+### 7.1. Framework Garbage Collection Index
+
+**Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
+
+**Centralized Resource Cleanup Strategy:** Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, complete resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
+
+**Structure-Derived Naming:**
+- **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-resources")}/index`
+- **Type:** `idx:FullIndex` with multiple indexed classes
+- **Registration:** Automatic Type Index registration by framework (not application-specific)
+
+**Indexed Resource Types:**
+- **User Data Resources:** Any `sync:ManagedDocument` with `crdt:deletedAt` timestamps
+- **Framework Resources:** `crdt:TombstonedShard` from completed populating operations
+- **Client Installations:** `crdt:ClientInstallation` marked for cleanup after inactivity periods
+
+**Index Configuration:**
+```turtle
+<gc-index-a1b2c3d4> a idx:FullIndex;
+   # Index covers all tombstoned resource types
+   idx:indexedProperty [
+     idx:property crdt:deletedAt;          # Deletion timestamps for all resources
+     idx:readBy <installation-1>, <installation-2>, <installation-3>
+   ], [
+     idx:property rdf:type;                # Resource type for cleanup process routing  
+     idx:readBy <installation-1>, <installation-2>, <installation-3>
+   ] ;
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 1
+   ] ;
+   idx:readBy <installation-1>, <installation-2>, <installation-3> .
+```
+
+**Resource Garbage Collection Process:**
+1. **Automatic Registration:** When complete resources (documents) receive `crdt:deletedAt` timestamp, automatically add entry to GC index
+2. **Periodic Cleanup:** Background processes scan GC index for tombstoned resources older than configured retention periods
+3. **Type-Specific Cleanup:** Route different resource types to appropriate cleanup logic based on `rdf:type`
+4. **Safe Deletion:** Remove entire resource files from Pod after verifying retention period has passed
+5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
+
+**Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
+
+**Cleanup Efficiency Benefits:**
+- **No Container Scanning:** Cleanup processes never need to scan entire data containers
+- **Batch Operations:** Process multiple tombstoned resources in single operation
+- **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
+- **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
+
+### 7.2. Retention Policies and Cleanup Configuration
+
+The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
+
+**Cleanup Configuration Properties:**
+
+**Resource Tombstone Configuration:**
+- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
+- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
+- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 7.1)
+- **Risk:** Zombie deletions can affect recreated resources with same IRI
+
+**Property Tombstone Configuration:**
+- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
+- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
+- **Cleanup Strategy:** Sync-time cleanup during document processing (not tracked in GC index)
+- **Risk:** Deleted property values may reappear, but resource remains intact
+
+**Configuration Hierarchy:**
+
+**Framework Defaults Hierarchy:**
+1. **Type Index defaults:** Cleanup properties on the Type Index document itself
+2. **Type-specific overrides:** Individual registrations can override Type Index defaults  
+3. **User control:** Framework never overwrites existing user-configured values
+
+**Example Type Index Configuration:**
+```turtle
+# Type Index with framework-wide defaults
+<> a solid:TypeIndex;
+   # Framework adds these defaults if missing
+   crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
+   crdt:enableResourceTombstoneCleanup true;
+   crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
+   crdt:enablePropertyTombstoneCleanup true;
+   solid:hasRegistration [
+      a solid:TypeRegistration;
+      solid:forClass sync:ManagedDocument;
+      sync:managedResourceType schema:Recipe;
+      solid:instanceContainer <../data/recipes/>;
+      # Override: Keep recipe resource tombstones longer
+      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration;
+      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration
+   ] .
+```
+
+**Cleanup Strategies:**
+
+**Resource Tombstone Cleanup (Proactive):**
+1. **Registration:** Complete tombstoned resources automatically registered in Framework Garbage Collection Index
+2. **Discovery:** Cleanup processes scan GC index for resources older than retention period
+3. **Processing:** Remove entire resource files from Pod after verifying retention requirements
+4. **Efficiency:** No need to scan data containers for tombstoned resources
+
+**Property Tombstone Cleanup (Sync-Time):**
+1. **Integration:** Property tombstone cleanup happens during normal document synchronization
+2. **Detection:** When syncing a document, check all property tombstones against retention configuration
+3. **Local Processing:** Clean expired property tombstones as part of document merge process
+4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
+5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
+
+### 7.3. Collaborative Index Lifecycle Management
+
+**CRDT-Based Index Coordination:**
+
+All index lifecycle decisions are made collaboratively through CRDT-managed installation documents and index properties, eliminating single points of failure and coordination bottlenecks.
+
+**Property-Level Reader Tracking:**
+```turtle
+<> a idx:FullIndex;
+   idx:indexedProperty [
+     idx:property schema:name;
+     idx:readBy <installation-1>, <installation-2>  # OR-Set of active readers
+   ],
+   [
+     idx:property schema:keywords;
+     idx:readBy <installation-1>  # Only one reader remaining
+   ];
+   idx:readBy <installation-1>, <installation-2>, <installation-3> .  # Index-level readers
+```
+
+**Index Reader Management:**
+
+**Property Cleanup Process:**
+1. **Reader removal:** When installation is tombstoned, remove from all `idx:readBy` lists
+2. **Property removal:** When property has no active readers, remove from `idx:indexedProperty`
+3. **Index deprecation:** When index has no active readers, set `idx:deprecatedAt`
+4. **Garbage collection:** Deprecated indices stop receiving updates from write operations
+
+**Index States and Transitions:**
+
+*Active State:*
+- **Properties:** `idx:populationState "active"`, non-empty `idx:readBy` list
+- **Behavior:** Receives write updates, participates in sync operations
+- **Reader management:** Installations can join/leave through `idx:readBy` OR-Set
+
+*Deprecated State:*
+- **Trigger:** Last active installation removed from `idx:readBy` (OR-Set becomes empty)
+- **Properties:** `idx:deprecatedAt` timestamp set, `idx:readBy` empty
+- **Behavior:** Stops receiving write updates, no active readers accessing it
+- **Persistence:** Index documents and shards remain in Pod but become stale over time
+
+*Tombstoned State (Proposed):*
+- **Trigger:** Deprecated for extended period (e.g., 1 year) with no reactivation
+- **Properties:** `crdt:tombstonedAt` timestamp set
+- **Behavior:** Marked for garbage collection, should not be reactivated
+- **Cleanup:** Framework GC index tracks for automated cleanup
+
+**Index Reactivation Policy:**
+
+*Deprecated Index Reactivation (Recommended):*
+- **Discovery:** New installation discovers deprecated index through Type Index
+- **Validation:** Check structural compatibility with current requirements
+- **Reactivation:** Add self to `idx:readBy`, remove `idx:deprecatedAt` timestamp
+- **Re-population required:** Index is stale, must re-enter populating state for update
+  - Set `idx:populationState "populating"`
+  - Create populating shards to scan for new/changed resources since deprecation
+  - Detect and handle tombstoned entries that may have been missed during deprecated period
+- **Stale data handling:** Deprecated period may have missed resource deletions and updates
+- **Tombstone detection algorithm:**
+  1. **Vector clock comparison:** Compare index entry vector clocks with actual resource vector clocks
+  2. **Resource availability check:** Verify that indexed resources still exist and are accessible
+  3. **Tombstone processing:** Apply any missed RDF reification tombstones from deprecation period
+  4. **Entry cleanup:** Remove stale entries for deleted or moved resources
+
+*Tombstoned Index Handling (Strict):*
+- **Discovery prevention:** Tombstoned indices should be hidden from Type Index
+- **Version increment required:** Must create new index with incremented version component
+- **Rationale:** Prevents conflicts with cleaned-up shard references
+
+**Configurable CRDT Tie-Breaking Framework:**
+
+*Algorithm-Specific Behaviors:*
+- **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic client ID tie-breaking
+- **`crdt:Immutable`:** No updates allowed after creation
+
+*Framework Benefits:*
+- **Explicit semantics:** Each property declares its intended collaboration model
+- **Configurable per-property:** Different tie-breaking rules for different use cases
+- **Backward compatibility:** Existing `crdt:LWW_Register` maps to `crdt:TimestampLWW`
+- **Self-describing:** Merge behavior discoverable through vocabulary definitions
+
+*Installation Document Specific Rules:*
+- Installations control their own identity and activity metrics via `SelfOnlyLWW` and `SelfWinsLWW`
+- Collaborative dormancy detection enabled through `TimestampLWW` for dormancy properties
+- Framework prevents ownership conflicts while enabling collaborative lifecycle management
+
+## 8. Synchronization Workflow
 
 With the architectural layers defined, we can now examine how the synchronization process operates. The synchronization process is governed by the **Sync Strategy** that the developer chooses.
 
@@ -1275,7 +1268,7 @@ With the architectural layers defined, we can now examine how the synchronizatio
 6.  **State-based Merge:** The library downloads the full RDF resource, consults the **Merge Contract**, performs property-by-property merging, and returns the merged object.
 7.  **App Notification (`onUpdate`):** The library notifies the application with the complete, merged object for local storage.
 
-### 6.1. Concrete Workflow Example
+### 8.1. Concrete Workflow Example
 
 **Scenario:** OnDemandSync for recipe collection
 
@@ -1314,18 +1307,18 @@ syncLibrary.onUpdate((mergedResource) => {
 });
 ```
 
-## 7. Error Handling and Resilience
+## 9. Error Handling and Resilience
 
-Real-world synchronization faces numerous failure modes. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions.
+While the synchronization workflow provides the ideal path for data consistency, real-world distributed systems face numerous failure modes that can disrupt this process. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions, ensuring the system remains robust across network failures, server outages, access control changes, and data corruption scenarios.
 
-### 7.1. Failure Classification
+### 9.1. Failure Classification
 
 **Error Granularities:**
 - **Type-Level:** Entire data type cannot sync (missing merge contracts, authentication failures)
 - **Resource-Level:** Individual resource blocked (parse errors, access control changes)  
 - **Property-Level:** Specific property cannot sync (unknown CRDT types, schema violations)
 
-### 7.2. Core Resilience Strategies
+### 9.2. Core Resilience Strategies
 
 **Network Resilience:**
 - Distinguish between systemic failures (abort entire sync) vs. resource-specific failures (skip and continue)
@@ -1342,7 +1335,7 @@ Real-world synchronization faces numerous failure modes. The architecture provid
 - CRDT merge conflict resolution at property level
 - Vector clock anomaly detection and handling
 
-### 7.3. Graceful Degradation
+### 9.3. Graceful Degradation
 
 The system provides multiple operational modes based on error conditions:
 
@@ -1353,9 +1346,9 @@ The system provides multiple operational modes based on error conditions:
 
 For comprehensive implementation guidance including specific error scenarios, recovery procedures, and user interface recommendations, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
-## 8. Performance Characteristics
+## 10. Performance Characteristics
 
-### 8.1. Sync Strategy Performance Trade-offs
+### 10.1. Sync Strategy Performance Trade-offs
 
 The choice of sync strategy fundamentally determines application performance characteristics:
 
@@ -1374,7 +1367,7 @@ The choice of sync strategy fundamentally determines application performance cha
 - **Best for:** Large collections with unpredictable access patterns
 - **Trade-off:** Individual resource fetches add latency to data access
 
-### 8.2. Index-Based Change Detection
+### 10.2. Index-Based Change Detection
 
 The architecture's index-based approach provides efficient incremental synchronization:
 
@@ -1382,7 +1375,7 @@ The architecture's index-based approach provides efficient incremental synchroni
 - **Incremental Sync:** Download only changed shards through vector clock hash comparison (O(k) where k = changed shards)
 - **Bandwidth Efficiency:** Index headers provide metadata without downloading full resources
 
-### 8.3. Architecture Performance Benefits
+### 10.3. Architecture Performance Benefits
 
 - **Parallel Fetching:** Sharded indices enable concurrent synchronization
 - **Partial Failure Resilience:** Failed shards don't block others
@@ -1391,9 +1384,9 @@ The architecture's index-based approach provides efficient incremental synchroni
 
 For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
 
-## 9. Data Organization Principles
+## 11. Data Organization Principles
 
-### 9.1. Resource IRI Design and Pod Performance
+### 11.1. Resource IRI Design and Pod Performance
 
 **The Challenge:**
 Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
@@ -1437,28 +1430,28 @@ For small collections (< 1000 resources), flat structure is acceptable:
 - **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
 - **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
 
-## 10. Benefits of this Architecture
+## 12. Benefits of this Architecture
 
 * **CRDT Interoperability:** CRDT-enabled applications achieve safe collaboration by discovering CRDT-managed resources through `sync:ManagedDocument` registrations and following published merge contracts, while remaining protected from interference by incompatible applications.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Controlled Discoverability:** The system is discoverable by CRDT-enabled applications while protecting CRDT-managed data from accidental modification by incompatible applications.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 11. Alignment with Standardization Efforts
+## 13. Alignment with Standardization Efforts
 
-### 11.1. Community Alignment
+### 13.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 11.2. Architectural Differentiators
+### 13.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 12. Outlook: Future Enhancements
+## 14. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
@@ -1472,3 +1465,4 @@ The core architecture provides a robust foundation for synchronization. The foll
 * **Proactive Access Control (WAC/ACP):** A mature version of this library should proactively check Solid's access control rules.
 * **Data Validation (SHACL):** By integrating SHACL, the library can validate the merged RDF graph against a predefined "shape" before uploading it.
 * **Richer Provenance (PROV-O):** By incorporating PROV-O, the library can create a rich, auditable history of changes.
+* Usage of "time in millis since unix " in vector clocks for better tie-breaking?
