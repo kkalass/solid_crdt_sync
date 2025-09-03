@@ -285,9 +285,9 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 * **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **Resource Tombstones** for managing deletions.
 
-#### 5.2.1. Tombstoning: Resource vs Property Deletion
+#### 5.2.1. Deletion Mechanisms
 
-Before examining specific document types, it's important to understand how deletion works in this CRDT system. The framework uses two distinct tombstone mechanisms for different deletion scopes.
+The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
 
 **Two Types of Tombstones:**
 
@@ -295,63 +295,80 @@ Before examining specific document types, it's important to understand how delet
 - **Purpose:** Mark complete resources as deleted (e.g., deleting an entire recipe)
 - **Property:** `crdt:deletedAt` with OR-Set semantics
 - **Scope:** Applied to the document itself, affects the entire resource
-- **Merge Behavior:** OR-Set union across all replicas - timestamps can be added or removed
 - **Use Case:** User deletes a recipe, shopping list entry, or other complete resource
 
 **2. Property Tombstones** (Individual Value Deletion):
 - **Purpose:** Mark specific values within multi-value properties as deleted (e.g., removing "quick" from recipe keywords)
-- **Property:** `crdt:deletedAt` timestamp with RDF Reification
+- **Property:** `crdt:deletedAt` with RDF Reification
 - **Scope:** Applied to individual property values within OR-Set or 2P-Set properties
-- **Merge Behavior:** RDF Reification statements with OR-Set semantics for the deletion timestamp
 - **Use Case:** User removes a keyword, ingredient, or other individual value from a multi-value property
 
-**Resource Deletion Semantics:**
+**Unified `crdt:deletedAt` Semantics:**
 
-Resources are marked as deleted using the `crdt:deletedAt` property with OR-Set semantics. This approach supports deletion/undeletion cycles, which is essential for semantic IRI naming where users might recreate resources with the same name (e.g., deleting and recreating a "tomato soup" recipe).
+The `crdt:deletedAt` predicate is defined globally in the framework's predicate mappings with consistent OR-Set semantics across all contexts:
+
+```turtle
+# In crdt-v1.ttl deletion mappings
+[ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ]
+```
 
 **Key Properties:**
 - **Multi-Value Set:** `crdt:deletedAt` is a set of deletion timestamps (OR-Set semantics)
-- **State Determination:** A resource is considered deleted if `crdt:deletedAt` set is non-empty, undeleted if set is empty
+- **State Determination:** A resource/value is considered deleted if `crdt:deletedAt` set is non-empty, undeleted if set is empty
 - **Merge Behavior:** OR-Set union across all replicas - timestamps can be added (delete) or removed (undelete)
-- **Cleanup Timing:** Use `max(crdt:deletedAt)` plus configured retention period for garbage collection
-- **Efficient Cleanup:** Tombstoned resources are tracked in the Framework Garbage Collection Index (see Section 5.3.4) for efficient discovery by cleanup processes
-- **Undeletion:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
+- **Undeletion Support:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
 
-**Trade-offs:** This approach allows "late deletions" to affect recreated content. If Client A deletes and recreates a resource, but Client B's deletion syncs afterward, the resource may appear deleted despite new content being present. This is an acceptable trade-off for supporting semantic IRI reuse patterns.
+**Property Tombstone Implementation:**
 
-**Property Deletion Semantics:**
+Individual values within multi-value properties are deleted using RDF Reification tombstones:
 
-Individual values within multi-value properties (OR-Set, 2P-Set) are deleted using RDF Reification tombstones with `crdt:deletedAt` timestamps. This mechanism enables precise deletion of specific values without affecting other values of the same property.
+```turtle
+# Example: Tombstone for deleted keyword "quick"
+<#crdt-tombstone-f8e4d2b1> a rdf:Statement;
+  rdf:subject :it;
+  rdf:predicate schema:keywords;
+  rdf:object "quick";
+  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
+```
 
-**Key Properties:**
-- **Multi-Value Set:** Property tombstones also use `crdt:deletedAt` as a set of deletion timestamps
-- **State Determination:** Property value is deleted if its tombstone's `crdt:deletedAt` set is non-empty
-- **Undeletion Mechanics:** Remove timestamps from tombstone's set by creating tombstones-of-tombstones targeting specific deletion timestamps
-- **Fragment Identifiers:** Deterministic generation using XXH64 hash of canonical N-Triple prevents conflicts while allowing collaborative tombstone creation
+**Fragment Identifiers:** Deterministic generation using XXH64 hash of canonical N-Triple prevents conflicts while allowing collaborative tombstone creation.
 
-**Implementation:** Uses RDF Reification with deterministic fragment identifiers for tombstone statements, allowing precise targeting of deleted values within CRDT sets. Property tombstones use the same `crdt:deletedAt` OR-Set property as resource tombstones, creating a harmonized deletion system.
+**RDF Reification Choice:** RDF Reification is semantically correct for tombstones because we need to mark statements as deleted without asserting them. RDF-Star syntax would incorrectly assert the triple.
 
-**Cleanup Configuration:** 
+#### 5.2.2. Vector Clock Mechanics
 
-The framework provides separate retention configurations for resource and property tombstones, recognizing their different risk profiles:
+The state-based merge process uses **document-level vector clocks** for causality determination. Each resource document has a single vector clock that tracks changes to the entire document.
 
-**Resource Tombstone Cleanup (High Impact):**
-- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: 2+ years)
-- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
-- **Risk:** Zombie deletions can affect recreated resources with same IRI
+**Vector Clock Structure:**
 
-**Property Tombstone Cleanup (Lower Impact):**
-- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: 6-12 months)
-- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
-- **Risk:** Deleted property values may reappear, but resource remains intact
+```turtle
+<> crdt:hasClockEntry [
+    crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
+    crdt:clockValue "15"^^xsd:integer
+  ] ,
+  [
+    crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
+    crdt:clockValue "8"^^xsd:integer
+  ] ;
+  # Pre-calculated hash for efficient index operations
+  crdt:vectorClockHash "xxh64:abcdef1234567890" .
+```
 
-Both configurations follow the same Type Index hierarchy: framework defaults on Type Index document, per-type overrides on individual registrations.
+**Clock Entry Identification:**
 
-#### 5.2.2. Client Installation Documents
+Vector clock entries are context-identified blank nodes using the pattern:
+`(document_IRI, crdt:clientId=<installation_IRI>)`
 
-Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for vector clock entries, and collaborative lifecycle management across the distributed system.
+**Merge Process:**
+1. **Causality Determination:** Compare vector clocks to determine document causality relationships
+2. **Property-by-Property Merging:** Apply CRDT rules (LWW-Register, OR-Set, etc.) to individual properties
+3. **Clock Updates:** Merge vector clocks using standard vector clock union algorithms
 
-Like all framework documents, Client Installation Documents follow the CRDT merge mechanics with their own merge contract specification.
+**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
+
+#### 5.2.3. Client Installation Documents
+
+Client IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for vector clock entries, and collaborative lifecycle management.
 
 **Discovery and Lifecycle:**
 1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
@@ -359,7 +376,8 @@ Like all framework documents, Client Installation Documents follow the CRDT merg
 3. **Registration:** Create installation document at discovered container location
 4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
 
-**Installation Lifecycle Properties:**
+**Installation Document Structure:**
+
 ```turtle
 <installation-uuid> a crdt:ClientInstallation;
    crdt:belongsToWebID <../profile/card#me>;
@@ -367,72 +385,6 @@ Like all framework documents, Client Installation Documents follow the CRDT merg
    crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime;
    crdt:lastActiveAt "2024-09-02T14:30:00Z"^^xsd:dateTime;
    sync:isGovernedBy mappings:client-installation-v1 .
-```
-
-**Type Index Cleanup Configuration:**
-
-The framework extends Type Index registrations with separate cleanup configuration properties for resource and property tombstones:
-
-**Resource Tombstone Configuration:**
-- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y for 2+ years)
-- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
-
-**Property Tombstone Configuration:**
-- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
-- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
-
-**Framework Defaults Hierarchy:**
-1. **Type Index defaults:** Cleanup properties on the Type Index document itself
-2. **Type-specific overrides:** Individual registrations can override Type Index defaults  
-3. **User control:** Framework never overwrites existing user-configured values
-
-**Example with Type Index Defaults:**
-```turtle
-# Type Index with framework-wide defaults
-<> a solid:TypeIndex;
-   # Framework adds these defaults if missing
-   crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
-   crdt:enableResourceTombstoneCleanup true;
-   crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
-   crdt:enablePropertyTombstoneCleanup true;
-   solid:hasRegistration [
-      a solid:TypeRegistration;
-      solid:forClass crdt:ClientInstallation;
-      solid:instanceContainer <../installations/>
-      # Uses Type Index defaults
-   ], [
-      a solid:TypeRegistration;
-      solid:forClass sync:ManagedDocument;
-      sync:managedResourceType schema:Recipe;
-      solid:instanceContainer <../data/recipes/>;
-      # Override: Keep recipe resource tombstones longer, property tombstones shorter
-      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration;
-      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration
-   ] .
-```
-
-**Framework Behavior:**
-- **Discovery:** Check Type Index for cleanup configuration (document-level defaults, registration-level overrides)
-- **Missing properties:** Add Type Index defaults without overwriting user values
-- **Respect user settings:** Never modify existing user-configured cleanup settings
-- **Per-type flexibility:** Individual registrations can override Type Index defaults for both tombstone types
-
-**Type Index Registration Example:**
-```turtle
-# In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
-@prefix solid: <http://www.w3.org/ns/solid/terms#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-
-<> solid:hasRegistration [
-      a solid:TypeRegistration;
-      solid:forClass crdt:ClientInstallation;
-      solid:instanceContainer <../installations/>;
-      # Override default cleanup configuration
-      crdt:resourceTombstoneRetentionPeriod "P1Y"^^xsd:duration;
-      crdt:enableResourceTombstoneCleanup true;
-      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration;
-      crdt:enablePropertyTombstoneCleanup true
-   ] .
 ```
 
 **Client ID Generation Process:**
@@ -444,52 +396,80 @@ The framework extends Type Index registrations with separate cleanup configurati
 4. **Register installation:** POST installation document to container
 5. **Use in vector clocks:** Reference full installation IRI in `crdt:clientId`
 
-**Example Generation:**
-```
-1. Container: https://alice.podprovider.org/installations/
-2. UUID v4: 550e8400-e29b-41d4-a716-446655440000
-3. Installation IRI: https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000
-4. Vector clock usage: crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000>
-```
-
-**Benefits of This Approach:**
-- **Uniqueness:** UUID v4 provides collision-resistant identifiers
-- **Traceability:** Installation documents link clients to WebIDs and applications  
-- **No Coordination:** Each client generates IDs independently without coordination
-- **Interoperability:** Different applications can discover and understand each other's installations
-- **Lifecycle Management:** Enables collaborative lifecycle tracking and cleanup
-
 **Installation Lifecycle Management:**
 
 *Self-Managed Properties (Installation Should Only Update Its Own):*
-- **`crdt:lastActiveAt`:** Installation should only update its own activity timestamp
+- **`crdt:lastActiveAt`:** Installation updates its own activity timestamp
   - **Update triggers:** Sync operations
-  - **Frequency:** Every sync cycle, limited to once per hour to prevent excessive updates
-  - **CRDT Algorithm:** `crdt:LWW_Register` (standard timestamp-based resolution)
-  - **Convention:** Applications should only update `lastActiveAt` for their own installation documents
-- **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (ISO 8601 duration, defaults to P6M)
-  - **CRDT Algorithm:** `crdt:LWW_Register` (allows threshold updates)
-  - **Convention:** Applications should only update their own installation's inactivity threshold
+  - **Frequency:** Limited to once per hour to prevent excessive updates
+  - **CRDT Algorithm:** `crdt:LWW_Register`
+- **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (defaults to P6M)
 
 *Identity Properties (Set Once at Creation):*
-- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable` (no updates after creation)
+- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable`
 
-**Installation Lifecycle and Cleanup:**
+**Installation Cleanup:**
+Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations to make tombstoning decisions.
 
-Inactive installations are handled through the general resource tombstoning mechanism described above:
+#### 5.2.4. Cleanup Configuration
 
-1. **Activity monitoring:** Other installations monitor `crdt:lastActiveAt` during collaborative operations
-2. **Tombstoning decision:** When an installation is inactive beyond its `crdt:maxInactivityPeriod` (or framework default), it gets tombstoned using `crdt:deletedAt` 
-3. **Cleanup configuration:** Retention periods configured per-type in Type Index with framework defaults fallback
-4. **Garbage collection:** Tombstoned installations cleaned up according to Type Index configuration using the cleanup timing from `crdt:deletedAt`
+The framework provides configurable retention policies for tombstoned resources, recognizing their different risk profiles.
 
-#### 5.2.3. Standard CRDT Library Examples
+**Cleanup Configuration Properties:**
+
+**Resource Tombstone Configuration:**
+- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
+- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
+- **Risk:** Zombie deletions can affect recreated resources with same IRI
+
+**Property Tombstone Configuration:**
+- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
+- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
+- **Risk:** Deleted property values may reappear, but resource remains intact
+
+**Configuration Hierarchy:**
+
+**Framework Defaults Hierarchy:**
+1. **Type Index defaults:** Cleanup properties on the Type Index document itself
+2. **Type-specific overrides:** Individual registrations can override Type Index defaults  
+3. **User control:** Framework never overwrites existing user-configured values
+
+**Example Type Index Configuration:**
+```turtle
+# Type Index with framework-wide defaults
+<> a solid:TypeIndex;
+   # Framework adds these defaults if missing
+   crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
+   crdt:enableResourceTombstoneCleanup true;
+   crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
+   crdt:enablePropertyTombstoneCleanup true;
+   solid:hasRegistration [
+      a solid:TypeRegistration;
+      solid:forClass sync:ManagedDocument;
+      sync:managedResourceType schema:Recipe;
+      solid:instanceContainer <../data/recipes/>;
+      # Override: Keep recipe resource tombstones longer
+      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration;
+      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration
+   ] .
+```
+
+**Cleanup Process:**
+1. **Cleanup Timing:** Use `max(crdt:deletedAt)` plus configured retention period for garbage collection
+2. **Efficient Discovery:** Tombstoned resources are tracked in the Framework Garbage Collection Index (see Section 5.3.4)
+3. **Trade-offs:** This approach allows "late deletions" to affect recreated content, but supports semantic IRI reuse patterns
+
+#### 5.2.5. Standard CRDT Library Examples
 
 **Example: Standard CRDT Library `crdt-v1`**
-This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping, which imports the existing [`statement-v1.ttl`](../mappings/statement-v1.ttl) for tombstone handling and defines predicate-based mappings for vector clock entries.
+This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping.
+
+**Key Global Predicate Mappings:**
+- **`crdt:clientId`:** Always uses LWW_Register and identifies blank nodes (vector clock entries)
+- **`crdt:clockValue`:** Always uses LWW_Register for clock values
+- **`crdt:deletedAt`:** Always uses OR-Set semantics for both resource and property tombstones
 
 **Example: Application-Specific Rules File `recipe-v1`**
-This file, created by application developers (or better even: by some code generation tool based on annotations on the developer's classes, if such a tool is provided by e.g. the library authors), imports the CRDT library and adds application-specific mappings.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -519,19 +499,32 @@ This file, created by application developers (or better even: by some code gener
      [ sync:predicate schema:protein; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
-
-**Example: The Mechanics embedded in `https://alice.podprovider.org/data/recipes/tomato-basil-soup`**
-This shows the full recipe resource with the CRDT mechanics included.
+**Example: Complete Resource with CRDT Mechanics**
 
 ```turtle
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix schema: <https://schema.org/> .
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix : <#> .
-# ... other prefixes and primary data from Layer 1 ...
 
-# -- CRDT Mechanics --
+# -- The Recipe Data (Layer 1) --
+:it a schema:Recipe;
+   schema:name "Tomato Soup" ;
+   schema:keywords "vegan", "soup" ;
+   schema:recipeIngredient "2 lbs fresh tomatoes", "1 cup fresh basil" ;
+   schema:totalTime "PT30M" .
+
+# -- Document Metadata --
+<> a sync:ManagedDocument;
+   foaf:primaryTopic :it;
+   sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
+   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
+
+# -- Vector Clock (Layer 2 Mechanics) --
 <> crdt:hasClockEntry [
     crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
     crdt:clockValue "15"^^xsd:integer
@@ -540,12 +533,9 @@ This shows the full recipe resource with the CRDT mechanics included.
     crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
     crdt:clockValue "8"^^xsd:integer
   ] ;
-  # A pre-calculated hash of the clock for efficient index updates
   crdt:vectorClockHash "xxh64:abcdef1234567890" .
 
-# RDF Reification tombstone for a deleted keyword
-# Note: RDF Reification is semantically correct for tombstones (vs RDF-Star which would assert the triple)
-# Fragment identifier generated deterministically from the deleted triple
+# -- Property Tombstone Example --
 <#crdt-tombstone-f8e4d2b1> a rdf:Statement;
   rdf:subject :it;
   rdf:predicate schema:keywords;
@@ -585,50 +575,40 @@ This resource uses semantic date-based organization, reflecting when the shoppin
    idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
 ```
 
-#### 5.2.4. CRDT Merge Mechanics
+#### 5.2.6. Property Mapping vs. Predicate Mapping Semantics
 
-The state-based merge process follows standard CRDT algorithms adapted for RDF. The merge contract specifies which CRDT type to use for each property (LWW-Register, OR-Set, etc.), and the library performs property-by-property merging using **document-level vector clocks** for causality determination. Each resource document (e.g., a complete Recipe or Shopping List Entry) has a single vector clock that tracks changes to the entire document, keeping the original resource content clean.
+**Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
 
-**RDF Reification for Tombstones:**
+**Property Mapping (Class-Scoped Rules):**
+- Rules defined within `sync:ClassMapping` apply **only within that specific class context**
+- Example: In `mappings:statement-v1`, `rdf:subject` uses LWW_Register **only when within `rdf:Statement` resources**
+- **Use case:** Class-specific behavior where the same predicate may have different merge semantics in different contexts
 
-This architecture uses **RDF Reification** to represent tombstones for deleted triples. RDF Reification is the semantically correct approach for this use case because:
-
-- **Tombstone Semantics:** We need to mark statements as deleted without asserting them
-- **RDF-Star Incompatibility:** RDF-Star syntax (`<< :it schema:keywords "deleted" >>`) would assert the triple, which is semantically incorrect for deletions
-- **Reification Advantages:** RDF Reification allows us to make statements about statements without asserting the original statement
-- **Implementation:** We use RDF 1.1 Reification vocabulary (`rdf:Statement`, `rdf:subject`, `rdf:predicate`, `rdf:object`) to represent deleted triples
-- **Timestamp-Based Deletion State:** Tombstones use `crdt:deletedAt` timestamps to mark deletion state, while document-level vector clocks handle merge causality determination
-
-**Vector Clock Example at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`:**
 ```turtle
-@prefix schema: <https://schema.org/> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix : <#> .
-
-# -- The Recipe Data --
-:it a schema:Recipe ;
-    schema:name "Tomato Soup" ;
-    schema:keywords "vegan", "soup" ;
-    schema:recipeIngredient "2 cans tomatoes", "1 onion" ;
-    schema:recipeInstructions "Sauté onion, add tomatoes, simmer 20 minutes." ;
-    schema:totalTime "PT30M" .
-    
-# -- Document-level Vector Clock --
-<> crdt:hasClockEntry [
-    crdt:clientId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
-    crdt:clockValue "5"^^xsd:integer
-  ] ,
-  [
-    crdt:clientId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
-    crdt:clockValue "2"^^xsd:integer
-  ] ;
-  crdt:vectorClockHash "xxh64:abcdef1234567890" .
+# Property mapping: rdf:subject behavior scoped to rdf:Statement context
+mappings:statement-v1 a sync:ClassMapping;
+   sync:appliesToClass rdf:Statement;
+   sync:rule
+     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
-**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
+**Predicate Mapping (Global Rules):**
+- Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
+- Example: In `mappings:crdt-v1`, `crdt:clientId` **always** identifies blank nodes and **always** uses LWW_Register
+- Example: In `mappings:crdt-v1`, `crdt:deletedAt` **always** uses OR-Set semantics for both resource and property tombstones
+- **Use case:** Framework-level predicates with consistent behavior regardless of context
 
-#### 5.2.5. Vocabulary Versioning and Evolution
+```turtle
+# Predicate mapping: Global behavior across all contexts
+<#clock-mappings> a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
+```
+
+**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW_Register when within `schema:Recipe` resources but could theoretically use OR_Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:clientId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
+
+#### 5.2.7. Vocabulary Versioning and Evolution
 
 **Versioning Strategy:**
 
@@ -656,37 +636,6 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Clients gracefully handle unknown properties within same major version
 - Different contract versions use conservative merge approach
 - Framework vocabularies evolve through major version URI changes when needed
-
-#### 5.2.6. Property Mapping vs. Predicate Mapping Semantics
-
-**Critical Distinction:** The framework supports two fundamentally different scoping approaches for merge rules, each serving different purposes:
-
-**Property Mapping (Class-Scoped Rules):**
-- Rules defined within `sync:ClassMapping` apply **only within that specific class context**
-- Example: In `mappings:statement-v1`, `rdf:subject` uses LWW_Register **only when within `rdf:Statement` resources**
-- **Use case:** Class-specific behavior where the same predicate may have different merge semantics in different contexts
-
-```turtle
-# Property mapping: rdf:subject behavior scoped to rdf:Statement context
-mappings:statement-v1 a sync:ClassMapping;
-   sync:appliesToClass rdf:Statement;
-   sync:rule
-     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
-```
-
-**Predicate Mapping (Global Rules):**
-- Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
-- Example: In `mappings:crdt-v1`, `crdt:clientId` **always** identifies blank nodes and **always** uses LWW_Register
-- **Use case:** Framework-level predicates with consistent behavior regardless of context
-
-```turtle
-# Predicate mapping: crdt:clientId behavior is global across all contexts
-<#clock-mappings> a sync:PredicateMapping;
-   sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ] .
-```
-
-**Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW_Register when within `schema:Recipe` resources but could theoretically use OR_Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:clientId` maintain consistent semantics everywhere.
 
 ### 5.3. Layer 3: The Indexing Layer
 

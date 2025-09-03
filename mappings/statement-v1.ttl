@@ -12,8 +12,4 @@ mappings:statement-v1 a sync:ClassMapping;
      # The subject, predicate, and object of the reified statement are immutable identifiers
      [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ],
      [ sync:predicate rdf:predicate; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate rdf:object; crdt:mergeWith crdt:LWW_Register ],
-     
-     # The deletion timestamp uses OR-Set semantics for property tombstones
-     # Applied to reified statements to mark individual property values as deleted
-     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
+     [ sync:predicate rdf:object; crdt:mergeWith crdt:LWW_Register ] .
