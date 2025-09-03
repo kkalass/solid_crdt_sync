@@ -775,14 +775,14 @@ When creating any new index, it enters "populating" state with appropriate popul
 2. **CRDT merge:** Merge with local processing state
 3. **Check completeness:** Verify if shard needs processing
 4. **Population work:** Read resources, populate both temporary + target shards
-5. **Completion marking:** Set `crdt:tombstonedAt`, add to garbage collection index
+5. **Completion marking:** Mark shard as completed in OR-Set
 6. **Upload:** PUT updated shard to Pod
 
 **State Transition to Active:**
 
 *LWW-Register State Machine for `idx:populationState`:*
 1. **Initial State:** Index created with `idx:populationState "populating"`
-2. **Completion Detection:** Installation detects all populating shards have `crdt:tombstonedAt` 
+2. **Completion Detection:** Installation detects all populating shards are completed
 3. **State Update:** Installation attempts `idx:populationState "active"` with current Hybrid Logical Clock
 4. **Collaborative Resolution:** Multiple installations may attempt transition simultaneously
    - LWW-Register ensures deterministic convergence to "active" state
@@ -1085,7 +1085,6 @@ Having established the architectural layers, we now examine advanced topics that
 
 **Indexed Resource Types:**
 - **User Data Resources:** Any `sync:ManagedDocument` with `crdt:deletedAt` timestamps
-- **Framework Resources:** `crdt:TombstonedShard` from completed populating operations
 - **Client Installations:** `crdt:ClientInstallation` marked for cleanup after inactivity periods
 
 **Index Configuration:**
@@ -1225,7 +1224,7 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 
 *Tombstoned State (Proposed):*
 - **Trigger:** Deprecated for extended period (e.g., 1 year) with no reactivation
-- **Properties:** `crdt:tombstonedAt` timestamp set
+- **Properties:** `crdt:deletedAt` timestamp set
 - **Behavior:** Marked for garbage collection, should not be reactivated
 - **Cleanup:** Framework GC index tracks for automated cleanup
 

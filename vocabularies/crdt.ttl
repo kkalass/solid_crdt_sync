@@ -154,7 +154,3 @@ crdt:deletedAt a rdf:Property;
     rdfs:comment "Timestamp marking when a resource or property value was deleted. Uses OR-Set semantics to support deletion/undeletion cycles for IRI reuse scenarios. Applied to both complete resources (document-level) and individual property values (via RDF Reification statements). Resource/value is considered deleted if this property has any values. For cleanup, use the latest timestamp plus retention period.";
     rdfs:domain [ a owl:Class; owl:unionOf (rdfs:Resource rdf:Statement) ];
     rdfs:range xsd:dateTime .
-
-crdt:TombstonedShard a rdfs:Class;
-    rdfs:label "Tombstoned Shard";
-    rdfs:comment "A populating shard that has completed its processing and is marked for garbage collection. Used in framework garbage collection indices to track temporary resources that can be safely deleted after a threshold period." .
