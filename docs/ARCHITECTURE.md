@@ -47,6 +47,12 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 - Used for properties where re-addition after removal should be prevented
 - Requires stable object identity for tombstone operations
 
+**Immutable:**
+- Framework-specific constraint (not a traditional CRDT algorithm)
+- Used for properties that must never change after creation
+- Examples: Resource creation timestamps, installation identifiers, structural configurations
+- Conflict resolution: Merge fails if different values encountered, forces resource versioning
+
 **Hybrid Logical Clock (HLC):**
 - Combines logical causality tracking with physical wall-clock timestamps
 - Provides tamper-resistant causality determination and intuitive tie-breaking
@@ -496,13 +502,19 @@ mappings:statement-v1 a sync:ClassMapping;
 
 **Semantic Impact:** This distinction is crucial for understanding merge behavior. A predicate like `schema:name` might use LWW-Register when within `schema:Recipe` resources but could theoretically use OR-Set when within `schema:Organization` resources if different mapping contracts specify different behaviors. However, framework predicates like `crdt:installationId` and `crdt:deletedAt` maintain consistent semantics everywhere through global predicate mappings.
 
-#### 4.2.2. Standard CRDT Library Examples
+#### 4.2.2. Merge Contract Import Hierarchy and Examples
 
-This section provides concrete examples of how merge contracts work in practice, showing both the RDF data structure and the CRDT mapping rules that govern conflict resolution.
+This section demonstrates how the hierarchical import system works in practice, showing how framework-provided mappings are reused across different application domains.
 
-**Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
+##### 4.2.2.1. Framework Import Mechanism
 
-This resource uses semantic date-based organization, reflecting when the shopping list was created (an invariant property). It shows how shopping list entries are derived from recipes in the meal planning workflow.
+The framework provides a reusable mapping library (`mappings:crdt-v1`) that defines standard behavior for all CRDT infrastructure predicates. Applications import this library and add their domain-specific rules on top.
+
+##### 4.2.2.2. Complete Example: Shopping List Entry
+
+**Data Resource:** `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`
+
+This resource demonstrates semantic date-based organization and shows how shopping list entries integrate with the meal planning workflow.
 
 ```turtle
 @prefix schema: <https://schema.org/> .
@@ -547,10 +559,10 @@ Now let's examine what the `shopping-entry-v1` merge contract actually contains.
 
 <> a sync:DocumentMapping;
    # Import the standard CRDT vocabulary mappings (framework-provided)
-   sync:imports mappings:crdt-v1;
+   sync:imports ( mappings:crdt-v1 );
    
    # Define shopping-specific property mappings
-   sync:hasMapping [
+   sync:classMapping ( [
      a sync:ClassMapping;
      sync:appliesToClass meal:ShoppingListEntry;
      sync:rule
@@ -560,57 +572,24 @@ Now let's examine what the `shopping-entry-v1` merge contract actually contains.
        [ sync:predicate meal:derivedFrom; crdt:mergeWith crdt:LWW_Register ],
        [ sync:predicate meal:requiredForDate; crdt:mergeWith crdt:LWW_Register ],
        [ sync:predicate schema:dateCreated; crdt:mergeWith crdt:LWW_Register ]
-   ] .
+   ] ) .
 ```
 
-**How This Contract Works:**
+##### 4.2.2.3. The Contract Hierarchy
 
-1. **Framework Import:** `sync:imports mappings:crdt-v1` brings in the standard CRDT framework mappings that define behavior for `crdt:installationId`, `crdt:deletedAt`, `crdt:logicalTime`, etc. These global predicate mappings work consistently across all resources.
+**How Import Resolution Works:**
 
-2. **Application Rules:** The `sync:ClassMapping` defines how shopping list entry properties should be merged. In this case, all properties use `crdt:LWW_Register` (Last Writer Wins) because shopping items are typically managed by a single user and conflicts are rare.
+1. **Framework Import:** `sync:imports ( mappings:crdt-v1 )` brings in standard CRDT framework mappings for infrastructure predicates like `crdt:installationId`, `crdt:deletedAt`, `crdt:logicalTime`. These use global predicate mappings for consistent behavior across all contexts.
 
-3. **Layered Resolution:** When merging a shopping list entry, the framework first applies the global predicate mappings (for clock metadata) and then applies the class-scoped property mappings (for shopping data).
+2. **Application Rules:** The local `sync:classMapping` defines domain-specific merge behavior for `meal:ShoppingListEntry` properties. All properties use `crdt:LWW_Register` since shopping items are typically single-user managed.
 
-This demonstrates the architecture's separation between framework concerns (managed globally) and application concerns (defined per class). The import mechanism allows applications to focus on their domain-specific rules while inheriting standard behavior for CRDT infrastructure.
+3. **Precedence Resolution:** Conflicts are resolved using deterministic precedence order (why `rdf:List` is used instead of multi-valued properties):
+   1. **Local Class Mappings** (highest priority) - `sync:classMapping` 
+   2. **Local Predicate Mappings** - `sync:predicateMapping`
+   3. **Imported Libraries** (lowest priority) - `sync:imports` in list order
+   
+   This ordered resolution enables application-specific customization while inheriting framework infrastructure.
 
-**Example: Class-Scoped Property Mapping**
-
-The following shows how `rdf:subject` uses LWW-Register **only when within `rdf:Statement` resources**:
-
-```turtle
-# Property mapping: rdf:subject behavior scoped to rdf:Statement context
-mappings:statement-v1 a sync:ClassMapping;
-   sync:appliesToClass rdf:Statement;
-   sync:rule
-     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
-```
-
-**Example: Global Predicate Mapping**
-
-Framework predicates maintain consistent behavior across all contexts through global predicate mappings:
-
-```turtle
-# Predicate mapping: Global behavior across all contexts
-<#clock-mappings> a sync:PredicateMapping;
-   sync:rule
-     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
-```
-
-**Example: OR-Set for Multi-Value Properties**
-
-Keywords in recipes use OR-Set semantics to allow multiple editors to add tags concurrently:
-
-```turtle
-mappings:recipe-v1 a sync:ClassMapping;
-   sync:appliesToClass schema:Recipe;
-   sync:rule
-     [ sync:predicate schema:name; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate schema:keywords; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate schema:recipeIngredient; crdt:mergeWith crdt:OR_Set ] .
-```
 
 #### 4.2.3. Hybrid Logical Clock Mechanics
 
@@ -630,7 +609,7 @@ The state-based merge process uses **document-level Hybrid Logical Clocks (HLC)*
     crdt:physicalTime "1693824550000"^^xsd:long
   ] ;
   # Pre-calculated hash for efficient index operations (includes both logical and physical times)
-  crdt:clockHash "xxh64:abcdef1234567890" .
+  crdt:clockHash "xxh64:abcdef1234567890" .  # Framework standard: xxh64 algorithm
 ```
 
 **CRDT Literature Mapping:** The `crdt:installationId` property corresponds to what CRDT literature typically calls "client ID" or "node ID." We use "installation" to distinguish from Solid OIDC client identifiers, which identify applications rather than specific installation instances.
@@ -679,8 +658,8 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 - Incompatible CRDT merge behavior changes
 
 **Client Compatibility:**
-- Clients gracefully handle unknown properties within same major version
-- Different contract versions use conservative merge approach
+- Clients handle unknown properties by defaulting to `crdt:LWW_Register` merge behavior when using known contracts
+- Different or unknown contracts trigger fallback to document-level `crdt:LWW_Register` (entire resource wins based on Hybrid Logical Clock)
 - Framework vocabularies evolve through major version URI changes when needed
 
 ### 4.3. Layer 3: The Indexing Layer
@@ -716,9 +695,6 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 * **`idx:shardingAlgorithm`:** Specifies the sharding algorithm configuration
 * **`idx:GroupingRule`:** Class defining how resources are assigned to groups
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
-
-**Application Vocabulary:**
-Applications define their own domain-specific vocabularies (e.g., `meal:ShoppingListEntry`, `meal:requiredForDate`) which are separate from the specification vocabulary but work within the specification's structure.
 
 #### 4.3.1. Sharding Overview
 
@@ -801,8 +777,8 @@ When installations attempt to create indices with conflicting immutable properti
 
 **Performance Impact Management:**
 - **Write overhead awareness:** Every additional index increases write operation overhead for all installations
-- **Property-level optimization:** Remove unused `idx:indexedProperty` entries when last reader is tombstoned
-- **Reader list maintenance:** Tombstoned installations removed from `idx:readBy` lists, enabling index deprecation when no active readers remain
+- **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.3 for index lifecycle management)
+- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.3)
 
 #### 4.3.3. Collaborative Bootstrap and Index Population
 
@@ -976,7 +952,7 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
    # Resources within each group are assigned to shards using: hash(resourceIRI) % numberOfShards
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";
+     idx:hashAlgorithm "xxhash64";  # Framework standard: xxhash64 provides fast, consistent hashing
      idx:numberOfShards 4
    ] ;
    sync:isGovernedBy mappings:group-index-template-v1;
@@ -1024,6 +1000,8 @@ This document contains entries pointing to shopping list data resources from Aug
 <> a idx:Shard;
    sync:isGovernedBy mappings:shard-v1;
    idx:isShardOf <index>; # Back-link to its GroupIndex document
+   # Note: Shard entries do not require explicit typing (a idx:ShardEntry) for space efficiency.
+   # Instead, idx:resource is marked as identifying at the predicate level in mappings:shard-v1.
    idx:containsEntry [
      idx:resource <../../../../data/shopping-entries/created/2024/08/weekly-shopping-001>;
      crdt:clockHash "xxh64:abcdef1234567890"
@@ -1046,7 +1024,19 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
 <> a idx:FullIndex;
    idx:indexesClass schema:Recipe;
    # Include properties needed for recipe browsing UI
-   idx:indexedProperty schema:name, schema:keywords, schema:totalTime;
+   idx:indexedProperty [
+     a idx:IndexedProperty;
+     idx:property schema:name;
+     idx:readBy <installation-1>, <installation-2>
+   ], [
+     a idx:IndexedProperty;
+     idx:property schema:keywords;
+     idx:readBy <installation-1>, <installation-2>
+   ], [
+     a idx:IndexedProperty;
+     idx:property schema:totalTime;
+     idx:readBy <installation-1>, <installation-2>
+   ];
    # Default sharding for the recipe collection
    # Resources are assigned to shards using: hash(resourceIRI) % numberOfShards
    idx:shardingAlgorithm [
@@ -1166,9 +1156,11 @@ Having established the architectural layers, we now examine advanced topics that
 <gc-index-a1b2c3d4> a idx:FullIndex;
    # Index covers all tombstoned resource types
    idx:indexedProperty [
+     a idx:IndexedProperty;
      idx:property crdt:deletedAt;          # Deletion timestamps for all resources
      idx:readBy <installation-1>, <installation-2>, <installation-3>
    ], [
+     a idx:IndexedProperty;
      idx:property rdf:type;                # Resource type for cleanup process routing  
      idx:readBy <installation-1>, <installation-2>, <installation-3>
    ] ;
@@ -1265,10 +1257,12 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 ```turtle
 <> a idx:FullIndex;
    idx:indexedProperty [
+     a idx:IndexedProperty;
      idx:property schema:name;
      idx:readBy <installation-1>, <installation-2>  # OR-Set of active readers
    ],
    [
+     a idx:IndexedProperty;
      idx:property schema:keywords;
      idx:readBy <installation-1>  # Only one reader remaining
    ];
@@ -1435,7 +1429,7 @@ For comprehensive implementation guidance including specific error scenarios, re
 
 ## 8. Performance Characteristics
 
-### 10.1. Sync Strategy Performance Trade-offs
+### 8.1. Sync Strategy Performance Trade-offs
 
 The choice of sync strategy fundamentally determines application performance characteristics:
 
@@ -1454,7 +1448,7 @@ The choice of sync strategy fundamentally determines application performance cha
 - **Best for:** Large collections with unpredictable access patterns
 - **Trade-off:** Individual resource fetches add latency to data access
 
-### 10.2. Index-Based Change Detection
+### 8.2. Index-Based Change Detection
 
 The architecture's index-based approach provides efficient incremental synchronization:
 
@@ -1462,7 +1456,7 @@ The architecture's index-based approach provides efficient incremental synchroni
 - **Incremental Sync:** Download only changed shards through Hybrid Logical Clock hash comparison (O(k) where k = changed shards)
 - **Bandwidth Efficiency:** Index headers provide metadata without downloading full resources
 
-### 10.3. Architecture Performance Benefits
+### 8.3. Architecture Performance Benefits
 
 - **Parallel Fetching:** Sharded indices enable concurrent synchronization
 - **Partial Failure Resilience:** Failed shards don't block others
@@ -1473,7 +1467,7 @@ For detailed performance analysis, benchmarks, optimization strategies, and mobi
 
 ## 9. Data Organization Principles
 
-### 11.1. Resource IRI Design and Pod Performance
+### 9.1. Resource IRI Design and Pod Performance
 
 **The Challenge:**
 Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
@@ -1526,13 +1520,13 @@ For small collections (< 1000 resources), flat structure is acceptable:
 
 ## 11. Alignment with Standardization Efforts
 
-### 13.1. Community Alignment
+### 11.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 13.2. Architectural Differentiators
+### 11.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.

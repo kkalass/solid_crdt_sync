@@ -3,7 +3,20 @@
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
-mappings:shard-v1 a sync:ClassMapping;
+mappings:shard-v1 a sync:DocumentMapping;
+   # Import standard CRDT mappings 
+   sync:imports ( mappings:crdt-v1 );
+   # Define class-specific rules for shards
+   sync:classMapping ( <#shard-class> );
+   # Define predicate-level rules for shard entries
+   sync:predicateMapping ( <#shard-entry-predicates> ) .
+
+<#shard-class> a sync:ClassMapping;
    sync:appliesToClass idx:Shard;
    sync:rule
-     [ sync:property idx:containsEntry; crdt:mergeWith crdt:2P_Set ].
+     [ sync:predicate idx:containsEntry; crdt:mergeWith crdt:2P_Set ] .
+
+# Predicate-level rules for typeless shard entries (idx:ShardEntry instances)
+<#shard-entry-predicates> a sync:PredicateMapping;
+   sync:rule
+     [ sync:predicate idx:resource; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ] .

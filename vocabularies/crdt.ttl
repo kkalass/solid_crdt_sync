@@ -76,7 +76,7 @@ crdt:physicalTime a rdf:Property;
 
 crdt:clockHash a rdf:Property;
     rdfs:label "clock hash";
-    rdfs:comment "A pre-calculated, lightweight hash of the resource's full Hybrid Logical Clock, used for efficient change detection in indices. Hash includes both logical and physical time components.";
+    rdfs:comment "A pre-calculated, lightweight hash of the resource's full Hybrid Logical Clock, used for efficient change detection in indices. Hash includes both logical and physical time components. Domain is kept general (rdfs:Resource) to allow usage in various contexts including idx:ShardEntry instances.";
     rdfs:domain rdfs:Resource;
     rdfs:range xsd:string .
 

@@ -47,6 +47,14 @@ idx:Shard a rdfs:Class;
     rdfs:comment "A document that contains a list of entries, each pointing to a data resource and its associated metadata (e.g., Hybrid Logical Clock hash)." ;
     rdfs:subClassOf foaf:Document .
 
+idx:ShardEntry a rdfs:Class;
+    rdfs:label "Shard Entry";
+    rdfs:comment "A structured entry within a shard that contains a reference to a data resource plus optional header properties and required clock hash metadata." .
+
+idx:IndexedProperty a rdfs:Class;
+    rdfs:label "Indexed Property";
+    rdfs:comment "A configuration object that specifies which property should be indexed and tracks which installations actively read from it. Used within idx:indexedProperty to enable property-level reader management." .
+
 # --- Property Definitions ---
 
 idx:belongsToIndexShard a rdf:Property;
@@ -63,9 +71,9 @@ idx:indexesClass a rdf:Property;
 
 idx:indexedProperty a rdf:Property;
     rdfs:label "indexed property";
-    rdfs:comment "Specifies a property from the data resource that should be included in the index entries.";
+    rdfs:comment "Links an index to an IndexedProperty configuration object that specifies which property should be indexed and tracks which installations read from it.";
     rdfs:domain [ a owl:Class; owl:unionOf (idx:FullIndex idx:GroupIndexTemplate) ];
-    rdfs:range rdf:Property .
+    rdfs:range idx:IndexedProperty .
 
 idx:hasShard a rdf:Property;
     rdfs:label "has shard";
@@ -141,14 +149,14 @@ idx:basedOn a rdf:Property;
 
 idx:containsEntry a rdf:Property;
     rdfs:label "contains entry";
-    rdfs:comment "Links a Shard to an entry, which points to a data resource and its associated metadata (e.g., Hybrid Logical Clock hash)." ;
+    rdfs:comment "Links a Shard to a structured entry containing resource reference and metadata." ;
     rdfs:domain idx:Shard ;
-    rdfs:range rdfs:Resource .
+    rdfs:range idx:ShardEntry .
 
 idx:readBy a rdf:Property;
     rdfs:label "read by";
     rdfs:comment "An OR-Set of installation IRIs that actively read from this index or specific indexed property. Used for collaborative lifecycle management and property cleanup when readers are tombstoned.";
-    rdfs:domain [ a owl:Class; owl:unionOf (idx:Index rdfs:Resource) ];
+    rdfs:domain [ a owl:Class; owl:unionOf (idx:Index idx:IndexedProperty) ];
     rdfs:range rdfs:Resource .
 
 idx:deprecatedAt a rdf:Property;
@@ -168,3 +176,15 @@ idx:hasPopulatingShard a rdf:Property;
     rdfs:comment "References temporary populating shards used during distributed index creation. These shards are tombstoned when population is complete. Uses OR-Set for collaborative shard management.";
     rdfs:domain idx:Index;
     rdfs:range rdfs:Resource .
+
+idx:resource a rdf:Property;
+    rdfs:label "resource";
+    rdfs:comment "Points to the actual data resource from a shard entry. Links shard entry metadata to the primary resource.";
+    rdfs:domain idx:ShardEntry;
+    rdfs:range rdfs:Resource .
+
+idx:property a rdf:Property;
+    rdfs:label "property";
+    rdfs:comment "Specifies which property is being tracked in an indexed property configuration object.";
+    rdfs:domain idx:IndexedProperty;
+    rdfs:range rdf:Property .
