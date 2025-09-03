@@ -310,9 +310,11 @@ Before examining specific document types, it's important to understand how delet
 Resources are marked as deleted using the `crdt:deletedAt` property with OR-Set semantics. This approach supports deletion/undeletion cycles, which is essential for semantic IRI naming where users might recreate resources with the same name (e.g., deleting and recreating a "tomato soup" recipe).
 
 **Key Properties:**
-- **State Determination:** A resource is considered deleted if `crdt:deletedAt` has any values
-- **Merge Behavior:** OR-Set union across all replicas - timestamps can be added or removed
-- **Cleanup Timing:** Use the latest timestamp plus configured retention period for garbage collection
+- **Multi-Value Set:** `crdt:deletedAt` is a set of deletion timestamps (OR-Set semantics)
+- **State Determination:** A resource is considered deleted if `crdt:deletedAt` set is non-empty, undeleted if set is empty
+- **Merge Behavior:** OR-Set union across all replicas - timestamps can be added (delete) or removed (undelete)
+- **Cleanup Timing:** Use `max(crdt:deletedAt)` plus configured retention period for garbage collection
+- **Undeletion:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
 
 **Trade-offs:** This approach allows "late deletions" to affect recreated content. If Client A deletes and recreates a resource, but Client B's deletion syncs afterward, the resource may appear deleted despite new content being present. This is an acceptable trade-off for supporting semantic IRI reuse patterns.
 
@@ -320,7 +322,13 @@ Resources are marked as deleted using the `crdt:deletedAt` property with OR-Set 
 
 Individual values within multi-value properties (OR-Set, 2P-Set) are deleted using RDF Reification tombstones with `crdt:deletedAt` timestamps. This mechanism enables precise deletion of specific values without affecting other values of the same property.
 
-**Implementation:** Uses RDF Reification with deterministic fragment identifiers for tombstone statements, allowing precise targeting of deleted values within CRDT sets. Property tombstones use the same `crdt:deletedAt` property as resource tombstones.
+**Key Properties:**
+- **Multi-Value Set:** Property tombstones also use `crdt:deletedAt` as a set of deletion timestamps
+- **State Determination:** Property value is deleted if its tombstone's `crdt:deletedAt` set is non-empty
+- **Undeletion Mechanics:** Remove timestamps from tombstone's set by creating tombstones-of-tombstones targeting specific deletion timestamps
+- **Fragment Identifiers:** Deterministic generation using XXH64 hash of canonical N-Triple prevents conflicts while allowing collaborative tombstone creation
+
+**Implementation:** Uses RDF Reification with deterministic fragment identifiers for tombstone statements, allowing precise targeting of deleted values within CRDT sets. Property tombstones use the same `crdt:deletedAt` OR-Set property as resource tombstones, creating a harmonized deletion system.
 
 **Cleanup Configuration:** 
 
@@ -588,7 +596,7 @@ This architecture uses **RDF Reification** to represent tombstones for deleted t
 - **RDF-Star Incompatibility:** RDF-Star syntax (`<< :it schema:keywords "deleted" >>`) would assert the triple, which is semantically incorrect for deletions
 - **Reification Advantages:** RDF Reification allows us to make statements about statements without asserting the original statement
 - **Implementation:** We use RDF 1.1 Reification vocabulary (`rdf:Statement`, `rdf:subject`, `rdf:predicate`, `rdf:object`) to represent deleted triples
-- **Document-Level Timing:** Tombstones rely on the document-level vector clock rather than storing individual timestamps, simplifying implementation at the cost of preventing compaction
+- **Timestamp-Based Deletion State:** Tombstones use `crdt:deletedAt` timestamps to mark deletion state, while document-level vector clocks handle merge causality determination
 
 **Vector Clock Example at `https://alice.podprovider.org/data/recipes/tomato-basil-soup`:**
 ```turtle

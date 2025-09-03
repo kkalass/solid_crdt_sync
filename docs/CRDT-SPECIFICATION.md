@@ -49,6 +49,22 @@ Vector clocks track causality between client operations using structured entries
 2. Increment merging client's entry: `result[mergingClient]++`
 3. Update hash: `crdt:vectorClockHash = hash(result)`
 
+### 2.4. Vector Clocks vs Timestamps: Distinct Roles
+
+**Two Complementary Systems:** The framework uses both vector clocks and `crdt:deletedAt` timestamps, each serving distinct purposes:
+
+**Vector Clocks (Causality Determination):**
+- **Purpose:** Determine which updates happened "before" or "after" others during merge conflicts
+- **Usage:** Compare document-level clocks to resolve OR-Set add vs remove conflicts (who wins)
+- **Example:** When merging conflicting states where Alice's version contains "spicy" (with document clock [Alice:5, Bob:4]) and Bob's version has tombstoned "spicy" (with document clock [Alice:3, Bob:4] when tombstone was created), Alice's add wins because her document clock dominates the tombstone's creation clock
+
+**`crdt:deletedAt` Timestamps (Deletion State & Cleanup):**
+- **Purpose:** Mark what is currently deleted and enable time-based cleanup policies
+- **Usage:** OR-Set semantics for deletion/undeletion cycles, garbage collection timing
+- **Example:** `crdt:deletedAt "2024-09-02T14:30:00Z"` marks a property value as deleted, supporting later undeletion by adding more timestamps
+
+**The Relationship:** Vector clocks answer "who wins during conflicts?" while timestamps answer "what is currently deleted and when can we clean it up?" Both systems work together - vector clocks drive the CRDT merge logic, timestamps handle deletion semantics and eventual cleanup.
+
 ## 3. CRDT Types and Algorithms
 
 ### 3.1. LWW-Register (Last Writer Wins Register)
@@ -89,7 +105,7 @@ A 2P-Set is used for multi-value properties where removal is permanent. Once an 
 
 **RDF Representation:**
 - **Additions:** The presence of a triple in the resource (e.g., `:it schema:keywords "vegan"`) signifies that the value is in the set.
-- **Removals:** A removal is marked with a simple, un-timestamped tombstone using RDF Reification, which is semantically correct for representing deleted statements without asserting them.
+- **Removals:** A removal is marked with a tombstone using RDF Reification with `crdt:deletedAt` timestamp, which is semantically correct for representing deleted statements without asserting them.
 
 ```turtle
 # The tombstone marks the triple as deleted using RDF Reification
@@ -116,8 +132,8 @@ A true OR-Set allows elements to be added and removed multiple times. The recomm
 An element's presence is determined by comparing the causality information of its addition (the document-level vector clock) and its removal (using the document-level vector clock at removal time).
 
 **RDF Representation:**
-- **Additions:** The presence of a triple in a version of a resource implies an "add" operation whose timestamp is the document-level vector clock.
-- **Removals:** A removal is marked with a **simple tombstone** using RDF Reification. The tombstone itself does NOT store its own vector clock - instead, it relies on the document-level vector clock of the resource version where the tombstone was created.
+- **Additions:** The presence of a triple in a version of a resource implies an "add" operation whose causality is tracked by the document-level vector clock.
+- **Removals:** A removal is marked with a **tombstone** using RDF Reification. The tombstone stores a `crdt:deletedAt` timestamp for deletion state, while causality comparison uses the document-level vector clock from when the tombstone was created.
 
 **Tombstone Structure:**
 ```turtle
@@ -129,7 +145,7 @@ An element's presence is determined by comparing the causality information of it
   rdf:object "spicy";
   crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 
-# The timing of this tombstone is determined by the document-level vector clock:
+# The causality of this tombstone (for merge conflicts) is determined by the document-level vector clock:
 <> crdt:hasClockEntry [
     crdt:clientId <client-that-deleted>;
     crdt:clockValue "5"^^xsd:integer
@@ -154,9 +170,72 @@ For each element `e`:
 
 This Add-Wins approach provides the desired OR-Set semantics (elements can be re-added) without requiring complex tags on every set element, thus preserving the clean, interoperable nature of the RDF data.
 
+**Detailed OR-Set Merge Algorithm:**
+
+```
+mergeORSet(localElements, localTombstones, localClock, 
+          remoteElements, remoteTombstones, remoteClock):
+  
+  // Combine all elements and tombstones from both replicas
+  allElements = localElements ∪ remoteElements
+  allTombstones = localTombstones ∪ remoteTombstones
+  
+  result = {}
+  
+  for each element e in allElements:
+    isDeleted = false
+    
+    // Check if element is tombstoned in either replica
+    for each tombstone t in allTombstones:
+      if t.targets(e):
+        // Compare element's presence clock vs tombstone's creation clock
+        elementClock = clockWhenElementWasAdded(e, localElements, localClock, remoteElements, remoteClock)
+        tombstoneClock = clockWhenTombstoneWasCreated(t, localTombstones, localClock, remoteTombstones, remoteClock)
+        
+        if tombstoneClock dominates elementClock:
+          isDeleted = true
+          break
+        elif elementClock dominates tombstoneClock:
+          continue  // Element wins, ignore this tombstone
+        else: // Concurrent
+          // Add-Wins policy: keep element on concurrent add/remove
+          continue
+    
+    if not isDeleted:
+      result.add(e)
+  
+  return result
+```
+
+**Undeletion Mechanics and Recursion Handling:**
+
+The OR-Set semantics for `crdt:deletedAt` enables undeletion through tombstone-of-tombstone creation:
+
+**Undeletion Process:**
+1. **Target Specific Timestamp:** Create tombstone targeting the specific `crdt:deletedAt` timestamp to be removed
+2. **Self-Limiting Recursion:** Each delete/undelete cycle uses fresh timestamps, preventing infinite recursion
+3. **Temporal Differentiation:** Tombstones target specific historical deletion events, not the deletion mechanism itself
+
+**Example Cycle:**
+```turtle
+# Step 1: Delete "spicy" 
+<#tomb-1> rdf:subject :it; rdf:predicate schema:keywords; rdf:object "spicy";
+          crdt:deletedAt "2024-09-02T14:30:00Z" .
+
+# Step 2: Undelete "spicy" (tombstone the tombstone's timestamp)
+<#tomb-2> rdf:subject <#tomb-1>; rdf:predicate crdt:deletedAt; 
+          rdf:object "2024-09-02T14:30:00Z"; crdt:deletedAt "2024-09-03T10:00:00Z" .
+
+# Step 3: Delete "spicy" again (NEW timestamp, no recursion)  
+<#tomb-3> rdf:subject :it; rdf:predicate schema:keywords; rdf:object "spicy";
+          crdt:deletedAt "2024-09-04T16:00:00Z" .
+```
+
+**Key Insight:** Each deletion gets a fresh timestamp, so undeletion operations target specific historical events rather than creating infinite recursive chains.
+
 **Deterministic Tombstone Fragment Identifier Algorithm:**
 
-Since tombstones use RDF Reification, they integrate seamlessly with our standard CRDT merge algorithms via the `statement-v1` merge contract. To prevent fragment identifier collisions when multiple clients independently create tombstones for the same triple, we use deterministic identifier generation.
+Since tombstones use RDF Reification, they integrate seamlessly with our standard CRDT merge algorithms via the `statement-v1` merge contract. To enable collaborative tombstone creation when multiple clients independently create tombstones for the same triple, we use deterministic identifier generation that ensures they target the same fragment identifier.
 
 **Algorithm Specification:**
 
@@ -176,25 +255,19 @@ Result: #crdt-tombstone-a1b2c3d4
 
 **Implementation Notes:**
 - **Pod Migration Limitation:** When documents are copied between pods, base URIs change, resulting in different tombstone identifiers for semantically equivalent tombstones. This is acceptable as equivalent tombstones merge correctly.
-- **Blank Node Support:** Identifiable blank nodes (those with `sync:identifyingPredicate` declarations) can serve as tombstone subjects using their stable identity pattern. Non-identifiable blank nodes cannot be tombstoned as they lack stable identity across documents. See ARCHITECTURE.md section 3.3-3.4 for identification patterns.
+- **Blank Node Support:** Identifiable blank nodes (those with `sync:isIdentifying` declarations) can serve as tombstone subjects using their stable identity pattern. Non-identifiable blank nodes cannot be tombstoned as they lack stable identity across documents. See ARCHITECTURE.md section 3.3-3.4 for identification patterns.
 - **Collision Resistance:** XXH64 provides sufficient collision resistance for practical use cases while maintaining compact identifiers.
 
-**Implementation Guidance:**
-- **Library Support:** RDF libraries should provide helper functions for generating deterministic tombstone identifiers to ensure consistency across implementations.
-- **Base URI Resolution:** Use the document's base URI (typically the document URL without fragment) for resolving relative IRIs in the canonical N-Triple.
-- **N-Triples Canonicalization:** Follow RFC 7932 N-Triples specification strictly, ensuring proper IRI bracketing, literal escaping, and terminating period.
-- **Hash Truncation:** Use only the first 8 characters of the XXH64 hex output to keep fragment identifiers compact while maintaining sufficient collision resistance.
+#### 3.3.1. Tombstone Cleanup with Timestamps
 
-#### 3.3.1. Tombstone Garbage Collection (Compaction Limitation)
+**Cleanup Strategy:** Tombstones use `crdt:deletedAt` timestamps to enable time-based cleanup policies, separate from vector clock causality determination.
 
-**Important Limitation:** With the document-level vector clock approach, tombstone compaction (cleanup) is **not possible** in the general case.
+**How Cleanup Works:**
+Since tombstones store `crdt:deletedAt` timestamps, we can implement time-based garbage collection after a sufficient retention period. The cleanup timing is determined by the latest timestamp in the `crdt:deletedAt` set, not by vector clock analysis.
 
-**Why Compaction is Not Safe:**
-Since tombstones rely on the document-level vector clock rather than storing their own creation timestamp, we cannot determine if a tombstone is truly redundant without full causal history. A tombstone can only be safely removed if we can prove that the "add" operation definitively happened after the "remove" operation across all possible merge scenarios.
-
-**Trade-off Decision:**
-- **Document-level clocks**: Simpler implementation, less storage overhead, but permanent tombstones
-- **Per-tombstone clocks**: More complex, higher storage cost, but allows compaction
+**Cleanup Trade-offs:**
+- **Time-based cleanup**: Simpler implementation, pragmatic retention policies, but may retain some redundant tombstones
+- **Causality-based compaction**: Theoretically optimal, but requires complex vector clock analysis and has fundamental flaws (see next section)
 
 **Why Per-Tombstone Vector Clocks Don't Work:**
 
@@ -223,11 +296,12 @@ The final tombstone design addresses two key requirements:
 
 1. **Mergeable RDF Data**: All tombstone statements are governed by the document-level merge contract (imported via `sync:includes mappings:statement-v1`), ensuring they can be properly merged as RDF data.
 
-2. **Document-Level Vector Clocks**: Tombstones rely on the document-level vector clock rather than storing individual timestamps, which:
-   - **Simplifies implementation** by avoiding per-tombstone clock management
-   - **Reduces storage overhead** for RDF data
-   - **Prevents compaction** as a trade-off, but enables passive storage approach
-   - **Aligns with passive storage philosophy** by minimizing metadata complexity
+2. **Dual Timing System**: Tombstones use both vector clocks and timestamps for different purposes:
+   - **Vector clocks** for merge causality determination (who wins during conflicts)
+   - **`crdt:deletedAt` timestamps** for deletion state and time-based cleanup policies
+   - **Simplifies implementation** by separating concerns (causality vs cleanup)
+   - **Enables cleanup** through retention policies while maintaining causality correctness
+   - **Aligns with passive storage philosophy** by using standard RDF timestamps
 
 This approach prioritizes simplicity and interoperability over storage optimization, consistent with the framework's core principles.
 
@@ -321,13 +395,13 @@ In this case, both paths result in equivalent identification since they have the
 
 **Why Not Structural Equality?** A tempting solution would be to declare two blank nodes equal if and only if all their properties are identical. However, this creates a subtle trap: if a blank node has naturally identifying properties (like `rdfs:label`) mixed with mutable properties (like `custom:priority`), then editing the mutable properties silently breaks tombstone matching. The deletion operation fails without error, creating hard-to-debug data inconsistencies. Therefore, this specification explicitly prohibits structural equality comparison and requires explicit identification patterns.
 
-**Solution Path:** This particular example could potentially be made identifiable by declaring `rdfs:label` as an identifying property using `sync:identifyingPredicate` in the mapping contract for `schema:keywords` properties. However, this only works when blank nodes have stable identifying properties that don't conflict across documents.
+**Solution Path:** This particular example could potentially be made identifiable by declaring `rdfs:label` as an identifying property using `sync:isIdentifying` in the mapping contract for `schema:keywords` properties. However, this only works when blank nodes have stable identifying properties that don't conflict across documents.
 
 ### 4.1. Identifiable vs Non-Identifiable Resources
 
 **Identifiable Resources** (safe for all CRDT types):
 - **IRI-identified resources:** Have globally unique, stable identifiers
-- **Context-identified blank nodes:** Blank nodes with identifying properties declared via `sync:identifyingPredicate` within specific subject-predicate contexts
+- **Context-identified blank nodes:** Blank nodes with identifying properties declared via `sync:isIdentifying` within specific subject-predicate contexts
 
 **Non-Identifiable Resources** (cause merge failures in identity-dependent CRDTs):
 - **Standard blank nodes:** Document-scoped identifiers that cannot be matched across documents without explicit identification patterns
@@ -355,14 +429,14 @@ validateMapping(property, crdtType, objectTypes):
 
 ### 4.4. Identifying Property Patterns and Precedence Rules
 
-**Context-Identified Blank Nodes:** Blank nodes can become identifiable when mapping documents declare identifying properties using `sync:identifyingPredicate true` flags within rules.
+**Context-Identified Blank Nodes:** Blank nodes can become identifiable when mapping documents declare identifying properties using `sync:isIdentifying true` flags within rules.
 
 **Example - Vector Clock Mapping:**
 ```turtle
 # Predicate-based mapping for vector clock entries (typeless blank nodes)
 mappings:clock-mappings-v1 a sync:PredicateMapping;
    sync:rule
-     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:identifyingPredicate true ],
+     [ sync:predicate crdt:clientId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
      [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
 ```
 
@@ -434,7 +508,7 @@ Solution: Use IRIs for objects or switch to LWW-Register for atomic treatment.
 
 ## 5. Merge Process Details
 
-### 8.1. Full Merge Algorithm
+### 5.1. Full Merge Algorithm
 
 ```
 mergeResources(localResource, remoteResource):
@@ -450,7 +524,7 @@ mergeResources(localResource, remoteResource):
        return propertyLevelMerge(local, remote, mergeContract)
 ```
 
-### 8.2. Property-Level Merge
+### 5.2. Property-Level Merge
 
 ```
 propertyLevelMerge(local, remote, contract):
@@ -472,14 +546,14 @@ propertyLevelMerge(local, remote, contract):
 
 ## 6. Edge Cases and Error Handling
 
-### 8.1. Missing Merge Contracts
+### 6.1. Missing Merge Contracts
 If a document's `sync:isGovernedBy` link points to a merge contract that is unavailable (e.g., due to network failure, or the resource was deleted), the document cannot be safely merged. 
 
 **Policy:**
 - **Document-Level Failure:** If the merge contract for a document is inaccessible, a client **MUST NOT** attempt to merge that document. It should be treated as temporarily offline-only. The client should periodically retry fetching the contract.
 - **Property-Level Failure:** If a contract is successfully fetched but it does not contain a mapping rule for a specific predicate present in the document, that predicate **MUST NOT** be merged. The client should preserve its local value for the unmapped predicate and may log a warning.
 
-### 8.2. Partial Resource Synchronization
+### 6.2. Partial Resource Synchronization
 - **TODO: Handle cases where only some properties are available**
 - **FIXME: Vector clock semantics for partial updates**
 
@@ -496,11 +570,11 @@ A robust, general-purpose, and safe clock pruning algorithm requires coordinatio
 
 ## 7. Implementation Notes
 
-### 8.1. Performance Optimizations
+### 7.1. Performance Optimizations
 - **Incremental Merging:** Instead of creating a new merged resource from scratch, a more memory-efficient approach is to calculate a diff or patch and apply it to the local resource. This is especially effective for large resources with small changes.
 - **Efficient Clock Representation:** Vector clocks can be stored in memory as sorted lists or maps for efficient lookups and comparisons. For persistence, client ID IRIs can be compressed using a local mapping (e.g., to integers) to reduce storage size.
 
-### 8.2. Concurrency Control
+### 7.2. Concurrency Control
 - **Atomic Updates:** The process of merging and persisting the new state MUST be atomic. An implementation should ensure that a failure during a write operation does not leave the local storage in an inconsistent state. A common pattern is to write the new resource to a temporary file and then atomically rename it to its final destination.
 - **Locking:** While the merge algorithm itself is deterministic, the process of reading the local state, merging, and writing it back should be treated as a single transaction to prevent race conditions with other local operations.
 
