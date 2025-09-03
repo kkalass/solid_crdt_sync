@@ -7,6 +7,6 @@ mappings:tombstoned-shard-v1 a sync:ClassMapping;
    sync:appliesToClass crdt:TombstonedShard;
    sync:rule
      [ sync:predicate crdt:tombstonedAt; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate idx:vectorClockHash; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate idx:clockHash; crdt:mergeWith crdt:LWW_Register ],
      [ sync:predicate idx:originalIndex; crdt:mergeWith crdt:Immutable ],
      [ sync:predicate idx:shardPath; crdt:mergeWith crdt:Immutable ].

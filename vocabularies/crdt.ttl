@@ -40,7 +40,7 @@ crdt:Sequence a rdfs:Class;
 
 crdt:ClockEntry a rdfs:Class;
     rdfs:label "Clock Entry";
-    rdfs:comment "A single entry in a Vector Clock, mapping an installation ID to its version number." .
+    rdfs:comment "A single entry in a Hybrid Logical Clock (HLC), mapping an installation ID to both its logical time (causality counter) and physical time (wall-clock timestamp for tie-breaking)." .
 
 # --- Property Definitions ---
 
@@ -52,31 +52,37 @@ crdt:mergeWith a rdf:Property;
 
 crdt:hasClockEntry a rdf:Property;
     rdfs:label "has clock entry";
-    rdfs:comment "Links a resource to a blank node representing a single entry in its Vector Clock.";
+    rdfs:comment "Links a resource to a blank node representing a single entry in its Hybrid Logical Clock (HLC). Each entry tracks both logical time (causality) and physical time (for intuitive tie-breaking) for one installation.";
     rdfs:domain rdfs:Resource;
     rdfs:range crdt:ClockEntry .
 
 crdt:installationId a rdf:Property;
     rdfs:label "installation ID";
-    rdfs:comment "The unique identifier for a client installation within a Vector Clock entry. Corresponds to 'client ID' in CRDT literature, but uses 'installation' to avoid confusion with Solid OIDC client identifiers.";
+    rdfs:comment "The unique identifier for a client installation within a Hybrid Logical Clock entry. Corresponds to 'client ID' in CRDT literature, but uses 'installation' to avoid confusion with Solid OIDC client identifiers.";
     rdfs:domain crdt:ClockEntry;
     rdfs:range rdfs:Resource . # Should be an IRI
 
-crdt:clockValue a rdf:Property;
-    rdfs:label "clock value";
-    rdfs:comment "The version number (counter) for an installation within a Vector Clock entry.";
+crdt:logicalTime a rdf:Property;
+    rdfs:label "logical time";
+    rdfs:comment "The logical time component of a Hybrid Logical Clock entry - a monotonically increasing counter that tracks causality relationships between operations. Provides tamper-proof causality tracking even when physical clocks are manipulated.";
     rdfs:domain crdt:ClockEntry;
-    rdfs:range xsd:integer .
+    rdfs:range xsd:long .
 
-crdt:vectorClockHash a rdf:Property;
-    rdfs:label "vector clock hash";
-    rdfs:comment "A pre-calculated, lightweight hash of the resource's full vector clock, used for efficient change detection in indices.";
+crdt:physicalTime a rdf:Property;
+    rdfs:label "physical time";
+    rdfs:comment "The physical time component of a Hybrid Logical Clock entry - wall-clock timestamp in milliseconds since Unix epoch. Used for intuitive tie-breaking when operations are truly concurrent (logical times don't establish dominance).";
+    rdfs:domain crdt:ClockEntry;
+    rdfs:range xsd:long .
+
+crdt:clockHash a rdf:Property;
+    rdfs:label "clock hash";
+    rdfs:comment "A pre-calculated, lightweight hash of the resource's full Hybrid Logical Clock, used for efficient change detection in indices. Hash includes both logical and physical time components.";
     rdfs:domain rdfs:Resource;
     rdfs:range xsd:string .
 
 crdt:ClientInstallation a rdfs:Class;
     rdfs:label "Client Installation";
-    rdfs:comment "A unique installation of a CRDT-enabled application, providing traceability and identity for vector clock entries across the distributed system." .
+    rdfs:comment "A unique installation of a CRDT-enabled application, providing traceability and identity for Hybrid Logical Clock entries across the distributed system." .
 
 crdt:Immutable a rdfs:Class;
     rdfs:label "Immutable";

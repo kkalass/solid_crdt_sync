@@ -13,14 +13,14 @@ This document provides detailed performance analysis and optimization guidance f
 - No opportunity for change detection optimization
 
 **Incremental Sync (Has Local Cache):**
-- Compare cached shard vector clock hashes with remote versions
+- Compare cached shard Hybrid Logical Clock hashes with remote versions
 - Download only changed shards (typically 0-20% on active datasets)
 - Efficient change detection enables responsive sync experience
 
 **Performance Patterns:**
 - **Cold Start:** O(s) where s = number of index shards (must download all shards for selected indices)
-- **Incremental Sync:** O(k) where k = number of changed shards (compare cached vs remote shard vector clock hashes)
-- **Change Detection:** O(1) per shard to detect changes (vector clock hash comparison)
+- **Incremental Sync:** O(k) where k = number of changed shards (compare cached vs remote shard Hybrid Logical Clock hashes)
+- **Change Detection:** O(1) per shard to detect changes (Hybrid Logical Clock hash comparison)
 - **Bandwidth:** Index headers provide metadata without downloading full resources
 
 ## 2. Complete Sync Performance by Strategy
@@ -88,7 +88,7 @@ Performance estimates include both index synchronization and data synchronizatio
 
 ### 3.1. Index Synchronization
 
-- **Minimal Headers:** ~100-200 bytes per resource (IRI + vector clock hash + 1-2 properties)
+- **Minimal Headers:** ~100-200 bytes per resource (IRI + Hybrid Logical Clock hash + 1-2 properties)
 - **Compression:** HTTP/2 and gzip reduce overhead by ~60-80%
 - **Incremental:** Only changed shards downloaded on subsequent syncs
 
@@ -96,7 +96,7 @@ Performance estimates include both index synchronization and data synchronizatio
 
 - **On-Demand:** Download only requested resources
 - **State-Based Merge:** Full resource download (no delta compression)
-- **CRDT Overhead:** Vector clocks add ~50-100 bytes per resource
+- **CRDT Overhead:** Hybrid Logical Clocks add ~50-100 bytes per resource
 
 ### 3.3. Sync Strategy Performance Impact
 
@@ -117,7 +117,7 @@ Performance estimates include both index synchronization and data synchronizatio
 ### 4.2. Merge Computation
 
 - **Property-by-Property:** O(p) where p = number of properties
-- **Vector Clock Comparison:** O(c) where c = number of installations
+- **Hybrid Logical Clock Comparison:** O(c) where c = number of installations
 - **Typically Fast:** Modern devices handle 100+ resources/second
 
 ### 4.3. Pod Server Limits

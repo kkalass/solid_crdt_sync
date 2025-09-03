@@ -55,7 +55,7 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 
 ### CRDT Implementation
 - State-based (not operation-based) CRDT approach
-- Vector clocks for versioning metadata
+- Hybrid Logical Clocks for versioning metadata
 - RDF-Star tombstones for deletion handling
 - Property-level merge strategies (LWW-Register, OR-Set, etc.)
 
@@ -63,7 +63,7 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 - Support both monolithic (`idx:RootIndex`) and partitioned (`idx:PartitionedIndex`) indices
 - Use sharding for performance with large datasets
 - Minimize default indices, allow app-specific indices
-- Index entries contain lightweight headers + vector clock hashes
+- Index entries contain lightweight headers + Hybrid Logical Clock hashes
 
 ### API Design Patterns
 - SyncStrategy pattern for different sync behaviors

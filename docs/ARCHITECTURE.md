@@ -60,7 +60,7 @@ The proposed solution addresses both challenges through a declarative, developer
 - **Recursive case:** Previously identified blank node (e.g., `(<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>)` identifies a clock entry)
 - **Nested example:** `((<https://alice.../recipes/tomato-soup>, installationId=<https://alice.../installation-123>), subProperty=value)` could identify a blank node within a clock entry
 
-For example, vector clock entries are identified by `(document_IRI, crdt:installationId=<full_installation_IRI>)`, where `document_IRI` is the full document IRI context and `crdt:installationId=<full_installation_IRI>` are the identifying properties.
+For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt:installationId=<full_installation_IRI>)`, where `document_IRI` is the full document IRI context and `crdt:installationId=<full_installation_IRI>` are the identifying properties.
 
 **Implementation Details:** For detailed mapping syntax, complex identification scenarios, and implementation patterns, see [CRDT-SPECIFICATION.md section 4](CRDT-SPECIFICATION.md#4-crdt-mapping-validation). 
 
@@ -155,7 +155,7 @@ CRDT-enabled applications use a modified Solid discovery approach that provides 
 
 ### 4.1. Discovery Isolation Strategy
 
-**The Challenge:** Traditional Solid discovery would expose CRDT-managed data to all applications, risking corruption by applications that don't understand CRDT metadata or vector clocks.
+**The Challenge:** Traditional Solid discovery would expose CRDT-managed data to all applications, risking corruption by applications that don't understand CRDT metadata or Hybrid Logical Clocks.
 
 **The Solution:** CRDT-managed resources are registered under `sync:ManagedDocument` in the Type Index rather than their semantic types (e.g., `schema:Recipe`). The semantic type is preserved via `sync:managedResourceType` property.
 
@@ -236,13 +236,13 @@ Before examining the architectural layers, we need to establish the fundamental 
 
 ### 5.1. Identity Management (Client Installation Documents)
 
-Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for vector clock entries, and collaborative lifecycle management.
+Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for Hybrid Logical Clock entries, and collaborative lifecycle management.
 
 **Discovery and Lifecycle:**
 1. **Discovery:** Applications query the Type Index for `crdt:ClientInstallation` container location
 2. **ID Generation:** Generate unique UUID v4 for each application installation
 3. **Registration:** Create installation document at discovered container location
-4. **Usage:** Reference installation IRI in vector clock entries for all subsequent operations
+4. **Usage:** Reference installation IRI in Hybrid Logical Clock entries for all subsequent operations
 
 **Installation Document Structure:**
 
@@ -262,7 +262,7 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 2. **Generate UUID:** Use UUID v4 for cryptographically strong uniqueness
 3. **Create IRI:** `{container-url}/{uuid}` 
 4. **Register installation:** POST installation document to container
-5. **Use in vector clocks:** Reference full installation IRI in `crdt:installationId`
+5. **Use in Hybrid Logical Clocks:** Reference full installation IRI in `crdt:installationId`
 
 **Installation Lifecycle Management:**
 
@@ -382,40 +382,49 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 * **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
 
-* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Vector Clocks** for versioning and **Resource Tombstones** for managing deletions.
+* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Hybrid Logical Clocks** for versioning and **Resource Tombstones** for managing deletions.
 
-#### 6.2.1. Vector Clock Mechanics
+#### 6.2.1. Hybrid Logical Clock Mechanics
 
-The state-based merge process uses **document-level vector clocks** for causality determination. Each resource document has a single vector clock that tracks changes to the entire document.
+The state-based merge process uses **document-level Hybrid Logical Clocks (HLC)** for causality determination and intuitive tie-breaking. Each resource document has a single HLC that tracks changes to the entire document using both logical time (causality) and physical time (wall-clock).
 
-**Vector Clock Structure:**
+**Hybrid Logical Clock Structure:**
 
 ```turtle
 <> crdt:hasClockEntry [
     crdt:installationId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
-    crdt:clockValue "15"^^xsd:integer
+    crdt:logicalTime "15"^^xsd:long ;  # Causality counter (tamper-proof)
+    crdt:physicalTime "1693824600000"^^xsd:long  # Wall-clock timestamp (intuitive tie-breaking)
   ] ,
   [
     crdt:installationId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
-    crdt:clockValue "8"^^xsd:integer
+    crdt:logicalTime "8"^^xsd:long ;
+    crdt:physicalTime "1693824550000"^^xsd:long
   ] ;
-  # Pre-calculated hash for efficient index operations
-  crdt:vectorClockHash "xxh64:abcdef1234567890" .
+  # Pre-calculated hash for efficient index operations (includes both logical and physical times)
+  crdt:clockHash "xxh64:abcdef1234567890" .
 ```
 
 **CRDT Literature Mapping:** The `crdt:installationId` property corresponds to what CRDT literature typically calls "client ID" or "node ID." We use "installation" to distinguish from Solid OIDC client identifiers, which identify applications rather than specific installation instances.
 
 **Clock Entry Identification:**
 
-Vector clock entries are context-identified blank nodes using the pattern:
+Hybrid Logical Clock entries are context-identified blank nodes using the pattern:
 `(document_IRI, crdt:installationId=<installation_IRI>)`
 
 **Merge Process:**
-1. **Causality Determination:** Compare vector clocks to determine document causality relationships
-2. **Property-by-Property Merging:** Apply CRDT rules (LWW-Register, OR-Set, etc.) to individual properties
-3. **Clock Updates:** Merge vector clocks using standard vector clock union algorithms
+1. **Causality Determination:** Compare logical clocks to determine document causality relationships
+2. **Physical Time Tie-Breaking:** For concurrent logical operations, use physical time for "most recent wins" semantics
+3. **Property-by-Property Merging:** Apply CRDT rules (LWW-Register, OR-Set, etc.) to individual properties
+4. **Clock Updates:** Merge Hybrid Logical Clocks using standard union algorithms (max logical times, max physical times)
 
-**Detailed Algorithms:** For comprehensive merge algorithms, vector clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
+**Benefits of Hybrid Logical Clocks:**
+- **Tamper-Resistant Causality:** Logical time protects against clock manipulation
+- **Intuitive Tie-Breaking:** Physical time provides "newer wins" semantics
+- **Related Change Coherence:** Operations done together tend to win/lose together across properties and documents
+- **Clock Skew Tolerance:** Physical time bias doesn't affect convergence, only fairness
+
+**Detailed Algorithms:** For comprehensive merge algorithms, Hybrid Logical Clock mechanics, and edge case handling, see [CRDT-SPECIFICATION.md](CRDT-SPECIFICATION.md).
 
 #### 6.2.2. Standard CRDT Library Examples
 
@@ -423,8 +432,9 @@ Vector clock entries are context-identified blank nodes using the pattern:
 This library, published at a public URL by the specification authors, defines standard mappings for CRDT framework components. See [`mappings/crdt-v1.ttl`](../mappings/crdt-v1.ttl) for the complete mapping.
 
 **Key Global Predicate Mappings:**
-- **`crdt:installationId`:** Always uses LWW-Register and identifies blank nodes (vector clock entries)
-- **`crdt:clockValue`:** Always uses LWW-Register for clock values
+- **`crdt:installationId`:** Always uses LWW-Register and identifies blank nodes (Hybrid Logical Clock entries)
+- **`crdt:logicalTime`:** Always uses LWW-Register for logical time components
+- **`crdt:physicalTime`:** Always uses LWW-Register for physical time components
 - **`crdt:deletedAt`:** Always uses OR-Set semantics for both resource and property tombstones
 
 **Example: Application-Specific Rules File `recipe-v1`**
@@ -482,16 +492,18 @@ This library, published at a public URL by the specification authors, defines st
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
    idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
 
-# -- Vector Clock (Layer 2 Mechanics) --
+# -- Hybrid Logical Clock (Layer 2 Mechanics) --
 <> crdt:hasClockEntry [
     crdt:installationId <https://alice.podprovider.org/installations/550e8400-e29b-41d4-a716-446655440000> ;
-    crdt:clockValue "15"^^xsd:integer
+    crdt:logicalTime "15"^^xsd:long ;
+    crdt:physicalTime "1693824600000"^^xsd:long
   ] ,
   [
     crdt:installationId <https://bob.podprovider.org/installations/6ba7b810-9dad-11d1-80b4-00c04fd430c8> ;
-    crdt:clockValue "8"^^xsd:integer
+    crdt:logicalTime "8"^^xsd:long ;
+    crdt:physicalTime "1693824550000"^^xsd:long
   ] ;
-  crdt:vectorClockHash "xxh64:abcdef1234567890" .
+  crdt:clockHash "xxh64:abcdef1234567890" .
 
 # -- Property Tombstone Example --
 <#crdt-tombstone-f8e4d2b1> a rdf:Statement;
@@ -561,6 +573,8 @@ mappings:statement-v1 a sync:ClassMapping;
 <#clock-mappings> a sync:PredicateMapping;
    sync:rule
      [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
+     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ],
      [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
 ```
 
@@ -597,9 +611,9 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 
 ### 6.3. Layer 3: The Indexing Layer
 
-This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only vector clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
+This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only Hybrid Logical Clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
-* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that **minimally contain a lightweight hash of each document's vector clock** for change detection. Indices may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
+* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that **minimally contain a lightweight hash of each document's Hybrid Logical Clock** for change detection. Indices may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
 
 * **Structure:** The index is a two-level hierarchy of **Groups** (logical groups) and **Shards** (technical splits). Each index is self-describing.
 
@@ -769,10 +783,10 @@ When creating any new index, it enters "populating" state with appropriate popul
 *LWW-Register State Machine for `idx:populationState`:*
 1. **Initial State:** Index created with `idx:populationState "populating"`
 2. **Completion Detection:** Installation detects all populating shards have `crdt:tombstonedAt` 
-3. **State Update:** Installation attempts `idx:populationState "active"` with current vector clock
+3. **State Update:** Installation attempts `idx:populationState "active"` with current Hybrid Logical Clock
 4. **Collaborative Resolution:** Multiple installations may attempt transition simultaneously
    - LWW-Register ensures deterministic convergence to "active" state
-   - Vector clock comparison resolves concurrent updates
+   - Hybrid Logical Clock comparison resolves concurrent updates
 5. **Cleanup Phase:** After state transition, remove `idx:hasPopulatingShard` entries using OR-Set removal
 
 *State Transition Requirements:*
@@ -869,7 +883,7 @@ When an application first encounters a Pod, it may need to configure the Type In
 ```
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/index`**
-This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only vector clock hashes for change detection.
+This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -918,14 +932,14 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
    # - Indexed properties (none defined, so minimal entries only)
    # - CRDT merge contract (mappings:group-index-v1)
    # Since the template has no idx:indexedProperty defined, this group's shards
-   # will contain only resource IRIs and vector clock hashes (no header data).
+   # will contain only resource IRIs and Hybrid Logical Clock hashes (no header data).
    # It has its own list of active shards, which are sibling documents.
    idx:hasShard <shard-mod-xxhash64-4-0-v1_0_0>, <shard-mod-xxhash64-4-1-v1_0_0>, 
                 <shard-mod-xxhash64-4-2-v1_0_0>, <shard-mod-xxhash64-4-3-v1_0_0> .
 ```
 
 **Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
-This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and vector clock hash, no header properties).
+This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and Hybrid Logical Clock hash, no header properties).
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -938,11 +952,11 @@ This document contains entries pointing to shopping list data resources from Aug
    idx:isShardOf <index>; # Back-link to its GroupIndex document
    idx:containsEntry [
      idx:resource <../../../../data/shopping-entries/created/2024/08/weekly-shopping-001>;
-     crdt:vectorClockHash "xxh64:abcdef1234567890"
+     crdt:clockHash "xxh64:abcdef1234567890"
    ],
    [
      idx:resource <../../../../data/shopping-entries/created/2024/08/weekly-shopping-002>;
-     crdt:vectorClockHash "xxh64:fedcba9876543210"
+     crdt:clockHash "xxh64:fedcba9876543210"
    ].
 ```
 
@@ -989,14 +1003,14 @@ This document contains entries for recipe resources. Since recipes are used with
      schema:name "Tomato Basil Soup";
      schema:keywords "vegan", "soup";
      schema:totalTime "PT30M";
-     crdt:vectorClockHash "xxh64:abcdef1234567890"
+     crdt:clockHash "xxh64:abcdef1234567890"
    ],
    [
      idx:resource <../../data/recipes/pasta-carbonara>;
      schema:name "Pasta Carbonara";
      schema:keywords "pasta", "italian";
      schema:totalTime "PT20M";
-     crdt:vectorClockHash "xxh64:fedcba9876543210"
+     crdt:clockHash "xxh64:fedcba9876543210"
    ].
 ```
 
@@ -1227,7 +1241,7 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
   - Detect and handle tombstoned entries that may have been missed during deprecated period
 - **Stale data handling:** Deprecated period may have missed resource deletions and updates
 - **Tombstone detection algorithm:**
-  1. **Vector clock comparison:** Compare index entry vector clocks with actual resource vector clocks
+  1. **Hybrid Logical Clock comparison:** Compare index entry clocks with actual resource clocks
   2. **Resource availability check:** Verify that indexed resources still exist and are accessible
   3. **Tombstone processing:** Apply any missed RDF reification tombstones from deprecation period
   4. **Entry cleanup:** Remove stale entries for deleted or moved resources
@@ -1323,7 +1337,7 @@ While the synchronization workflow provides the ideal path for data consistency,
 **Network Resilience:**
 - Distinguish between systemic failures (abort entire sync) vs. resource-specific failures (skip and continue)
 - Exponential backoff for systemic issues, immediate retry for individual resources
-- Offline operation continues with local vector clock increments
+- Offline operation continues with local Hybrid Logical Clock increments
 
 **Discovery and Setup:**
 - Comprehensive Pod setup process with user consent for configuration changes
@@ -1333,7 +1347,7 @@ While the synchronization workflow provides the ideal path for data consistency,
 **Data Integrity:**
 - Index inconsistency detection and automatic resolution
 - CRDT merge conflict resolution at property level
-- Vector clock anomaly detection and handling
+- Hybrid Logical Clock anomaly detection and handling
 
 ### 9.3. Graceful Degradation
 
@@ -1372,7 +1386,7 @@ The choice of sync strategy fundamentally determines application performance cha
 The architecture's index-based approach provides efficient incremental synchronization:
 
 - **Cold Start:** Must download all relevant index shards (O(s) where s = number of shards)
-- **Incremental Sync:** Download only changed shards through vector clock hash comparison (O(k) where k = changed shards)
+- **Incremental Sync:** Download only changed shards through Hybrid Logical Clock hash comparison (O(k) where k = changed shards)
 - **Bandwidth Efficiency:** Index headers provide metadata without downloading full resources
 
 ### 10.3. Architecture Performance Benefits
@@ -1465,4 +1479,4 @@ The core architecture provides a robust foundation for synchronization. The foll
 * **Proactive Access Control (WAC/ACP):** A mature version of this library should proactively check Solid's access control rules.
 * **Data Validation (SHACL):** By integrating SHACL, the library can validate the merged RDF graph against a predefined "shape" before uploading it.
 * **Richer Provenance (PROV-O):** By incorporating PROV-O, the library can create a rich, auditable history of changes.
-* Usage of "time in millis since unix " in vector clocks for better tie-breaking?
+* Usage of physical timestamps in Hybrid Logical Clocks for better tie-breaking (already implemented).

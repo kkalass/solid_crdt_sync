@@ -24,14 +24,14 @@ Distinguish between systemic and resource-specific failures:
 - **Index Sync Interruption:** Always abort and retry from beginning - partial indices create inconsistent views
 - **Systemic Failure Detection:** Stop current sync, schedule retry with exponential backoff (5min, 15min, 45min...)
 - **Resource-Specific Failures:** Log failure, continue sync with remaining resources, retry failed resources on next sync cycle
-- **Upload Failures:** Queue locally, retry with backoff, but preserve vector clock consistency
+- **Upload Failures:** Queue locally, retry with backoff, but preserve Hybrid Logical Clock consistency
 
 ### Network Partitioning
 
 During extended network unavailability:
 
 - **Offline Operation:** Applications continue working with locally cached data and indices
-- **Local-Only Updates:** Continue incrementing vector clocks for local changes
+- **Local-Only Updates:** Continue incrementing Hybrid Logical Clocks for local changes
 - **Sync Resume:** On reconnection, normal CRDT merge processes handle any conflicts from the partition period
 
 ## 2. Managed Resource Discovery Failures
@@ -108,7 +108,7 @@ When merge contract parsing fails:
   - If no local changes to property: Accept remote state ("trust remote")
   - If local changes exist: Skip property in merge, keep local value, continue syncing other properties
   - Log warning and recommend app update
-- **Missing Predicate Mappings:** Use LWW-Register fallback based on vector clocks, log warning
+- **Missing Predicate Mappings:** Use LWW-Register fallback based on Hybrid Logical Clocks, log warning
 
 ### Version Conflicts
 
@@ -123,8 +123,8 @@ When different clients reference different contract versions:
 When index shards contain conflicting information:
 
 ```
-1. Detect inconsistency during index merge (conflicting vectorClockHash values)
-2. Fetch all conflicting shards and compare vector clocks
+1. Detect inconsistency during index merge (conflicting clockHash values)
+2. Fetch all conflicting shards and compare Hybrid Logical Clocks
 3. Use CRDT merge logic on shard contents themselves
 4. Write merged shard back to Pod
 5. Log inconsistency for monitoring/debugging
@@ -140,7 +140,7 @@ When group index references non-existent shards:
 ### Index-Data Divergence
 
 When index entries point to non-existent or modified data:
-- **Validate index entries** against actual data resource vector clocks
+- **Validate index entries** against actual data resource Hybrid Logical Clocks
 - **Remove stale entries** during index sync
 - **Rebuild index entries** for resources with updated clocks
 - **Rate-limit rebuilding** to avoid performance impact
@@ -151,7 +151,7 @@ When index entries point to non-existent or modified data:
 
 - **Expired Tokens:** Attempt token refresh through authentication provider
 - **Invalid Credentials:** Prompt user to re-authenticate
-- **Provider Unavailable:** Skip sync operations, continue working with local data and incrementing vector clocks for offline changes
+- **Provider Unavailable:** Skip sync operations, continue working with local data and incrementing Hybrid Logical Clocks for offline changes
 
 ### Access Control Changes
 
@@ -162,7 +162,7 @@ When resource permissions change between syncs:
 
 ## 6. Data Integrity Failures
 
-### Vector Clock Anomalies
+### Hybrid Logical Clock Anomalies
 
 - **Clock Regression:** Detect and log impossible clock decreases, reject such updates
 - **Unknown Installation IDs:** Preserve unknown entries as-is (no need to validate existence)
@@ -226,7 +226,7 @@ Understanding the different levels at which synchronization can be blocked helps
 - **RDF Parse Errors:** Resource content is malformed and unparseable
 - **Access Control Loss:** HTTP 403 for previously accessible specific resource
 - **Network Failures:** Specific resource consistently unreachable (while others work)
-- **Vector Clock Corruption:** Clock regression or invalid clock data
+- **Hybrid Logical Clock Corruption:** Clock regression or invalid clock data
 
 **User Impact:** "Tomato Soup recipe" won't sync, but other recipes work fine
 **UI Suggestion:** "Some recipes cannot sync - [Show Details] [Work Offline]"
@@ -258,7 +258,7 @@ Understanding the different levels at which synchronization can be blocked helps
 
 ### Diagnostic Information
 
-- **Vector Clock States:** Include clock values in error reports for debugging
+- **Hybrid Logical Clock States:** Include clock values in error reports for debugging
 - **Network Conditions:** Log connection quality and server response patterns
 - **Resource Metadata:** Include resource IRIs, sizes, and modification times
 

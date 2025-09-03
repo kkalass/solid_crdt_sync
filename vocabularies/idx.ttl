@@ -44,7 +44,7 @@ idx:ModuloHashSharding a rdfs:Class;
 
 idx:Shard a rdfs:Class;
     rdfs:label "Shard";
-    rdfs:comment "A document that contains a list of entries, each pointing to a data resource and its associated metadata (e.g., vector clock hash)." ;
+    rdfs:comment "A document that contains a list of entries, each pointing to a data resource and its associated metadata (e.g., Hybrid Logical Clock hash)." ;
     rdfs:subClassOf foaf:Document .
 
 # --- Property Definitions ---
@@ -141,7 +141,7 @@ idx:basedOn a rdf:Property;
 
 idx:containsEntry a rdf:Property;
     rdfs:label "contains entry";
-    rdfs:comment "Links a Shard to an entry, which points to a data resource and its associated metadata (e.g., vector clock hash)." ;
+    rdfs:comment "Links a Shard to an entry, which points to a data resource and its associated metadata (e.g., Hybrid Logical Clock hash)." ;
     rdfs:domain idx:Shard ;
     rdfs:range rdfs:Resource .
 
@@ -169,9 +169,9 @@ idx:hasPopulatingShard a rdf:Property;
     rdfs:domain idx:Index;
     rdfs:range rdfs:Resource .
 
-idx:vectorClockHash a rdf:Property;
-    rdfs:label "vector clock hash";
-    rdfs:comment "Hash of the vector clock state at time of tombstoning, used for verification during garbage collection.";
+idx:clockHash a rdf:Property;
+    rdfs:label "clock hash";
+    rdfs:comment "Hash of the Hybrid Logical Clock state at time of tombstoning, used for verification during garbage collection.";
     rdfs:domain crdt:TombstonedShard;
     rdfs:range xsd:string .
 

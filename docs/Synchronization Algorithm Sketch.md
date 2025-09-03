@@ -113,16 +113,16 @@ This phase handles actual data resource synchronization based on the sync strate
 
    2. **State-Based CRDT Merge:**
       * Fetch the resource's merge contract (`sync:isGovernedBy`)
-      * Compare vector clocks to determine merge necessity
+      * Compare Hybrid Logical Clocks to determine merge necessity
       * Perform property-by-property merge using contract rules
-      * Update resource's vector clock and metadata
+      * Update resource's Hybrid Logical Clock and metadata
 
 3. **Index Maintenance:**
    1. **After successful resource merge:**
       * Determine which indices this resource belongs to (via `idx:belongsToIndexShard`)
       * For each affected index shard:
         - Fetch current shard
-        - Update the resource's entry with new vector clock hash
+        - Update the resource's entry with new Hybrid Logical Clock hash
         - Update any indexed properties (schema:name, etc.)
         - Upload updated shard
 
@@ -143,13 +143,13 @@ This process is triggered when the application calls `store()` on an object.
 2. **Resource Merge and Update:**
    1. Fetch current version of data resource from Solid Pod
    2. Perform state-based CRDT merge with local changes
-   3. Increment local client's vector clock
+   3. Increment local client's Hybrid Logical Clock
    4. Upload merged resource to Solid Pod
 
 3. **Index Updates:**
    1. For each index the resource belongs to:
       * Fetch affected shard(s) using current configuration (handle legacy shards if present)
-      * Update entries with new vector clock hash and indexed properties
+      * Update entries with new Hybrid Logical Clock hash and indexed properties
       * Check if shard exceeds autoScaleThreshold during update
       * If scaling needed: auto-increment configVersion and begin lazy migration to new shard count
       * Upload updated shard(s)
@@ -157,7 +157,7 @@ This process is triggered when the application calls `store()` on an object.
 4. **Cross-Strategy Consistency:**
    1. If resource belongs to multiple indices (different applications/strategies):
       * Update all relevant index shards
-      * Ensure vector clock consistency across all references
+      * Ensure Hybrid Logical Clock consistency across all references
 
 ## **Phase 7: Automatic Scaling Management**
 
@@ -234,7 +234,7 @@ All phases integrate the comprehensive error handling strategies defined in the 
 
 1. **Type Index as Single Source of Truth:** Always use Type Index for discovery, never hardcoded paths
 2. **Conditional Requests:** Leverage HTTP ETags for bandwidth efficiency
-3. **Document-Level Vector Clocks:** Maintain causality across all index and data updates using document-level vector clocks
+3. **Document-Level Hybrid Logical Clocks:** Maintain causality across all index and data updates using document-level Hybrid Logical Clocks
 4. **Strategy Flexibility:** Support mixed strategies (FullSync recipes + GroupedSync shopping entries)
 5. **Zero-Configuration Scaling:** System defaults to single shard with automatic scaling (1→2→4→8→16) based on entry thresholds
 6. **Self-Healing Conflicts:** Automatic configVersion conflict resolution using deterministic suffix increments

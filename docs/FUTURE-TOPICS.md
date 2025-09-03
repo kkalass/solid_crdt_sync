@@ -25,13 +25,13 @@ really adding anything new to the spec.
 
 ---
 
-## 3. Vector Clock Optimization for Tombstones
+## 3. Hybrid Logical Clock Optimization for Tombstones
 
 **Status**: Open Question  
-**Current Limitation**: Document-level vector clocks prevent tombstone compaction.
+**Current Limitation**: Document-level Hybrid Logical Clocks prevent tombstone compaction.
 
 **Optimization Strategies**:
-- **Referenced Vector Clocks**: Multiple tombstones share clock references instead of full copies
+- **Referenced Hybrid Logical Clocks**: Multiple tombstones share clock references instead of full copies
 - **Clock Base + Diffs**: Represent clocks as base + incremental changes rather than full state
 - **Hybrid Per-Tombstone Clocks**: Enable compaction while minimizing storage overhead
 - **Clock Compression**: Develop algorithms for safely pruning old clock entries
@@ -98,14 +98,14 @@ really adding anything new to the spec.
 
 **Status:** Future Topic (Advanced Research)
 
-**Current Limitation:** In long-running systems with many participants, a single resource's vector clock and tombstone set can grow indefinitely. This impacts storage and sync performance, as all installations must download and process the entire metadata set on every sync.
+**Current Limitation:** In long-running systems with many participants, a single resource's Hybrid Logical Clock and tombstone set can grow indefinitely. This impacts storage and sync performance, as all installations must download and process the entire metadata set on every sync.
 
 #### Proposed Solution: Hot/Cold Metadata Partitioning
 This proposal introduces a library-level, transparent mechanism to partition CRDT metadata into "hot" (active) and "cold" (inactive/stable) sets, keeping the primary data resource lean and sync operations fast.
 
 * **Primary Document ("Hot"):** The main data resource would only contain metadata for recently active installations and tombstones for recent deletions.
 
-* **Metadata Documents ("Cold"):** Linked, separate documents would archive vector clock entries for inactive installations and "stable" tombstones (those acknowledged by all active installations). The primary document would only store a link and a hash for these cold documents.
+* **Metadata Documents ("Cold"):** Linked, separate documents would archive Hybrid Logical Clock entries for inactive installations and "stable" tombstones (those acknowledged by all active installations). The primary document would only store a link and a hash for these cold documents.
 
 This would allow the vast majority of sync operations to only involve the small, "hot" document.
 
@@ -135,8 +135,8 @@ This would allow the vast majority of sync operations to only involve the small,
 * If the "cold state" of an installation is global and recorded in its instance identification document, we could probably get around the need to sync the cold data initially. Only if an installation learns that it is cold will it have to do this extra work - and only this installation has to do it. All others never need to touch the cold document unless they want to move someone from hot to cold. 
 * For the question who does the demotion when: We could state that an installation that adds itself to a clock needs to check if it can demote another installation.
 * And for really extreme cases, we could even think about sharding of the cold metadata
-* Instead of real tombstones, when moving a tombstone to cold, we could maybe att its fragment identifier to some list and record a vector clock in cold, so that we can reduce this list after some time? 
-* Could we also do a similar approach of highly optimized pseudo tombstones in the main document for vector clock entries to signal during merge that an item was "tombstoned" (e.g. moved to cold) and should be removed safely? 
+* Instead of real tombstones, when moving a tombstone to cold, we could maybe att its fragment identifier to some list and record a Hybrid Logical Clock in cold, so that we can reduce this list after some time? 
+* Could we also do a similar approach of highly optimized pseudo tombstones in the main document for Hybrid Logical Clock entries to signal during merge that an item was "tombstoned" (e.g. moved to cold) and should be removed safely? 
 * But ok, how do we get this list reduced later? Maybe by treating it as a LMW_Register? But that could cause data loss. Or putting this list into its own fragment identifier resource and then "forking" the list, using LMW_Register to determine who wins? OK, this still needs a lot of thoughts.
 
 ---
@@ -178,10 +178,10 @@ This would allow the vast majority of sync operations to only involve the small,
 >
 Idea: Should we incorporate a mapping analyzis phase or such? probably not viable, but we should at least provide helpful error and logging messages. But: Once the core functionality works I was planning to generate the mapping document out of annotations on dart classes and then we should be able to let the generator fail and give helpful advice. 
 
-> * **Tombstone Compaction:** The CRDT-SPECIFICATION.md explicitly states that with the current document-level vector clock approach, tombstone compaction is not possible. While the document justifies this as a trade-off for implementation simplicity, for very long-lived, highly dynamic data, the accumulation of tombstones could become a storage and performance issue. This is a valid architectural trade-off, but it's worth keeping in mind for future versions.
+> * **Tombstone Compaction:** The CRDT-SPECIFICATION.md explicitly states that with the current document-level Hybrid Logical Clock approach, tombstone compaction is not possible. While the document justifies this as a trade-off for implementation simplicity, for very long-lived, highly dynamic data, the accumulation of tombstones could become a storage and performance issue. This is a valid architectural trade-off, but it's worth keeping in mind for future versions.
 
-Agreed - we should find some efficient way to attach vector clocks. Or we need to make it optional. 
-**!!! IMPORTANT: Maybe put vector clocks on tombstones after all, trusting on future solutions like the cold metadata**!!! - that would be more future safe, since this way we do not lose information. And also some more efficient vector clock handling could likely be based on this.
+Agreed - we should find some efficient way to attach Hybrid Logical Clocks. Or we need to make it optional. 
+**!!! IMPORTANT: Maybe put Hybrid Logical Clocks on tombstones after all, trusting on future solutions like the cold metadata**!!! - that would be more future safe, since this way we do not lose information. And also some more efficient Hybrid Logical Clock handling could likely be based on this.
 
 > * **Initialization of Existing Pods:** The documentation mentions the "cold start" problem for new indices but doesn't go into extensive detail about the process of integrating with a Pod that already contains a large amount of legacy data. A clear strategy for a "retro-fitting" or migration process would be a valuable addition.
 >

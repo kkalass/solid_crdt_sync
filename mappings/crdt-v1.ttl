@@ -12,11 +12,12 @@
    # Define predicate mappings for framework components (ordered list)
    sync:predicateMapping ( <#clock-mappings> <#deletion-mappings> ) .
 
-# Standard mapping for predicates of vector clock entries (typeless blank nodes)  
+# Standard mapping for predicates of Hybrid Logical Clock entries (typeless blank nodes)  
 <#clock-mappings> a sync:PredicateMapping;
    sync:rule
      [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-     [ sync:predicate crdt:clockValue; crdt:mergeWith crdt:LWW_Register ] .
+     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ] .
 
 # Standard mapping for deletion semantics across all CRDT contexts
 <#deletion-mappings> a sync:PredicateMapping;
