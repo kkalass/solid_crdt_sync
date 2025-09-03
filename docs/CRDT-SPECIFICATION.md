@@ -98,7 +98,7 @@ A 2P-Set is used for multi-value properties where removal is permanent. Once an 
   rdf:subject :it;
   rdf:predicate schema:keywords;
   rdf:object "vegan";
-  crdt:isDeleted true .
+  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 ```
 
 **Merge Algorithm:**
@@ -127,7 +127,7 @@ An element's presence is determined by comparing the causality information of it
   rdf:subject :it;
   rdf:predicate schema:keywords;
   rdf:object "spicy";
-  crdt:isDeleted true .
+  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 
 # The timing of this tombstone is determined by the document-level vector clock:
 <> crdt:hasClockEntry [
@@ -304,7 +304,7 @@ In this case, both paths result in equivalent identification since they have the
   rdf:subject :recipe;
   rdf:predicate schema:keywords;
   rdf:object [rdfs:label "homemade"; custom:priority 1];
-  crdt:isDeleted true .
+  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 
 # Document B: Contains similar but non-identical blank node  
 :recipe schema:keywords [rdfs:label "homemade"; custom:priority 2] .

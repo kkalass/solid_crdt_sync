@@ -300,9 +300,9 @@ Before examining specific document types, it's important to understand how delet
 
 **2. Property Tombstones** (Individual Value Deletion):
 - **Purpose:** Mark specific values within multi-value properties as deleted (e.g., removing "quick" from recipe keywords)
-- **Property:** `crdt:isDeleted` boolean with RDF Reification
+- **Property:** `crdt:deletedAt` timestamp with RDF Reification
 - **Scope:** Applied to individual property values within OR-Set or 2P-Set properties
-- **Merge Behavior:** RDF Reification statements with LWW-Register for the deletion flag
+- **Merge Behavior:** RDF Reification statements with OR-Set semantics for the deletion timestamp
 - **Use Case:** User removes a keyword, ingredient, or other individual value from a multi-value property
 
 **Resource Deletion Semantics:**
@@ -318,11 +318,25 @@ Resources are marked as deleted using the `crdt:deletedAt` property with OR-Set 
 
 **Property Deletion Semantics:**
 
-Individual values within multi-value properties (OR-Set, 2P-Set) are deleted using RDF Reification tombstones. This mechanism enables precise deletion of specific values without affecting other values of the same property.
+Individual values within multi-value properties (OR-Set, 2P-Set) are deleted using RDF Reification tombstones with `crdt:deletedAt` timestamps. This mechanism enables precise deletion of specific values without affecting other values of the same property.
 
-**Implementation:** Uses RDF Reification with deterministic fragment identifiers for tombstone statements, allowing precise targeting of deleted values within CRDT sets.
+**Implementation:** Uses RDF Reification with deterministic fragment identifiers for tombstone statements, allowing precise targeting of deleted values within CRDT sets. Property tombstones use the same `crdt:deletedAt` property as resource tombstones.
 
-**Cleanup Configuration:** Retention periods and automatic cleanup behavior are configured at the Type Index level, with per-type overrides available through Type Registration properties. This applies to both resource and property tombstones.
+**Cleanup Configuration:** 
+
+The framework provides separate retention configurations for resource and property tombstones, recognizing their different risk profiles:
+
+**Resource Tombstone Cleanup (High Impact):**
+- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: 2+ years)
+- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
+- **Risk:** Zombie deletions can affect recreated resources with same IRI
+
+**Property Tombstone Cleanup (Lower Impact):**
+- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: 6-12 months)
+- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
+- **Risk:** Deleted property values may reappear, but resource remains intact
+
+Both configurations follow the same Type Index hierarchy: framework defaults on Type Index document, per-type overrides on individual registrations.
 
 #### 5.2.2. Client Installation Documents
 
@@ -348,13 +362,18 @@ Like all framework documents, Client Installation Documents follow the CRDT merg
 
 **Type Index Cleanup Configuration:**
 
-The framework extends Type Index registrations with cleanup configuration properties:
+The framework extends Type Index registrations with separate cleanup configuration properties for resource and property tombstones:
 
-- **`crdt:tombstoneRetentionPeriod`:** Duration to retain tombstoned resources (ISO 8601 duration, default from framework config)
-- **`crdt:enableAutomaticCleanup`:** Whether to automatically clean up after retention period (default from framework config)
+**Resource Tombstone Configuration:**
+- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y for 2+ years)
+- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
+
+**Property Tombstone Configuration:**
+- **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
+- **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
 
 **Framework Defaults Hierarchy:**
-1. **Type Index defaults:** `crdt:tombstoneRetentionPeriod` and `crdt:enableAutomaticCleanup` on the Type Index document itself
+1. **Type Index defaults:** Cleanup properties on the Type Index document itself
 2. **Type-specific overrides:** Individual registrations can override Type Index defaults  
 3. **User control:** Framework never overwrites existing user-configured values
 
@@ -363,8 +382,10 @@ The framework extends Type Index registrations with cleanup configuration proper
 # Type Index with framework-wide defaults
 <> a solid:TypeIndex;
    # Framework adds these defaults if missing
-   crdt:tombstoneRetentionPeriod "P1Y"^^xsd:duration;
-   crdt:enableAutomaticCleanup true;
+   crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
+   crdt:enableResourceTombstoneCleanup true;
+   crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
+   crdt:enablePropertyTombstoneCleanup true;
    solid:hasRegistration [
       a solid:TypeRegistration;
       solid:forClass crdt:ClientInstallation;
@@ -375,8 +396,9 @@ The framework extends Type Index registrations with cleanup configuration proper
       solid:forClass sync:ManagedDocument;
       sync:managedResourceType schema:Recipe;
       solid:instanceContainer <../data/recipes/>;
-      # Override: Keep recipe tombstones longer
-      crdt:tombstoneRetentionPeriod "P3Y"^^xsd:duration
+      # Override: Keep recipe resource tombstones longer, property tombstones shorter
+      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration;
+      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration
    ] .
 ```
 
@@ -384,7 +406,7 @@ The framework extends Type Index registrations with cleanup configuration proper
 - **Discovery:** Check Type Index for cleanup configuration (document-level defaults, registration-level overrides)
 - **Missing properties:** Add Type Index defaults without overwriting user values
 - **Respect user settings:** Never modify existing user-configured cleanup settings
-- **Per-type flexibility:** Individual registrations can override Type Index defaults
+- **Per-type flexibility:** Individual registrations can override Type Index defaults for both tombstone types
 
 **Type Index Registration Example:**
 ```turtle
@@ -397,8 +419,10 @@ The framework extends Type Index registrations with cleanup configuration proper
       solid:forClass crdt:ClientInstallation;
       solid:instanceContainer <../installations/>;
       # Override default cleanup configuration
-      crdt:tombstoneRetentionPeriod "P1Y"^^xsd:duration;  # Keep tombstones 1 year
-      crdt:enableAutomaticCleanup true
+      crdt:resourceTombstoneRetentionPeriod "P1Y"^^xsd:duration;
+      crdt:enableResourceTombstoneCleanup true;
+      crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration;
+      crdt:enablePropertyTombstoneCleanup true
    ] .
 ```
 
@@ -517,7 +541,7 @@ This shows the full recipe resource with the CRDT mechanics included.
   rdf:subject :it;
   rdf:predicate schema:keywords;
   rdf:object "quick";
-  crdt:isDeleted true .
+  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 ```
 
 **Example: A shopping list entry at `https://alice.podprovider.org/data/shopping-entries/created/2024/08/weekly-shopping-001`**
