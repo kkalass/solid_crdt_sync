@@ -8,7 +8,7 @@ The proposed solution addresses both challenges through a declarative, developer
 
 **Implementation Model:** The technical complexity described in this document is intended to be encapsulated within a reusable synchronization library (such as `solid-crdt-sync`). Application developers interact with a simple, declarative API while the library handles all CRDT algorithms, index management, conflict resolution, and Pod communication. The detailed specifications in this document serve as implementation guidance for library authors and reference for understanding the underlying system behavior.
 
-**Scale and Design Constraints:** This framework is designed for personal to small-organization scale collaboration, targeting **2-100 installations** with optimal performance at **2-20 installations**. Primary use cases include personal synchronization across multiple devices (2-5 installations), family collaboration (5-15 installations), and small teams or friend groups (10-20 installations). Extended use cases support small organizations up to 100 installations. Beyond this scale, different architectural assumptions around centralized coordination, professional IT support, and enterprise-grade infrastructure would be more appropriate.
+**Scale and Design Constraints:** This framework is designed for personal to small-organization scale collaboration, targeting **2-100 installations** with optimal performance at **2-20 installations**. Primary use cases include personal synchronization across multiple devices (2-5 installations), family collaboration (5-15 installations), and small teams or friend groups (10-20 installations). Extended use cases support small organizations up to 100 installations. Beyond this scale, different architectural assumptions around centralized coordination, professional IT support, and enterprise-grade infrastructure might be more appropriate.
 
 ## 2. Core Principles
 
@@ -335,8 +335,8 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 
 *Self-Managed Properties (Installation Should Only Update Its Own):*
 - **`crdt:lastActiveAt`:** Installation updates its own activity timestamp
-  - **Update triggers:** Sync operations
-  - **Frequency:** Limited to once per hour to prevent excessive updates
+  - **Update triggers:** First sync operation of each day
+  - **Frequency:** Daily maximum to align with Management Phase operations and reduce write overhead
   - **CRDT Algorithm:** `crdt:LWW_Register`
 - **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (defaults to P6M)
 
@@ -677,11 +677,40 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 
 This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only Hybrid Logical Clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
 
-* **The Convention (`idx:` vocabulary):** The index is a separate set of CRDT resources that **minimally contain a lightweight hash of each document's Hybrid Logical Clock** for change detection. Indices may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios. The vocabulary uses a clear naming hierarchy to distinguish between different types of indices.
+#### 4.3.1. Index Architecture Overview
 
-* **Structure:** The index is a two-level hierarchy of **Groups** (logical groups) and **Shards** (technical splits). Each index is self-describing.
+The framework provides two fundamental indexing approaches to handle different data organization patterns:
 
-**Framework Vocabulary Hierarchy:**
+**FullIndex (Monolithic Approach):**
+- **Purpose:** Single index covering an entire dataset
+- **Use cases:** Bounded, searchable collections where you want global access
+- **Examples:** Personal recipe collection, document library, contact list
+- **Structure:** One index with multiple shards for performance (technical partitioning)
+- **Benefits:** Simple discovery, global search capabilities, unified management
+
+**GroupIndexTemplate + GroupIndex (Grouped Approach):**
+- **Purpose:** Data split into logical groups, each with its own index
+- **Use cases:** Unbounded or naturally-grouped data where you work with specific subsets
+- **Examples:** Shopping entries by month, financial transactions by year, email by folder
+- **Structure:** Template defines grouping rules, individual GroupIndex instances for each group
+- **Benefits:** Scales to unlimited data size, efficient partial sync, natural organization
+
+**Key Architectural Distinction:**
+- **Groups** = Logical organization (August 2024 shopping entries, Italian recipes, Q3 transactions)
+- **Shards** = Technical performance optimization (split large indices for parallel processing)
+
+**When to Choose Each Pattern:**
+
+| Pattern | Best For | Examples | Scaling |
+|---------|----------|----------|---------|
+| **FullIndex** | Bounded datasets you browse/search globally | Recipes (≤1000s), Contacts, Documents | Limited by total size |
+| **GroupIndexTemplate** | Unbounded datasets with natural groupings | Shopping by month, Transactions by year | Unlimited (groups stay small) |
+
+#### 4.3.2. Framework Vocabulary
+
+The `idx:` vocabulary provides the building blocks for both indexing approaches:
+
+**Index Convention:** Indices are separate CRDT resources that **minimally contain a lightweight hash of each document's Hybrid Logical Clock** for change detection. They may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios.
 
 **Core Index Classes:**
 * **`idx:Index`:** The abstract base class for any sharded index that directly contains data entries.
@@ -707,24 +736,25 @@ This layer is **vital for change detection and synchronization efficiency**. It 
 * **`idx:GroupingRule`:** Class defining how resources are assigned to groups
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
 
-#### 4.3.1. Sharding Overview
+#### 4.3.3. Sharding and Performance
 
-**Resource Assignment:**
+Both FullIndex and GroupIndex instances use **sharding** for performance optimization. This is a technical implementation detail that splits large indices into smaller, parallel-processable chunks.
 
-Resources are assigned to shards using a deterministic hash algorithm, ensuring even distribution and consistent assignment across installations.
+**Key Principles:**
+- **Deterministic assignment:** Each resource always maps to the same shard
+- **Automatic scaling:** System increases shard count when size thresholds are exceeded (default: 1000 entries per shard)
+- **Lazy migration:** Shard rebalancing happens opportunistically during normal operations
+- **Self-describing names:** Shard names encode their configuration for automatic coordination
 
-**Key Concepts:**
-- **Automatic Scaling:** System increases shard count when size thresholds are exceeded (default: 1000 entries per shard)
-- **Lazy Migration:** Existing entries migrate opportunistically during normal operations
-- **Self-Describing Names:** Shard names encode algorithm, configuration, and version information
-- **Conflict Resolution:** Automatic version increment resolves configuration conflicts
+**Example Shard Structure:**
+```turtle
+<index> idx:hasShard <shard-mod-xxhash64-4-0-v1_2_0>, <shard-mod-xxhash64-4-1-v1_2_0>,
+                     <shard-mod-xxhash64-4-2-v1_2_0>, <shard-mod-xxhash64-4-3-v1_2_0> .
+```
 
-**Migration Process:**
-Shard count changes are handled through lazy, client-side migration rather than centralized maintenance operations. This approach respects Solid's decentralized nature where users are not system administrators.
+**Implementation Details:** For comprehensive sharding algorithms, migration procedures, and version handling, see [SHARDING.md](SHARDING.md).
 
-For detailed implementation guidance, including algorithms, version handling, and migration procedures, see [SHARDING.md](SHARDING.md).
-
-#### 4.3.2. Structure-Derived Index Naming
+#### 4.3.4. Structure-Derived Index Naming
 
 **Coordination-Free Index Convergence:**
 
@@ -788,10 +818,10 @@ When installations attempt to create indices with conflicting immutable properti
 
 **Performance Impact Management:**
 - **Write overhead awareness:** Every additional index increases write operation overhead for all installations
-- **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.3 for index lifecycle management)
-- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.3)
+- **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.4 for index lifecycle management)
+- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.4)
 
-#### 4.3.3. Index Population Mechanics
+#### 4.3.5. Index Population Mechanics
 
 Index population occurs in two scenarios: when creating a new index, or when syncing an existing index that is still in populating state.
 
@@ -863,57 +893,39 @@ When any installation encounters a populating index during sync:
                           <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-#### 4.3.4. Installation Index Management and Scalability
+#### 4.3.6. Installation Index Management and Scalability
 
-**Installation Management at Target Scale:** Within the framework's design constraints of 2-100 installations, installation management remains straightforward using simple approaches.
+**Installation Management Strategy:** Within the framework's design constraints of 2-100 installations, installation management uses a dedicated **Framework Installation Index** combined with periodic **Management Phase** operations (detailed in Section 6.2).
 
-**Scalable Solutions for Target Range:**
+**Framework Installation Index:**
+Rather than expensive Type Index container scanning, the framework maintains a dedicated installation index that provides efficient batch access to installation states:
 
-*Primary Approach: Direct Reader List Management*
-- Direct OR-Set management of `idx:readBy` lists works efficiently at target scale (2-100 installations)
-- Simple dormancy validation through Type Index scanning of `crdt:ClientInstallation` containers
-- Linear validation costs are acceptable for the target installation count
-- Benefits: Simple implementation, no additional index complexity
-
-*Optimization for Larger End of Range (50-100 installations):*
-- **Lazy Dormancy Detection:** Only validate installations when encountered during normal operations
-- **TTL-based caching:** Cache installation activity validation results to avoid repeated lookups
-- **Opportunistic cleanup:** Clean up reader lists during regular sync operations rather than dedicated scans
-
-**Beyond Design Scale:** For scenarios exceeding 100 installations, different architectural patterns (sharded installation indices, hierarchical reader management, centralized coordination) would be more appropriate than extending this framework.
-
-#### 4.3.5. Pod Setup and Configuration Process
-
-When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
-
-**Comprehensive Setup Process:**
-1. Check WebID Profile Document for solid:publicTypeIndex
-2. If found, query Type Index for required managed resource registrations (sync:ManagedDocument with sync:managedResourceType schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
-3. Collect all missing/required configuration:
-   - Missing Type Index entirely
-   - Missing Type Registrations for managed data types (sync:ManagedDocument)
-   - Missing Type Registrations for indices  
-   - Missing Type Registrations for installations
-4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
-5. User chooses approach:
-   1. **"Automatic Setup"** - Configure Pod with standard paths automatically
-   2. **"Custom Setup"** - Review and modify proposed Profile/Type Index changes before applying
-6. If user cancels: Run with hardcoded default paths, warn about reduced interoperability
-
-**Setup Dialog Design Principles:**
-- **Explicit Consent:** Never modify Pod configuration without user permission
-- **Progressive Disclosure:** Automatic Setup shields users from complexity, Custom Setup provides full control
-- **Clear Options:** Two main paths - trust the app or customize the details
-- **Graceful Fallback:** Always offer alternative approaches if user declines configuration changes
-
-**Example Setup Flow:**
+```turtle
+# At /indices/framework/installations-index-${hash}/index  
+<> a idx:FullIndex;
+   idx:indexesClass crdt:ClientInstallation;
+   idx:indexedProperty [
+     idx:property crdt:lastActiveAt;        # For dormancy detection
+     idx:readBy <installation-1>, <installation-2>
+   ], [
+     idx:property crdt:maxInactivityPeriod; # For cleanup thresholds
+     idx:readBy <installation-1>, <installation-2>  
+   ] .
 ```
-1. Discover missing Type Index registrations for sync:ManagedDocument with sync:managedResourceType schema:Recipe
-2. Present setup dialog: "This app needs to configure CRDT-managed recipe storage in your Pod"
-3. User selects "Automatic Setup"
-4. App creates Type Index entries for managed recipes, recipe index, client installations
-5. App proceeds with normal synchronization workflow
-```
+
+**Operational Benefits:**
+- **Efficient reader list management**: Management phase can batch-validate installation states without individual Pod requests
+- **Collaborative dormancy detection**: Multiple installations can safely coordinate cleanup through CRDT operations
+- **Scalable at target range**: Direct OR-Set management of `idx:readBy` lists works efficiently for 2-100 installations
+- **Framework consistency**: Uses same indexing patterns as user data
+
+**Management Phase Integration:** Installation lifecycle operations (dormancy detection, reader list cleanup, tombstone processing) are handled through periodic Management Phase operations rather than during every sync. See Section 6.2 for detailed algorithms and coordination mechanisms.
+
+**Beyond Design Scale:** For scenarios exceeding 100 installations, different architectural patterns might be more appropriate than extending this framework.
+
+#### 4.3.7. Index Structure Examples
+
+The following examples demonstrate concrete RDF structures for different types of indices, showing how the indexing architecture works in practice with real data.
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/index`**
 This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
@@ -971,7 +983,7 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
                 <shard-mod-xxhash64-4-2-v1_0_0>, <shard-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-**Example: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
+**Example 3: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
 This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and Hybrid Logical Clock hash, no header properties).
 
 ```turtle
@@ -995,7 +1007,7 @@ This document contains entries pointing to shopping list data resources from Aug
    ].
 ```
 
-**Example: A Recipe Index for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index`**
+**Example 4: A Recipe Index for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index`**
 This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing. The name hash is derived from SHA256(https://schema.org/Recipe|ModuloHashSharding|xxhash64).
 
 ```turtle
@@ -1032,7 +1044,7 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
    idx:hasShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0> .
 ```
 
-**Example: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0`**
+**Example 5: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0`**
 This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header properties (schema:name, schema:keywords, etc.) as specified in the FullIndex's `idx:indexedProperty` list to support browsing without loading full recipe data.
 
 ```turtle
@@ -1136,7 +1148,40 @@ The named sync strategies combine the two decisions above:
 
 Having established the architectural layers, we now examine advanced topics that span across multiple layers and deal with the complete lifecycle management of resources, indices, and installations.
 
-### 5.1. Framework Garbage Collection Index
+### 5.1. Pod Setup and Initial Configuration
+
+When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
+
+**Comprehensive Setup Process:**
+1. Check WebID Profile Document for solid:publicTypeIndex
+2. If found, query Type Index for required managed resource registrations (sync:ManagedDocument with sync:managedResourceType schema:Recipe, idx:FullIndex, crdt:ClientInstallation, etc.)
+3. Collect all missing/required configuration:
+   - Missing Type Index entirely
+   - Missing Type Registrations for managed data types (sync:ManagedDocument)
+   - Missing Type Registrations for indices  
+   - Missing Type Registrations for installations
+4. If any configuration is missing: Display single comprehensive "Pod Setup Dialog"
+5. User chooses approach:
+   1. **"Automatic Setup"** - Configure Pod with standard paths automatically
+   2. **"Custom Setup"** - Review and modify proposed Profile/Type Index changes before applying
+6. If user cancels: Run with hardcoded default paths, warn about reduced interoperability
+
+**Setup Dialog Design Principles:**
+- **Explicit Consent:** Never modify Pod configuration without user permission
+- **Progressive Disclosure:** Automatic Setup shields users from complexity, Custom Setup provides full control
+- **Clear Options:** Two main paths - trust the app or customize the details
+- **Graceful Fallback:** Always offer alternative approaches if user declines configuration changes
+
+**Example Setup Flow:**
+```
+1. Discover missing Type Index registrations for sync:ManagedDocument with sync:managedResourceType schema:Recipe
+2. Present setup dialog: "This app needs to configure CRDT-managed recipe storage in your Pod"
+3. User selects "Automatic Setup"
+4. App creates Type Index entries for managed recipes, recipe index, client installations
+5. App proceeds with normal synchronization workflow
+```
+
+### 5.2. Framework Garbage Collection Index
 
 **Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
@@ -1187,7 +1232,7 @@ Having established the architectural layers, we now examine advanced topics that
 - **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
 - **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
 
-### 5.2. Retention Policies and Cleanup Configuration
+### 5.3. Retention Policies and Cleanup Configuration
 
 The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
 
@@ -1196,7 +1241,7 @@ The framework provides configurable retention policies for tombstoned resources,
 **Resource Tombstone Configuration:**
 - **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
 - **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
-- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 7.1)
+- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 5.2)
 - **Risk:** Zombie deletions can affect recreated resources with same IRI
 
 **Property Tombstone Configuration:**
@@ -1247,7 +1292,7 @@ The framework provides configurable retention policies for tombstoned resources,
 4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
 5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
 
-### 5.3. Collaborative Index Lifecycle Management
+### 5.4. Collaborative Index Lifecycle Management
 
 **CRDT-Based Index Coordination:**
 
@@ -1387,6 +1432,86 @@ syncLibrary.onUpdate((mergedResource) => {
   // mergedResource = { name: 'Tomato Basil Soup', ingredients: [...], ... }
 });
 ```
+
+### 6.2. Management Phase Operations
+
+Beyond regular data synchronization, the framework requires periodic **management operations** to maintain system health and clean up stale metadata. These operations are separate from normal sync workflows and run on a different schedule.
+
+#### 6.2.1. Management Phase Scope and Frequency
+
+**When Management Phase Runs:**
+- **Scheduled**: Daily or weekly (configurable, default: daily)
+- **Triggered**: When encountering obviously invalid installations during normal operations
+- **Per-Installation**: Each active installation independently performs management work
+
+**Management Operations:**
+1. **Reader List Cleanup**: Remove tombstoned installations from `idx:readBy` lists across indices
+2. **Installation Dormancy Detection**: Check installation activity and tombstone inactive ones
+3. **Index Deprecation**: Mark indices with no active readers as deprecated
+4. **Garbage Collection**: Process framework GC index for cleanup-ready resources
+
+#### 6.2.2. Installation Index for Efficient Management
+
+**Framework Installation Index:**
+To avoid expensive Type Index container scanning, the framework maintains a dedicated installation index at `/indices/framework/installations-index-${hash}/index`.
+
+**Index Properties:**
+```turtle
+<installations-index> a idx:FullIndex;
+   idx:indexesClass crdt:ClientInstallation;
+   idx:indexedProperty [
+     idx:property crdt:lastActiveAt;        # For dormancy detection
+     idx:readBy <installation-1>, <installation-2>
+   ], [
+     idx:property crdt:maxInactivityPeriod; # For cleanup thresholds  
+     idx:readBy <installation-1>, <installation-2>
+   ];
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 1
+   ] .
+```
+
+**Benefits:**
+- **Efficient batch validation**: Check all installation states in single index sync
+- **No container scanning**: Avoid expensive Pod filesystem operations
+- **Framework consistency**: Use same index patterns as user data
+
+#### 6.2.3. Management Phase Algorithm
+
+**Phase 1: Sync Installation Index**
+1. Sync framework installation index (same as any other index)
+2. Identify potentially dormant installations from `crdt:lastActiveAt` headers
+3. Build priority list for validation (oldest first)
+
+**Phase 2: Validate Dormant Installations**
+1. For each potentially dormant installation:
+   - GET installation document from Pod
+   - Check `crdt:lastActiveAt` against `crdt:maxInactivityPeriod` 
+   - Apply collaborative tombstoning if beyond threshold
+2. Update installation index with validation results
+
+**Phase 3: Clean Reader Lists**
+1. For each index this installation reads (`idx:readBy` contains self):
+   - Remove tombstoned installations from reader lists
+   - Mark indices with empty reader lists as deprecated
+   - Update indices using standard CRDT merge
+
+**Phase 4: Framework Garbage Collection**
+1. Process framework GC index for cleanup-ready resources
+2. Remove resources beyond retention periods
+3. Update GC index to reflect completed cleanups
+
+#### 6.2.4. Coordination and Conflict Resolution
+
+**Collaborative Execution**: Multiple installations may run management phases simultaneously. CRDT merge semantics ensure safe coordination:
+
+- **Installation tombstoning**: OR-Set semantics on `crdt:deletedAt` allow multiple installations to safely mark dormant installations
+- **Reader list updates**: OR-Set removal operations are commutative and convergent  
+- **Index state changes**: LWW-Register semantics on `idx:deprecatedAt` ensure deterministic state transitions
+
+**Efficiency Optimization**: Management phase skips work already completed by other installations by checking index states before performing updates.
 
 ## 7. Error Handling and Resilience
 
