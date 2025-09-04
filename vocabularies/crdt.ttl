@@ -89,6 +89,11 @@ crdt:Immutable a rdfs:Class;
     rdfs:comment "A CRDT algorithm for properties that must never change after creation. Sync fails if different values are encountered, forcing creation of new resource versions.";
     rdfs:subClassOf crdt:Algorithm .
 
+crdt:FWW_Register a rdfs:Class;
+    rdfs:label "FWW-Register";
+    rdfs:comment "A First-Writer-Wins Register CRDT for properties that should not change after creation. When conflicting values are encountered, the first written value (by timestamp) is preserved and subsequent writes are ignored.";
+    rdfs:subClassOf crdt:Algorithm .
+
 
 
 # --- Property Definitions (continued) ---

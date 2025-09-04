@@ -56,8 +56,8 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 ### CRDT Implementation
 - State-based (not operation-based) CRDT approach
 - Hybrid Logical Clocks for versioning metadata
-- RDF-Star tombstones for deletion handling
-- Property-level merge strategies (LWW-Register, OR-Set, etc.)
+- RDF reification tombstones for deletion handling
+- Property-level merge strategies (LWW-Register, FWW-Register, OR-Set, Immutable, etc.)
 
 ### Indexing Strategy
 - Support both monolithic (`idx:RootIndex`) and partitioned (`idx:PartitionedIndex`) indices

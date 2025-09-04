@@ -191,6 +191,146 @@ Agreed - we should find some efficient way to attach Hybrid Logical Clocks. Or w
 
 
 
+## 9. Framework Version Compatibility and Migration
+
+**Status**: Open Question - Major Architectural Challenge  
+**Current Limitation**: Framework lacks comprehensive version compatibility and migration strategy for collaborative environments.
+
+**Core Architectural Issues**:
+
+**Specification Version in Installation Documents**:
+- Installation documents must include spec version for compatibility checking
+- Installation Index must index spec versions for discovery and coordination
+- Version compatibility matrix needed to determine which installations can collaborate
+
+**Multi-Format Support During Transitions**:
+- During version transitions, frameworks must write BOTH old and new formats (e.g., tombstone formats)
+- Support period length determination: Who decides how long to maintain backward compatibility?
+- Storage and performance overhead of maintaining multiple formats simultaneously
+
+**Collaborative Deprecation Coordination**:
+- New spec versions can only fully deprecate old features when NO installations use the old spec
+- Requires distributed consensus mechanism across all installations in a Pod
+- Challenge: How to coordinate deprecation decisions across independently operated installations?
+
+**Version Mismatch Scenarios**:
+- **Application too old**: Needs "graceful degradation" or "way out" when joining Pod with newer spec versions
+- **Application too new**: Must maintain compatibility with older installations already in the Pod
+- **Mixed versions**: How do installations with different spec versions collaborate on shared indices?
+
+**Migration Complexity**:
+- **Resource format changes**: How to migrate existing resources to new formats without breaking references
+- **Index structure evolution**: Coordinate index format changes across multiple installations
+- **Tombstone format migration**: RDF reification to potential future formats while maintaining consistency
+- **Merge contract evolution**: Updates to CRDT algorithms and their compatibility across versions
+
+**Discovery and Negotiation**:
+- How do installations discover version compatibility before attempting collaboration?
+- Negotiation protocol for determining common supported feature set
+- Fallback mechanisms when version incompatibility is detected
+
+**Design Questions**:
+- Should framework support "version islands" where incompatible versions coexist separately?
+- How to handle emergency deprecation (security issues) vs gradual deprecation?
+- What's the minimum viable compatibility window for different types of changes?
+- How to communicate version requirements and migration paths to users?
+
+**Implementation Challenges**:
+- Multi-version code maintenance burden for implementers
+- Testing matrix explosion with multiple supported versions
+- User experience during long migration periods
+- Data consistency during partial migration states
+
+**Potential Approaches**:
+- **Versioned Installation Documents**: Explicit spec version declarations with compatibility matrices
+- **Feature Negotiation**: Dynamic capability negotiation rather than monolithic version numbers
+- **Migration Phases**: Defined phases (Preparation → Transition → Consolidation) with clear rules
+- **Version-aware Type Index**: Separate registration paths for different framework versions
+
+**Related**: This fundamentally affects all collaborative operations described in ARCHITECTURE.md Chapter 5 and CRDT merge behaviors in CRDT-SPECIFICATION.md.
+
+---
+
+## 10. Multi-Pod Application Integration
+
+**Status**: Future Enhancement (v2/v3 Candidate)  
+**Current Limitation**: Framework focuses on single-Pod CRDT synchronization but doesn't address applications that need to integrate data from multiple Pods, including Pods not owned by the user.
+
+**Use Case Scenario:**
+Alice's Recipe Manager app wants to display:
+- Alice's personal recipes from `https://alice.pod/data/recipes/`
+- Bob's shared recipes from `https://bob.pod/data/recipes/` 
+- Carol's family recipes from `https://carol.pod/data/family-recipes/`
+- Community recipes from `https://community-pod.org/recipes/`
+
+**Technical Integration Challenges:**
+
+**Discovery and Connection Management:**
+- How do applications discover relevant Pods containing related data?
+- Managing authentication/authorization across multiple independent Pods
+- Handling different availability and connectivity states per Pod
+- Coordinating sync processes across multiple concurrent Pod connections
+
+**Resource Identity and Semantic Relationships:**
+- IRIs are globally unique (no conflicts), but semantic relationships are complex
+- Cross-Pod resource references: `owl:sameAs`, `schema:isVariantOf`, custom relationships
+- Determining when resources from different Pods represent the same conceptual entity
+- Handling conflicting semantic assertions across Pods (Alice says X, Bob says Y about same topic)
+
+**Index and Query Coordination:**
+- Should applications create separate indices per Pod or attempt federation?
+- Cross-Pod search and discovery: querying multiple Pod indices efficiently
+- Handling different indexing patterns and schema versions across Pods
+- Performance implications of distributed query execution
+
+**Synchronization Architecture:**
+- Managing multiple independent sync processes without interference
+- Batch operations and consistency across Pod boundaries
+- Handling partial failures when some Pods are unavailable
+- Cache coordination and invalidation across multiple data sources
+
+**User Experience Challenges:**
+- Presenting unified views of distributed data with clear source attribution
+- Handling permission differences across Pods in consistent UI
+- Conflict resolution when related data from different Pods disagrees
+- Offline/online state management for multiple connection states
+
+**Schema Evolution Across Pods:**
+- Different Pods may use different framework versions or merge contracts
+- Handling schema compatibility in federated scenarios  
+- Migration coordination when not all Pods upgrade simultaneously
+- Graceful degradation when encountering incompatible schemas
+
+**Application Architecture Patterns:**
+
+**Federated Query Pattern:**
+- Applications maintain separate sync state per Pod
+- Cross-Pod queries executed as distributed operations
+- UI aggregates results with clear source provenance
+
+**Local Integration Pattern:**
+- Applications sync data from multiple Pods into unified local store
+- Semantic relationship resolution happens locally
+- Trade-offs between storage overhead and query performance
+
+**Hybrid Pattern:**
+- Critical data synced locally, secondary data queried on-demand
+- Application-specific policies for what data to integrate vs. reference
+
+**Open Design Questions:**
+- Should the framework provide multi-Pod orchestration primitives?
+- How to handle semantic conflicts across Pod boundaries?
+- What's the role of the framework vs. application-specific integration logic?
+- Should there be standard vocabularies for cross-Pod relationships?
+- How to balance performance, consistency, and user experience?
+
+**Implementation Scope:**
+This represents a major expansion beyond single-Pod CRDT synchronization into distributed application orchestration, semantic web integration, and multi-source data management. Likely requires significant framework extensions and new architectural patterns.
+
+**Related**: Builds on all current framework concepts but extends them into distributed, multi-authority scenarios that go beyond the current single-Pod collaborative model.
+
+---
+
 ## Contributing to Future Topics
 
 When identifying new topics:

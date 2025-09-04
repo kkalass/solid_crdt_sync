@@ -2,13 +2,31 @@
 
 ## 1. Executive Summary
 
+### 1.1. Framework Overview
+
 This document outlines an architecture for building **local-first, collaborative, and truly interoperable applications** using Solid Pods as a synchronization backend. The core challenge is twofold: first, to enable robust, conflict-free data merging without sacrificing semantic interoperability; and second, to provide a scalable solution for building performant applications, regardless of dataset size.
 
 The proposed solution addresses both challenges through a declarative, developer-centric framework. Unlike operation-based approaches (such as SU-Set) that synchronize individual change events, our architecture uses a **state-based CRDT model**. This means the entire state of a resource is synchronized, a choice that works seamlessly with passive storage backends like Solid Pods. To ensure data integrity, developers declaratively **link data properties to CRDT merge strategies**. To manage performance, they define a high-level **Sync Strategy** per type (full, groups, or on-demand). This approach allows the library to act as a flexible "add-on" to an existing application, rather than a monolithic database, while ensuring all data at rest on the Solid Pod is clean, standard RDF.
 
-**Implementation Model:** The technical complexity described in this document is intended to be encapsulated within a reusable synchronization library (such as `solid-crdt-sync`). Application developers interact with a simple, declarative API while the library handles all CRDT algorithms, index management, conflict resolution, and Pod communication. The detailed specifications in this document serve as implementation guidance for library authors and reference for understanding the underlying system behavior.
+### 1.2. Implementation Model
 
-**Scale and Design Constraints:** This framework is designed for personal to small-organization scale collaboration, targeting **2-100 installations** with optimal performance at **2-20 installations**. Primary use cases include personal synchronization across multiple devices (2-5 installations), family collaboration (5-15 installations), and small teams or friend groups (10-20 installations). Extended use cases support small organizations up to 100 installations. Beyond this scale, different architectural assumptions around centralized coordination, professional IT support, and enterprise-grade infrastructure might be more appropriate.
+The technical complexity described in this document is intended to be encapsulated within a reusable synchronization library (such as `solid-crdt-sync`). Application developers interact with a simple, declarative API while the library handles all CRDT algorithms, index management, conflict resolution, and Pod communication. The detailed specifications in this document serve as implementation guidance for library authors and reference for understanding the underlying system behavior.
+
+### 1.3. Scale and Design Constraints
+
+This framework is designed for personal to small-organization scale collaboration, targeting **2-100 installations** with optimal performance at **2-20 installations**. Primary use cases include personal synchronization across multiple devices (2-5 installations), family collaboration (5-15 installations), and small teams or friend groups (10-20 installations). Extended use cases support small organizations up to 100 installations. Beyond this scale, different architectural assumptions around centralized coordination, professional IT support, and enterprise-grade infrastructure might be more appropriate.
+
+### 1.4. Current Scope and Limitations
+
+**Single-Pod Focus:** This framework is designed for CRDT synchronization within a single Solid Pod. All collaborating installations work with data stored in one Pod, with multiple users (WebIDs) able to participate through separate installations.
+
+**Multi-Pod Integration Limitation:** Applications requiring data integration across multiple Pods (such as displaying Alice's recipes from `https://alice.pod/` alongside Bob's recipes from `https://bob.pod/`) need additional orchestration beyond this specification. While IRIs ensure global uniqueness across Pods, the challenges include:
+- Discovery and connection management across multiple Pods
+- Semantic relationship resolution across Pod boundaries
+- Cross-Pod query coordination and performance optimization
+- Multi-source synchronization architecture and user experience
+
+**Future Evolution:** Multi-Pod application integration represents a significant architectural enhancement planned for future specification versions (v2/v3). See FUTURE-TOPICS.md Section 10 for detailed analysis of the challenges and potential approaches.
 
 ## 2. Core Principles
 
@@ -341,7 +359,7 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 - **`crdt:maxInactivityPeriod`:** Installation's maximum inactivity period before tombstoning (defaults to P6M)
 
 *Identity Properties (Set Once at Creation):*
-- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable`
+- **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable` or `crdt:FWW_Register` based on error handling preference
 
 **Installation Cleanup:**
 Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations and make dormant installation tombstoning decisions as part of their sync management phase. For general tombstone mechanics, see Section 3.4.2 below.
@@ -791,7 +809,7 @@ Applications with identical structural requirements generate identical index nam
 
 **Immutable vs Extendable Properties:**
 
-**Immutable (encoded in name, enforced by `crdt:Immutable`):**
+**Immutable (encoded in name, enforced by `crdt:Immutable` or `crdt:FWW_Register`):**
 - Index type (FullIndex vs GroupIndexTemplate)
 - Indexed class (`idx:indexesClass`)
 - Grouping configuration (`idx:groupedBy` structure)
@@ -818,8 +836,8 @@ When installations attempt to create indices with conflicting immutable properti
 
 **Performance Impact Management:**
 - **Write overhead awareness:** Every additional index increases write operation overhead for all installations
-- **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.4 for index lifecycle management)
-- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.4)
+- **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.8 for index lifecycle management)
+- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.8)
 
 #### 4.3.5. Index Population Mechanics
 
@@ -1091,11 +1109,7 @@ This decision determines how data is organized and indexed in the Pod.
 *   Good for unbounded or naturally-grouped data
 *   Examples: Shopping entries by month, financial transactions by year
 
-**Managed Resource Discovery Process:**
-1. **Developer declares data pattern:** "I have recipe data that needs to be searchable"
-2. **Implementation discovers:** Checks Type Index for `sync:ManagedDocument` registrations with `sync:managedResourceType schema:Recipe` and corresponding recipe indices  
-3. **Compatibility evaluation:** Does discovered index structure meet data pattern needs?
-4. **Resolution:** Use compatible index OR create new index with appropriate structure
+**Implementation Note:** The framework automatically handles index discovery and creation through structure-derived naming (see Section 4.3.4 for technical details). Developers simply declare their data organization needs, and the implementation manages the underlying index infrastructure.
 
 #### 4.4.2. Decision 2: Sync Timing
 
@@ -1112,24 +1126,7 @@ This decision determines when and how much data gets loaded from the Pod.
 *   Good for large datasets or browse-then-load workflows
 *   Examples: Large recipe collections, document libraries, photo albums
 
-#### 4.4.3. HTTP-Level Optimizations
-
-**ETag-Based Conflict Detection:**
-
-Solid Pods support standard HTTP ETags for optimistic concurrency control:
-- **GET responses:** Include `ETag` header with resource version identifier
-- **PUT requests:** Include `If-Match` header with stored ETag to detect concurrent modifications  
-- **412 Precondition Failed:** Server rejects if ETag doesn't match current version
-
-**CRDT Integration Strategy:**
-Unlike traditional REST APIs that fail on conflicts, this framework leverages ETags as a performance optimization:
-1. **Optimistic path:** Most PUTs succeed immediately when no concurrent modifications occurred
-2. **Conflict resolution:** On 412 response, GET current state, perform CRDT merge with local changes, retry PUT
-3. **Eventual consistency:** CRDT merge semantics ensure convergence regardless of update order
-
-This approach provides both immediate conflict detection (via ETags) and robust conflict resolution (via CRDT merging), offering better performance than pure CRDT approaches while maintaining stronger consistency than traditional optimistic locking.
-
-#### 4.4.4. Common Strategies
+#### 4.4.3. Common Strategies
 
 The named sync strategies combine the two decisions above:
 
@@ -1144,9 +1141,9 @@ The named sync strategies combine the two decisions above:
 *   **GroupedSync:** Shopping entries, activity logs → GroupIndexTemplate + immediate data for subscribed groups  
 *   **OnDemandSync:** Recipe collections, document libraries → Any index + headers-only until requested
 
-## 5. Advanced Lifecycle Management
+## 5. Lifecycle Management
 
-Having established the architectural layers, we now examine advanced topics that span across multiple layers and deal with the complete lifecycle management of resources, indices, and installations.
+Having established the architectural layers, we now examine the complete lifecycle of resources, indices, and installations - from initial Pod setup through daily operations to long-term maintenance and cleanup.
 
 ### 5.1. Pod Setup and Initial Configuration
 
@@ -1181,7 +1178,137 @@ When an application first encounters a Pod, it may need to configure the Type In
 5. App proceeds with normal synchronization workflow
 ```
 
-### 5.2. Framework Garbage Collection Index
+### 5.2. Installation Document Creation
+
+After successful Pod setup, the framework automatically creates an Installation Document (`crdt:ClientInstallation`) to represent this specific client installation in the collaborative system. This document establishes the installation's identity and enables collaborative coordination with other installations.
+
+**Lifecycle Role:**
+The Installation Document serves as the foundation for all collaborative operations - index management, dormancy detection, and CRDT conflict resolution. It is registered in the system Installation Index and remains active until the installation is tombstoned.
+
+**Tombstoned Installation Recovery:**
+If an installation discovers its own document has been tombstoned (marked with `crdt:deletedAt`) **or cannot find its installation document remotely** (indicating it was tombstoned and later garbage collected), it must **not** attempt undeletion or continue using the stored installation ID. Instead, it creates a fresh installation identity and resets all internal state.
+
+**Recovery Process:**
+1. **Detection during startup:** Framework checks if its locally stored installation ID exists in the remote Installation Index
+2. **Scenario A - Document found but tombstoned:** Proceed with fresh start
+3. **Scenario B - Document not found:** Assume it was tombstoned and garbage collected, proceed with fresh start
+4. **User notification:** Inform user that "this installation was deactivated due to inactivity and will be reset"
+5. **Fresh start:** Generate new installation ID and reset all local caches/state
+6. **Clean re-sync:** Re-synchronize all data from Pod with fresh collaborative state
+
+**Critical Policy:**
+An installation that has a locally stored installation ID but cannot find that specific ID in the remote Installation Index must assume it was tombstoned and subsequently garbage collected. It must **not** continue using the stored ID or attempt to recreate a document with that same ID - it must generate a completely new installation ID.
+
+This approach ensures system integrity and prevents "zombie" installations from creating CRDT conflicts.
+
+**Details:** See Section 4.2 for complete Installation Document specification, properties, and CRDT behavior.
+
+### 5.3. System Index Setup
+
+Before application-specific functionality can begin, the framework establishes essential system indices required for collaborative coordination and maintenance operations.
+
+**Required System Indices:**
+- **Installation Index:** For tracking all client installations (Section 4.2.2)
+- **Framework Garbage Collection Index:** For tracking tombstoned resources (Section 5.6)
+
+**Lifecycle Role:**
+These indices follow standard creation and discovery rules (Chapter 4) but are established automatically during framework initialization. The Installation Index receives the installation document created in Section 5.2, enabling collaborative operations for subsequent application indices.
+
+**Creation Timing:**
+System indices are created before application indices to ensure the collaborative infrastructure is ready when applications begin data synchronization.
+
+### 5.4. Application Index Setup
+
+With system indices established, the framework creates application-specific indices based on the data types the application needs to synchronize. Applications declare their requirements and the framework establishes the appropriate index patterns (FullIndex or GroupIndexTemplate) following the rules in Chapter 4.
+
+**Lifecycle Role:**
+Application indices are created during startup or when first accessing new data types. The framework coordinates creation collaboratively - discovering existing compatible indices before creating new ones, and ensuring all installations can participate in the collaborative indexing.
+
+**Synchronization Priority:**
+All **required** application indices must be synchronized and merged before exposing functionality to users, ensuring consistent application state across installations. However, applications that can handle incomplete data may choose to use indices still in populating state, with the understanding that results will be incrementally complete as population progresses.
+
+**Details:** See Chapter 4 for complete indexing patterns, creation rules, and collaborative coordination mechanisms.
+
+### 5.5. Resource Creation and Naming
+
+Once Pod setup is complete and all required system and application indices are established and synchronized, applications can begin creating data resources. Resource naming is a critical design decision that affects both performance and maintainability, requiring careful consideration of Pod filesystem limitations and RDF principles.
+
+**The Performance Challenge:**
+Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
+
+**Fundamental Principle: IRIs Must Be Stable**
+Resource IRIs are **identifiers**, not storage locations. Any organizational structure must derive from **invariant properties** of the resource that will never change. Changing IRIs breaks references and violates RDF principles.
+
+**Recommended Naming Approaches:**
+
+**1. Semantic Organization (Preferred)**
+Structure paths based on meaningful, invariant properties:
+```turtle
+# By semantic category (if immutable)
+/data/recipes/cuisine/italian/pasta-carbonara
+/data/recipes/cuisine/mexican/tacos-al-pastor
+
+# By creation date (if relevant and stable)
+/data/shopping-entries/created/2024/08/weekly-shopping-list-001
+/data/journal-entries/created/2024/08/15/morning-reflection
+```
+
+**2. UUID-Based Distribution (For Large Datasets)**
+For UUID-based identifiers, use prefix-based distribution:
+```turtle
+# UUID: af1e2d43-3ed4-4f5e-9876-1234567890ab
+/data/resources/af/1e/af1e2d43-3ed4-4f5e-9876-1234567890ab
+
+# Benefits: Predictable, evenly distributed, derived from invariant UUID
+```
+
+**3. Flat Structure (Small Datasets)**
+For small collections (< 1000 resources), flat structure is acceptable:
+```turtle
+/data/recipes/tomato-soup-recipe
+/data/recipes/pasta-carbonara-recipe
+```
+
+**Strategy Comparison:**
+
+| Strategy | Best For | Performance | Discoverability | Trade-offs |
+|----------|----------|-------------|-----------------|------------|
+| **Semantic** | Human browsing, meaningful categories | Complex path computation, potential hotspots | High - paths are human-readable | Reorganization complexity if categories change |
+| **UUID** | High throughput, even distribution | Optimal - predictable, evenly distributed | Low - requires index for discovery | Loss of human-readable structure |
+| **Flat** | Small datasets, simple apps | Good for <1000 resources | Medium - browsable but no structure | Degrades with scale, directory limits |
+
+**Resource Creation Workflow:**
+1. **Generate stable IRI** using chosen naming strategy
+2. **Determine target indices** - Identify all matching index shards based on:
+   - Resource type
+   - Group membership for GroupIndexTemplate patterns (resources may belong to multiple groups)  
+   - Active shard status (exclude tombstoned or deleted shards)
+3. **Prepare resource document** with semantic data, CRDT metadata, and `idx:belongsToIndexShard` links to target shards
+4. **Upload resource document** to Pod storage
+5. **Update index shards** - Add index entries to all target shards and upload updated shards to Pod (may be batched when creating multiple resources together)
+6. **Resumption mechanism** - Implementations should track workflow state to resume interrupted operations at any step
+
+**Fault Tolerance:**
+Resource creation must be resumable after interruptions (network failures, app termination, etc.). The workflow is designed so each step can be retried independently, with the resource document serving as the source of truth for which shards need updating.
+
+**Critical Guidelines:**
+- **Never change IRIs**: Once published, IRIs are permanent identifiers - even if underlying properties change
+- **Derive from invariants**: Path structure should be based on properties unlikely to change, but IRI stability takes precedence over semantic accuracy
+- **Plan for scale**: Consider performance implications of naming choices early
+- **Accept semantic drift**: If "invariant" properties do change, maintain the existing IRI and let CRDT merge behavior handle the data updates
+
+**Framework Migration Scenarios:**
+
+**Version Upgrade Migration:**
+When upgrading framework versions, existing resources remain at their current IRIs. Only new resources adopt updated naming conventions. This prevents breaking existing references while allowing gradual migration to improved patterns.
+
+**RDF Reification Tombstone Format Changes:**
+Framework version compatibility during tombstone format evolution is a complex architectural challenge requiring coordinated migration strategies. See FUTURE-TOPICS.md Section 9 for detailed analysis of multi-format support and collaborative deprecation coordination.
+
+**Index Structure Evolution:**
+Naming strategy changes affect only index organization, never resource IRIs. Applications may choose to create new indices with improved naming while deprecated indices are phased out through the collaborative lifecycle process (Section 5.8).
+
+### 5.6. Framework Garbage Collection Index
 
 **Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
@@ -1224,6 +1351,24 @@ When an application first encounters a Pod, it may need to configure the Type In
 4. **Safe Deletion:** Remove entire resource files from Pod after verifying retention period has passed
 5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
 
+**Performance Thresholds and Cleanup Triggers:**
+
+**GC Index Size Monitoring:**
+- **Warning threshold:** 1000+ tombstoned entries in GC index suggests retention periods may be too long
+- **Performance threshold:** 5000+ entries may impact index sync performance, consider more aggressive cleanup
+- **Critical threshold:** 10000+ entries indicates cleanup process failure, requires manual intervention
+
+**Cleanup Process Batching:**
+- **Batch size:** Process 50-100 tombstoned resources per cleanup cycle to respect mobile device constraints
+- **Frequency:** Run cleanup cycles every 24-48 hours during low-activity periods
+- **Resource limits:** Limit cleanup operations to 2-5 minutes total execution time per cycle
+- **Concurrent safety:** Multiple installations may run cleanup simultaneously - use CRDT merge rules for coordination
+
+**Retention Period Balancing:**
+- **Minimum safe period:** 30 days for property tombstones, 6 months for resource tombstones
+- **Performance optimization:** Shorter periods reduce GC index size but increase risk of zombie deletions
+- **Storage optimization:** Longer periods ensure deletion propagation but may accumulate storage overhead
+
 **Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
 
 **Cleanup Efficiency Benefits:**
@@ -1232,7 +1377,7 @@ When an application first encounters a Pod, it may need to configure the Type In
 - **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
 - **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
 
-### 5.3. Retention Policies and Cleanup Configuration
+### 5.7. Retention Policies and Cleanup Configuration
 
 The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
 
@@ -1241,7 +1386,7 @@ The framework provides configurable retention policies for tombstoned resources,
 **Resource Tombstone Configuration:**
 - **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
 - **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
-- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 5.2)
+- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 5.6)
 - **Risk:** Zombie deletions can affect recreated resources with same IRI
 
 **Property Tombstone Configuration:**
@@ -1292,7 +1437,7 @@ The framework provides configurable retention policies for tombstoned resources,
 4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
 5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
 
-### 5.4. Collaborative Index Lifecycle Management
+### 5.8. Collaborative Index Lifecycle Management
 
 **CRDT-Based Index Coordination:**
 
@@ -1367,7 +1512,8 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 
 *Algorithm-Specific Behaviors:*
 - **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic installation ID tie-breaking
-- **`crdt:Immutable`:** No updates allowed after creation
+- **`crdt:Immutable`:** No updates allowed after creation - sync fails on conflicting values
+- **`crdt:FWW_Register`:** First write wins - subsequent conflicting writes are ignored gracefully
 
 *Framework Benefits:*
 - **Explicit semantics:** Each property declares its intended collaboration model
@@ -1379,6 +1525,72 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 - Installations control their own identity and activity metrics via `SelfOnlyLWW` and `SelfWinsLWW`
 - Collaborative dormancy detection enabled through `TimestampLWW` for dormancy properties
 - Framework prevents ownership conflicts while enabling collaborative lifecycle management
+
+### 5.9. Error Handling and Recovery
+
+The framework provides robust error handling for lifecycle management failures, ensuring system integrity and recovery from various failure scenarios.
+
+**Pod Setup Failure Recovery:**
+
+**Incomplete Setup Detection:**
+- **Missing Type Index entries:** Framework detects incomplete registrations during startup and re-presents setup dialog
+- **Corrupted configuration:** Validate all Type Index entries against expected schema, repair automatically where possible
+- **Permission failures:** If Pod modification fails during setup, offer alternative approaches (read-only mode, manual configuration)
+- **Network interruptions:** Resume setup process from last successfully completed step, avoid duplicate operations
+
+**Setup State Tracking:**
+```turtle
+# Framework tracks setup progress to enable resumption
+<installation-123> a crdt:ClientInstallation;
+    crdt:setupProgress [
+        crdt:typeIndexUpdated true;
+        crdt:dataContainersCreated true;
+        crdt:indicesInitialized false;  # Failed here, needs retry
+        crdt:lastSetupAttempt "2024-08-15T10:30:00Z"^^xsd:dateTime
+    ] .
+```
+
+**Garbage Collection Failure Recovery:**
+
+**Corrupted GC Index State:**
+- **Index corruption:** Rebuild GC index from scratch by scanning all data containers for tombstoned resources
+- **Inconsistent tombstone tracking:** Cross-validate GC index entries against actual resource tombstone states
+- **Missing cleanup operations:** Detect resources that should have been cleaned but weren't, reschedule cleanup operations
+- **Partially deleted resources:** Handle cases where resource files were deleted but GC index entries remain
+
+**Cleanup Process Interruption:**
+- **Batch failure recovery:** If cleanup batch fails, mark individual resources for retry rather than entire batch
+- **Resource lock conflicts:** If multiple installations attempt cleanup simultaneously, use CRDT merge rules to coordinate
+- **Network failures during cleanup:** Queue failed cleanup operations for retry with exponential backoff
+- **Storage errors:** Handle filesystem-level errors gracefully, log issues for manual intervention
+
+**RDF Reification Tombstone Recovery:**
+
+**Tombstone Format Migration Issues:**
+- **Version compatibility:** Framework recognizes and processes both old and new tombstone formats during migration periods
+- **Malformed tombstones:** Detect and repair tombstones with invalid RDF structure or missing required properties
+- **Orphaned tombstones:** Clean up tombstones that reference non-existent resources or properties
+- **Duplicate tombstone conflicts:** Resolve cases where multiple tombstones exist for the same triple using CRDT merge rules
+
+**Tombstone Processing Failures:**
+- **Incomplete tombstone application:** Track which tombstones have been successfully applied during sync operations
+- **Merge conflict resolution:** When tombstone conflicts with resource updates, apply deterministic CRDT resolution
+- **Clock synchronization issues:** Handle cases where tombstone timestamps are inconsistent with resource clocks
+
+**Index Lifecycle Recovery:**
+
+**Deprecated Index Recovery:**
+- **Reactivation failure:** If index reactivation fails partway through, restart with clean deprecated state
+- **Stale data corruption:** If deprecated index contains corrupted entries, mark for full re-population rather than incremental update
+- **Population process interruption:** Resume index population from last successfully processed resource
+- **Concurrent reactivation conflicts:** Use CRDT merge rules when multiple installations attempt reactivation simultaneously
+
+**Recovery Process Principles:**
+- **Fail-safe defaults:** When in doubt, choose the safer option that preserves data integrity
+- **Incremental recovery:** Break recovery operations into small, resumable steps to handle interruptions
+- **State validation:** Always validate system state after recovery operations complete
+- **Manual override capability:** Provide escape hatches for situations requiring human intervention
+- **Comprehensive logging:** Log all recovery operations to enable debugging and prevent repeated failures
 
 ## 6. Synchronization Workflow
 
@@ -1513,6 +1725,23 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
 
 **Efficiency Optimization**: Management phase skips work already completed by other installations by checking index states before performing updates.
 
+### 6.3. HTTP-Level Optimizations
+
+**ETag-Based Conflict Detection:**
+
+Solid Pods support standard HTTP ETags for optimistic concurrency control:
+- **GET responses:** Include `ETag` header with resource version identifier
+- **PUT requests:** Include `If-Match` header with stored ETag to detect concurrent modifications  
+- **412 Precondition Failed:** Server rejects if ETag doesn't match current version
+
+**CRDT Integration Strategy:**
+Unlike traditional REST APIs that fail on conflicts, this framework leverages ETags as a performance optimization:
+1. **Optimistic path:** Most PUTs succeed immediately when no concurrent modifications occurred
+2. **Conflict resolution:** On 412 response, GET current state, perform CRDT merge with local changes, retry PUT
+3. **Eventual consistency:** CRDT merge semantics ensure convergence regardless of update order
+
+This approach provides both immediate conflict detection (via ETags) and robust conflict resolution (via CRDT merging), offering better performance than pure CRDT approaches while maintaining stronger consistency than traditional optimistic locking.
+
 ## 7. Error Handling and Resilience
 
 While the synchronization workflow provides the ideal path for data consistency, real-world distributed systems face numerous failure modes that can disrupt this process. The architecture provides comprehensive strategies for maintaining consistency and availability despite various error conditions, ensuring the system remains robust across network failures, server outages, access control changes, and data corruption scenarios.
@@ -1590,74 +1819,28 @@ The architecture's index-based approach provides efficient incremental synchroni
 
 For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
 
-## 9. Data Organization Principles
-
-### 9.1. Resource IRI Design and Pod Performance
-
-**The Challenge:**
-Most Pod servers (including Community Solid Server) use filesystem backends that can experience performance degradation with thousands of files in a single directory. While the framework uses sophisticated sharding for indices, data resources still need thoughtful organization.
-
-**Fundamental Principle: IRIs Must Be Stable**
-Resource IRIs are **identifiers**, not storage locations. Any organizational structure must derive from **invariant properties** of the resource that will never change. Changing IRIs breaks references and violates RDF principles.
-
-**Recommended Approaches:**
-
-**1. Semantic Organization (Preferred)**
-Structure paths based on meaningful, invariant properties:
-```turtle
-# By semantic category (if immutable)
-/data/recipes/cuisine/italian/pasta-carbonara
-/data/recipes/cuisine/mexican/tacos-al-pastor
-
-# By creation date (if relevant and stable)
-/data/shopping-entries/created/2024/08/weekly-shopping-list-001
-/data/journal-entries/created/2024/08/15/morning-reflection
-```
-
-**2. UUID-Based Distribution (For Large Datasets)**
-For UUID-based identifiers, use prefix-based distribution:
-```turtle
-# UUID: af1e2d43-3ed4-4f5e-9876-1234567890ab
-/data/resources/af/1e/af1e2d43-3ed4-4f5e-9876-1234567890ab
-
-# Benefits: Predictable, evenly distributed, derived from invariant UUID
-```
-
-**3. Flat Structure (Small Datasets)**
-For small collections (< 1000 resources), flat structure is acceptable:
-```turtle
-/data/recipes/tomato-soup-recipe
-/data/recipes/pasta-carbonara-recipe
-```
-
-**Critical Guidelines:**
-- **Never change IRIs**: Once published, IRIs are permanent identifiers
-- **Derive from invariants**: Path structure must be computable from unchanging resource properties
-- **Developer awareness**: Library documentations should warn developers about performance implications of flat structures at scale
-- **No migration**: If you choose flat structure, accept the performance trade-offs rather than breaking IRI stability
-
-## 10. Benefits of this Architecture
+## 9. Benefits of this Architecture
 
 * **CRDT Interoperability:** CRDT-enabled applications achieve safe collaboration by discovering CRDT-managed resources through `sync:ManagedDocument` registrations and following published merge contracts, while remaining protected from interference by incompatible applications.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Controlled Discoverability:** The system is discoverable by CRDT-enabled applications while protecting CRDT-managed data from accidental modification by incompatible applications.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 11. Alignment with Standardization Efforts
+## 10. Alignment with Standardization Efforts
 
-### 11.1. Community Alignment
+### 10.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 11.2. Architectural Differentiators
+### 10.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 12. Outlook: Future Enhancements
+## 11. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 

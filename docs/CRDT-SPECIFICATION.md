@@ -606,10 +606,57 @@ propertyLevelMerge(local, remote, contract):
         result.setProperty(property.name, mergeLWW(localValue, remoteValue))
       case OR_Set:
         result.setProperty(property.name, mergeORSet(localValue, remoteValue))
+      case FWW_Register:
+        result.setProperty(property.name, mergeFWW(localValue, remoteValue))
+      case Immutable:
+        result.setProperty(property.name, mergeImmutable(localValue, remoteValue))
       // TODO: Add other CRDT types
   
   result.vectorClock = mergeClocks(local.clock, remote.clock)
   return result
+```
+
+### 5.3. Merge Algorithm Implementations
+
+**FWW-Register (First-Writer-Wins) Merge:**
+```
+mergeFWW(localValue, localClock, remoteValue, remoteClock):
+  if localValue == null and remoteValue != null:
+    return remoteValue  // First write from remote
+  
+  if remoteValue == null and localValue != null:
+    return localValue   // First write was local
+    
+  if localValue == remoteValue:
+    return localValue   // Same value, no conflict
+  
+  // Conflict: different non-null values - use timestamp to determine first write
+  if localClock dominates remoteClock:
+    return remoteValue  // Remote was earlier (first)
+  elif remoteClock dominates localClock:
+    return localValue   // Local was earlier (first)  
+  else:
+    // Concurrent writes - use physical time tie-breaking for deterministic first-write
+    if max(remoteClock.physicalTimes) < max(localClock.physicalTimes):
+      return remoteValue  // Remote timestamp is earlier
+    else:
+      return localValue   // Local wins on tie-breaking
+```
+
+**Immutable Merge:**
+```
+mergeImmutable(localValue, localClock, remoteValue, remoteClock):
+  if localValue == null and remoteValue != null:
+    return remoteValue  // First write
+  
+  if remoteValue == null and localValue != null:
+    return localValue   // First write was local
+    
+  if localValue == remoteValue:
+    return localValue   // Same value, no conflict
+  
+  // Conflict: Immutable property has different values
+  throw ImmutableConflictException("Immutable property has conflicting values: local=" + localValue + ", remote=" + remoteValue)
 ```
 
 ## 6. Edge Cases and Error Handling
