@@ -46,6 +46,12 @@ Hybrid Logical Clocks (HLC) combine the benefits of logical clocks (causality tr
 - If A.logical[i] == B.logical[i] for all installations i, the clocks are **identical** (no merge needed)
 - If neither dominates based on logical time, the changes are **concurrent** and require physical time tie-breaking
 
+**Empty/Missing Clock Handling:**
+- **Missing/empty clock**: Treated as Hybrid Logical Clock with all zeros (logical=0, physical=0, no installation entries)
+- **One-side empty**: Empty clock is always dominated by any present clock (loses merge comparison)
+- **Both-sides empty**: If values are equal, no conflict. If values differ, local value wins (deterministic local-wins policy)
+- **Semantic meaning**: Missing clock indicates "this installation has never modified this property"
+
 ### 2.3. Hybrid Logical Clock Operations
 
 **On Local Update:**
@@ -114,6 +120,19 @@ Used for properties where only the most recent value matters.
 When merging two versions of a resource, A and B:
 ```
 merge(A, B):
+  // Handle empty/missing clocks first
+  if A.logicalClock is empty and B.logicalClock is empty:
+    if A.value == B.value:
+      return A.value  // No conflict
+    else:
+      // Both sides uninitialized but different values - local wins deterministically
+      return A.value  // A is local, B is remote
+  elif A.logicalClock is empty:
+    return B.value  // Empty clock always loses
+  elif B.logicalClock is empty:
+    return A.value  // Empty clock always loses
+    
+  // Normal CRDT comparison for non-empty clocks
   if A.logicalClock dominates B.logicalClock:
     return A.value
   elif B.logicalClock dominates A.logicalClock:
@@ -250,7 +269,18 @@ mergeORSet(localElements, localTombstones, localLogicalClock, localPhysicalClock
         tombstoneLogicalClock = logicalClockWhenTombstoneWasCreated(t, ...)
         tombstonePhysicalClock = physicalClockWhenTombstoneWasCreated(t, ...)
         
-        if tombstoneLogicalClock dominates elementLogicalClock:
+        // Handle empty/missing clocks for element and tombstone
+        if elementLogicalClock is empty and tombstoneLogicalClock is empty:
+          // Both uninitialized - element wins (Add-Wins policy for OR-Set)
+          continue
+        elif elementLogicalClock is empty and tombstoneLogicalClock is not empty:
+          // Element never had a proper write, tombstone wins
+          isDeleted = true
+          break
+        elif elementLogicalClock is not empty and tombstoneLogicalClock is empty:
+          // Tombstone never had proper write, element wins
+          continue
+        elif tombstoneLogicalClock dominates elementLogicalClock:
           isDeleted = true
           break
         elif elementLogicalClock dominates tombstoneLogicalClock:
@@ -621,6 +651,19 @@ propertyLevelMerge(local, remote, contract):
 **FWW-Register (First-Writer-Wins) Merge:**
 ```
 mergeFWW(localValue, localClock, remoteValue, remoteClock):
+  // Handle empty/missing clocks first
+  if localClock is empty and remoteClock is empty:
+    if localValue == remoteValue:
+      return localValue  // No conflict
+    else:
+      // Both uninitialized but different values - local wins deterministically
+      return localValue
+  elif localClock is empty and remoteClock is not empty:
+    return remoteValue  // Remote was first to write
+  elif localClock is not empty and remoteClock is empty:
+    return localValue   // Local was first to write
+    
+  // Handle null values with present clocks
   if localValue == null and remoteValue != null:
     return remoteValue  // First write from remote
   
@@ -646,6 +689,20 @@ mergeFWW(localValue, localClock, remoteValue, remoteClock):
 **Immutable Merge:**
 ```
 mergeImmutable(localValue, localClock, remoteValue, remoteClock):
+  // Handle empty/missing clocks first
+  if localClock is empty and remoteClock is empty:
+    if localValue == remoteValue:
+      return localValue  // No conflict
+    else:
+      // Both uninitialized but different values - this is still an immutable conflict
+      // Note: Unlike other CRDT types, Immutable maintains strict conflict detection
+      throw ImmutableConflictException("Immutable property has conflicting uninitialized values: local=" + localValue + ", remote=" + remoteValue)
+  elif localClock is empty and remoteClock is not empty:
+    return remoteValue  // Remote was initialized first
+  elif localClock is not empty and remoteClock is empty:
+    return localValue   // Local was initialized first
+    
+  // Handle null values with present clocks
   if localValue == null and remoteValue != null:
     return remoteValue  // First write
   

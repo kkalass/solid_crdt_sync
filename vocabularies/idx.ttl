@@ -36,7 +36,11 @@ idx:GroupIndex a rdfs:Class;
 
 idx:GroupingRule a rdfs:Class;
     rdfs:label "Grouping Rule";
-    rdfs:comment "A declarative rule that describes how a data resource should be assigned to a specific group based on its properties." .
+    rdfs:comment "A declarative rule that describes how a data resource should be assigned to a specific group based on its properties. Contains multiple GroupingRuleProperty instances and a group template." .
+
+idx:GroupingRuleProperty a rdfs:Class;
+    rdfs:label "Grouping Rule Property";
+    rdfs:comment "An individual property specification within a GroupingRule that defines how to extract and format values from a source property for group assignment." .
 
 idx:ModuloHashSharding a rdfs:Class;
     rdfs:label "Modulo Hash Sharding";
@@ -123,16 +127,34 @@ idx:groupedBy a rdf:Property;
     rdfs:domain idx:GroupIndexTemplate;
     rdfs:range idx:GroupingRule .
 
+idx:property a rdf:Property;
+    rdfs:label "property";
+    rdfs:comment "Links a GroupingRule to its GroupingRuleProperty instances. Multi-value property for complex grouping scenarios.";
+    rdfs:domain idx:GroupingRule;
+    rdfs:range idx:GroupingRuleProperty .
+
 idx:sourceProperty a rdf:Property;
     rdfs:label "source property";
-    rdfs:comment "The property in the data resource that the grouping rule is based on.";
-    rdfs:domain idx:GroupingRule;
+    rdfs:comment "The property in the data resource to extract grouping values from.";
+    rdfs:domain idx:GroupingRuleProperty;
     rdfs:range rdf:Property .
+
+idx:name a rdf:Property;
+    rdfs:label "name";
+    rdfs:comment "Variable name for template substitution. Must be unique within a GroupingRule.";
+    rdfs:domain idx:GroupingRuleProperty;
+    rdfs:range xsd:string .
 
 idx:format a rdf:Property;
     rdfs:label "format";
-    rdfs:comment "The format string to apply to the sourceProperty's value to generate the group key.";
-    rdfs:domain idx:GroupingRule;
+    rdfs:comment "Optional format string to apply to the sourceProperty's value (e.g., 'YYYY-MM' for dates).";
+    rdfs:domain idx:GroupingRuleProperty;
+    rdfs:range xsd:string .
+
+idx:missingValue a rdf:Property;
+    rdfs:label "missing value";
+    rdfs:comment "Optional default value to use when the sourceProperty is absent. If not specified, resources without this property create no groups.";
+    rdfs:domain idx:GroupingRuleProperty;
     rdfs:range xsd:string .
 
 idx:groupTemplate a rdf:Property;

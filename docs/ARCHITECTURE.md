@@ -332,12 +332,15 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 **Installation Document Structure:**
 
 ```turtle
-<installation-uuid> a crdt:ClientInstallation;
+<> a sync:ManagedDocument;
+   sync:primaryTopic <#installation>;
+   sync:isGovernedBy mappings:client-installation-v1 .
+
+<#installation> a crdt:ClientInstallation;
    crdt:belongsToWebID <../profile/card#me>;
    crdt:applicationId <https://meal-planning-app.example.org/id>;
    crdt:createdAt "2024-08-19T10:30:00Z"^^xsd:dateTime;
-   crdt:lastActiveAt "2024-09-02T14:30:00Z"^^xsd:dateTime;
-   sync:isGovernedBy mappings:client-installation-v1 .
+   crdt:lastActiveAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 ```
 
 **Installation ID Generation Process:**
@@ -747,14 +750,93 @@ The `idx:` vocabulary provides the building blocks for both indexing approaches:
 * **`idx:containsEntry`:** Contains an index entry with resource IRI and metadata
 * **`idx:resource`:** Points to the actual data resource from an index entry
 * **`idx:groupedBy`:** Links GroupIndexTemplate to its GroupingRule
-* **`idx:sourceProperty`:** Property to extract grouping value from (in GroupingRule)
-* **`idx:format`:** Format pattern for date/time values (in GroupingRule)
-* **`idx:groupTemplate`:** Template for group index paths (in GroupingRule)
+* **`idx:property`:** Multi-value property linking to GroupingRuleProperty instances (in GroupingRule)
+* **`idx:groupTemplate`:** Template for group index paths using named substitution (in GroupingRule)
 * **`idx:shardingAlgorithm`:** Specifies the sharding algorithm configuration
 * **`idx:GroupingRule`:** Class defining how resources are assigned to groups
+* **`idx:GroupingRuleProperty`:** Individual property specification within a GroupingRule
+* **`idx:sourceProperty`:** Property to extract grouping value from (in GroupingRuleProperty)
+* **`idx:format`:** Format pattern for date/time values (in GroupingRuleProperty)  
+* **`idx:name`:** Variable name for template substitution (in GroupingRuleProperty)
+* **`idx:missingValue`:** Default value when property is absent (in GroupingRuleProperty)
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
 
-#### 4.3.3. Sharding and Performance
+#### 4.3.3. GroupingRule Specification
+
+GroupIndexTemplate uses a GroupingRule to determine which group(s) a resource belongs to. This system supports conditional indexing (resources only indexed when certain properties are present) and multi-dimensional grouping.
+
+**GroupingRule Algorithm:**
+
+The GroupingRule determines group membership using the following process:
+
+1. **Property Extraction:** For each `idx:GroupingRuleProperty`, extract all values for `idx:sourceProperty` from the resource
+2. **Missing Value Handling:** If a property has no values:
+   - **With `idx:missingValue`:** Use the specified default value
+   - **Without `idx:missingValue`:** Return empty set (resource joins no groups)
+3. **Permutation Generation:** Compute Cartesian product of all property value sets
+4. **Format Application:** Apply `idx:format` to each value (for dates/times)
+5. **Template Substitution:** Apply `idx:groupTemplate` using named substitution with `idx:name` variables
+6. **Set Deduplication:** Convert the list of group identifiers to a set, removing duplicates that arise from different source values formatting to the same string
+7. **Group Creation:** Create GroupIndex instances for all unique group identifiers
+
+**Configuration Structure:**
+```turtle
+idx:groupedBy [
+  a idx:GroupingRule;
+  idx:property [
+    a idx:GroupingRuleProperty;
+    idx:sourceProperty <predicate>;  # RDF property to extract from
+    idx:name "variableName";         # Variable name for template
+    idx:format "YYYY-MM";            # Optional formatting (dates/times)
+    idx:missingValue "default"       # Optional default if property absent
+  ];
+  idx:groupTemplate "groups/{variableName}/index"
+];
+```
+
+**Common Patterns:**
+
+*Time-Based Grouping:*
+```turtle
+idx:property [
+  idx:sourceProperty schema:dateCreated;
+  idx:name "month";
+  idx:format "YYYY-MM"
+];
+idx:groupTemplate "groups/{month}/index"
+# Result: groups/2024-08/index, groups/2024-09/index, etc.
+```
+
+*Conditional Registration:*
+```turtle
+idx:property [
+  idx:sourceProperty crdt:deletedAt;
+  idx:name "year";
+  idx:format "YYYY"
+  # No missingValue = no group if property absent
+];
+idx:groupTemplate "gc/{year}/index"
+# Only resources WITH crdt:deletedAt get indexed
+```
+
+*Multi-Value Permutations with Deduplication:*
+```turtle
+idx:property [
+  idx:sourceProperty schema:dateCreated;
+  idx:name "month";
+  idx:format "YYYY-MM"
+], [
+  idx:sourceProperty schema:dateModified;  
+  idx:name "month";
+  idx:format "YYYY-MM"
+];
+idx:groupTemplate "groups/{month}/index"
+# Resource with dateCreated="2024-08-15", dateModified="2024-08-20"
+# Before deduplication: ["groups/2024-08/index", "groups/2024-08/index"]
+# After deduplication: {"groups/2024-08/index"}
+```
+
+#### 4.3.4. Sharding and Performance
 
 Both FullIndex and GroupIndex instances use **sharding** for performance optimization. This is a technical implementation detail that splits large indices into smaller, parallel-processable chunks.
 
@@ -772,7 +854,7 @@ Both FullIndex and GroupIndex instances use **sharding** for performance optimiz
 
 **Implementation Details:** For comprehensive sharding algorithms, migration procedures, and version handling, see [SHARDING.md](SHARDING.md).
 
-#### 4.3.4. Structure-Derived Index Naming
+#### 4.3.5. Structure-Derived Index Naming
 
 **Coordination-Free Index Convergence:**
 
@@ -780,10 +862,11 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 
 **Deterministic Naming Pattern:**
 - **FullIndex:** `index-full-${SHA256(indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
-- **GroupIndexTemplate:** `index-grouped-${SHA256(sourcePropertyIRI|format|groupTemplate|indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
+- **GroupIndexTemplate:** `index-grouped-${SHA256(groupingRuleProperties|groupTemplate|indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
 - **Hash computation:** SHA256 with pipe separators (`|`) between all structural inputs
 - **Full IRI usage:** Hash computation uses complete IRIs, not prefixed forms
 - **Directory structure:** Hash-derived directory name + consistent `index` document
+- **GroupingRuleProperties serialization:** Each GroupingRuleProperty serialized as `sourceProperty|name|format|missingValue`, multiple properties sorted by name (lexicographically) and concatenated with `&` separator
 
 **Hash Computation Examples:**
 ```turtle
@@ -792,10 +875,24 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 # Directory: /indices/recipes/index-full-a1b2c3d4/
 # Document: /indices/recipes/index-full-a1b2c3d4/index
 
-# GroupIndexTemplate for shopping entries  
-# Input: "https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
+# GroupIndexTemplate for shopping entries with single property
+# groupingRuleProperties: "https://example.org/vocab/meal#requiredForDate|monthYear|YYYY-MM|"
+# (format: sourceProperty|name|format|missingValue - empty missingValue at end)
+# Input: "https://example.org/vocab/meal#requiredForDate|monthYear|YYYY-MM||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
 # Directory: /indices/shopping-entries/index-grouped-e5f6g7h8/
 # Document: /indices/shopping-entries/index-grouped-e5f6g7h8/index
+
+# GroupIndexTemplate with single property (GC index example)
+# groupingRuleProperties: "https://kkalass.github.io/solid_crdt_sync/vocab/crdt#deletedAt|deletionYear|YYYY|"
+# Input: "https://kkalass.github.io/solid_crdt_sync/vocab/crdt#deletedAt|deletionYear|YYYY||gc/{deletionYear}/index|https://kkalass.github.io/solid_crdt_sync/vocab/sync#ManagedDocument|ModuloHashSharding|xxhash64"
+# Directory: /indices/gc/index-grouped-f9g8h7i6/
+# Document: /indices/gc/index-grouped-f9g8h7i6/index
+
+# GroupIndexTemplate with multiple properties
+# Two properties: rdf:type and schema:keywords
+# groupingRuleProperties: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|type||&https://schema.org/keywords|keyword||default"
+# (sorted by sourceProperty IRI, joined with &)
+# Input: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|type||&https://schema.org/keywords|keyword||default|groups/{type}-{keyword}/index|https://schema.org/Recipe|ModuloHashSharding|xxhash64"
 ```
 
 **Automatic Convergence Property:**
@@ -839,7 +936,7 @@ When installations attempt to create indices with conflicting immutable properti
 - **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.8 for index lifecycle management)
 - **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.8)
 
-#### 4.3.5. Index Population Mechanics
+#### 4.3.6. Index Population Mechanics
 
 Index population occurs in two scenarios: when creating a new index, or when syncing an existing index that is still in populating state.
 
@@ -911,7 +1008,7 @@ When any installation encounters a populating index during sync:
                           <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
 ```
 
-#### 4.3.6. Installation Index Management and Scalability
+#### 4.3.7. Installation Index Management and Scalability
 
 **Installation Management Strategy:** Within the framework's design constraints of 2-100 installations, installation management uses a dedicated **Framework Installation Index** combined with periodic **Management Phase** operations (detailed in Section 6.2).
 
@@ -921,6 +1018,7 @@ Rather than expensive Type Index container scanning, the framework maintains a d
 ```turtle
 # At /indices/framework/installations-index-${hash}/index  
 <> a idx:FullIndex;
+   sync:isGovernedBy mappings:index-v1;
    idx:indexesClass crdt:ClientInstallation;
    idx:indexedProperty [
      idx:property crdt:lastActiveAt;        # For dormancy detection
@@ -941,7 +1039,7 @@ Rather than expensive Type Index container scanning, the framework maintains a d
 
 **Beyond Design Scale:** For scenarios exceeding 100 installations, different architectural patterns might be more appropriate than extending this framework.
 
-#### 4.3.7. Index Structure Examples
+#### 4.3.8. Index Structure Examples
 
 The following examples demonstrate concrete RDF structures for different types of indices, showing how the indexing architecture works in practice with real data.
 
@@ -959,6 +1057,7 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
 # such as group-index-template-v1, group-index-v1, shard-v1, full-index-v1
 
 <> a idx:GroupIndexTemplate;
+   sync:isGovernedBy mappings:index-v1;
    idx:indexesClass meal:ShoppingListEntry;
    # No idx:indexedProperty needed - groups are loaded fully
    # A default sharding algorithm for all group indices created under this rule.
@@ -973,9 +1072,13 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
    # The declarative rule for how to assign items to group indices.
    idx:groupedBy [
      a idx:GroupingRule;
-     idx:sourceProperty meal:requiredForDate;  # Property to extract grouping value from
-     idx:format "YYYY-MM";                     # Format pattern for date/time values  
-     idx:groupTemplate "groups/{value}/index"  # Template for group index paths
+     idx:property [
+       a idx:GroupingRuleProperty;
+       idx:sourceProperty meal:requiredForDate;
+       idx:name "monthYear";
+       idx:format "YYYY-MM"
+     ];
+     idx:groupTemplate "groups/{monthYear}/index"
    ].
 ```
 
@@ -987,13 +1090,13 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 
 <> a idx:GroupIndex;
-   sync:isGovernedBy mappings:group-index-v1;
+   sync:isGovernedBy mappings:index-v1;
    # Back-link to the rulebook.
    idx:basedOn <../../index-grouped-e5f6g7h8/index>;
    # Inherits configuration from GroupIndexTemplate:
    # - Sharding algorithm (ModuloHashSharding with xxhash64, 4 shards)
    # - Indexed properties (none defined, so minimal entries only)
-   # - CRDT merge contract (mappings:group-index-v1)
+   # - CRDT merge contract (mappings:index-v1)
    # Since the template has no idx:indexedProperty defined, this group's shards
    # will contain only resource IRIs and Hybrid Logical Clock hashes (no header data).
    # It has its own list of active shards, which are sibling documents.
@@ -1035,6 +1138,7 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
 <> a idx:FullIndex;
+   sync:isGovernedBy mappings:index-v1;
    idx:indexesClass schema:Recipe;
    # Include properties needed for recipe browsing UI
    idx:indexedProperty [
@@ -1297,35 +1401,59 @@ Resource creation must be resumable after interruptions (network failures, app t
 - **Plan for scale**: Consider performance implications of naming choices early
 - **Accept semantic drift**: If "invariant" properties do change, maintain the existing IRI and let CRDT merge behavior handle the data updates
 
-**Framework Migration Scenarios:**
-
-**Version Upgrade Migration:**
-When upgrading framework versions, existing resources remain at their current IRIs. Only new resources adopt updated naming conventions. This prevents breaking existing references while allowing gradual migration to improved patterns.
-
-**RDF Reification Tombstone Format Changes:**
-Framework version compatibility during tombstone format evolution is a complex architectural challenge requiring coordinated migration strategies. See FUTURE-TOPICS.md Section 9 for detailed analysis of multi-format support and collaborative deprecation coordination.
-
-**Index Structure Evolution:**
-Naming strategy changes affect only index organization, never resource IRIs. Applications may choose to create new indices with improved naming while deprecated indices are phased out through the collaborative lifecycle process (Section 5.8).
 
 ### 5.6. Framework Garbage Collection Index
 
-**Purpose:** System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
+System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
-**Centralized Resource Cleanup Strategy:** Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, complete resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
+#### 5.6.1. Design Overview
 
-**Structure-Derived Naming:**
-- **Path:** `/indices/framework/gc-index-${SHA256("tombstoned-resources")}/index`
-- **Type:** `idx:FullIndex` with multiple indexed classes
-- **Registration:** Automatic Type Index registration by framework (not application-specific)
+**Centralized Cleanup Strategy:**
+Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, complete resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
 
-**Indexed Resource Types:**
-- **User Data Resources:** Any `sync:ManagedDocument` with `crdt:deletedAt` timestamps
-- **Client Installations:** `crdt:ClientInstallation` marked for cleanup after inactivity periods
+**GroupIndexTemplate Implementation:**
+The GC index leverages the enhanced GroupingRule system to achieve conditional registration - only resources with `crdt:deletedAt` timestamps get indexed, organized by deletion year for efficient cleanup operations.
 
-**Index Configuration:**
+**Multi-Type Support:**
+Uses `rdfs:Resource` as `idx:indexesClass` to handle any resource type. The framework consistently extracts the primary topic resource from `sync:ManagedDocument` wrappers for indexing.
+
+#### 5.6.2. Index Structure
+
+**Configuration:**
+```turtle
+<gc-index-template> a idx:GroupIndexTemplate;
+   sync:isGovernedBy mappings:index-v1;
+   idx:indexesClass rdfs:Resource;  # Indexes any resource type
+   idx:groupedBy [
+     a idx:GroupingRule;
+     idx:property [
+       a idx:GroupingRuleProperty;
+       idx:sourceProperty crdt:deletedAt;
+       idx:name "deletionYear";
+       idx:format "YYYY"
+       # No idx:missingValue = resources without deletedAt create no groups
+     ];
+     idx:groupTemplate "gc/{deletionYear}/index"
+   ];
+   # Standard sharding and merge contracts...
+```
+
+**Registration Behavior:**
+- **Active resources** (no `crdt:deletedAt`): Not indexed (no groups created)  
+- **Tombstoned resources** (with `crdt:deletedAt`): Automatically registered in appropriate yearly group
+- **Yearly organization:** `gc/2024/index`, `gc/2025/index`, etc. for efficient retention policy application
+
+#### 5.6.3. Lifecycle Management
+
+**Index Discovery:**
+- **Type Index registration:** Framework registers as `idx:GroupIndexTemplate` for tombstoned resource cleanup
+- **Structure-derived naming:** Follows standard GroupIndexTemplate creation rules (Section 4.3)
+- **System index creation:** Created during System Index Setup (Section 5.3) as part of essential framework infrastructure
+
+**Detailed Configuration:**
 ```turtle
 <gc-index-a1b2c3d4> a idx:FullIndex;
+   sync:isGovernedBy mappings:index-v1;
    # Index covers all tombstoned resource types
    idx:indexedProperty [
      a idx:IndexedProperty;
@@ -1344,6 +1472,8 @@ Naming strategy changes affect only index organization, never resource IRIs. App
    idx:readBy <installation-1>, <installation-2>, <installation-3> .
 ```
 
+#### 5.6.4. Cleanup Operations
+
 **Resource Garbage Collection Process:**
 1. **Automatic Registration:** When complete resources (documents) receive `crdt:deletedAt` timestamp, automatically add entry to GC index
 2. **Periodic Cleanup:** Background processes scan GC index for tombstoned resources older than configured retention periods
@@ -1351,7 +1481,9 @@ Naming strategy changes affect only index organization, never resource IRIs. App
 4. **Safe Deletion:** Remove entire resource files from Pod after verifying retention period has passed
 5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
 
-**Performance Thresholds and Cleanup Triggers:**
+**Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
+
+#### 5.6.5. Performance and Thresholds
 
 **GC Index Size Monitoring:**
 - **Warning threshold:** 1000+ tombstoned entries in GC index suggests retention periods may be too long
@@ -1368,8 +1500,6 @@ Naming strategy changes affect only index organization, never resource IRIs. App
 - **Minimum safe period:** 30 days for property tombstones, 6 months for resource tombstones
 - **Performance optimization:** Shorter periods reduce GC index size but increase risk of zombie deletions
 - **Storage optimization:** Longer periods ensure deletion propagation but may accumulate storage overhead
-
-**Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
 
 **Cleanup Efficiency Benefits:**
 - **No Container Scanning:** Cleanup processes never need to scan entire data containers
@@ -1446,6 +1576,7 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 **Property-Level Reader Tracking:**
 ```turtle
 <> a idx:FullIndex;
+   sync:isGovernedBy mappings:index-v1;
    idx:indexedProperty [
      a idx:IndexedProperty;
      idx:property schema:name;
@@ -1541,7 +1672,11 @@ The framework provides robust error handling for lifecycle management failures, 
 **Setup State Tracking:**
 ```turtle
 # Framework tracks setup progress to enable resumption
-<installation-123> a crdt:ClientInstallation;
+<> a sync:ManagedDocument;
+   sync:primaryTopic <#installation>;
+   sync:isGovernedBy mappings:client-installation-v1 .
+
+<#installation> a crdt:ClientInstallation;
     crdt:setupProgress [
         crdt:typeIndexUpdated true;
         crdt:dataContainersCreated true;
@@ -1670,6 +1805,7 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
 **Index Properties:**
 ```turtle
 <installations-index> a idx:FullIndex;
+   sync:isGovernedBy mappings:index-v1;
    idx:indexesClass crdt:ClientInstallation;
    idx:indexedProperty [
      idx:property crdt:lastActiveAt;        # For dormancy detection

@@ -7,10 +7,28 @@
 # This DocumentMapping provides all essential CRDT mappings that most applications need
 
 <> a sync:DocumentMapping;
-   # Import existing statement mapping for tombstones (ordered list)
-   sync:classMapping ( mappings:statement-v1 ) ;
+   # Define class mappings for framework components
+   sync:classMapping ( <#managed-document> <#statement> ) ;
    # Define predicate mappings for framework components (ordered list)
    sync:predicateMapping ( <#clock-mappings> <#deletion-mappings> ) .
+
+# ManagedDocument is the wrapper for all CRDT-managed resources
+<#managed-document> a sync:ClassMapping;
+   sync:appliesToClass sync:ManagedDocument;
+   sync:rule
+     [ sync:predicate sync:primaryTopic; crdt:mergeWith crdt:Immutable ],  # The resource being managed
+     [ sync:predicate sync:isGovernedBy; crdt:mergeWith crdt:Immutable ],  # Merge contract reference
+     [ sync:predicate sync:managedResourceType; crdt:mergeWith crdt:Immutable ],  # Resource type for discovery
+     [ sync:predicate idx:belongsToIndexShard; crdt:mergeWith crdt:OR_Set ] .  # Index shard memberships
+
+# Merge contract for RDF reified statements used as tombstones in CRDT sets
+<#statement> a sync:ClassMapping;
+   sync:appliesToClass rdf:Statement;
+   sync:rule
+     # The subject, predicate, and object of the reified statement are immutable identifiers
+     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate rdf:predicate; crdt:mergeWith crdt:LWW_Register ],
+     [ sync:predicate rdf:object; crdt:mergeWith crdt:LWW_Register ] .
 
 # Standard mapping for predicates of Hybrid Logical Clock entries (typeless blank nodes)  
 <#clock-mappings> a sync:PredicateMapping;
