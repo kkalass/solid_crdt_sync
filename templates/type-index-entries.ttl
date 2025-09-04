@@ -9,7 +9,7 @@
 # Placeholders: {INSTALLATION_CONTAINER_URI}, {FRAMEWORK_INDEX_CONTAINER_URI}
 
 # Framework retention policies (global defaults)
-<> crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
+<> crdt:resourceTombstoneRetentionPeriod "P1Y"^^xsd:duration;
    crdt:enableResourceTombstoneCleanup true;
    crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
    crdt:enablePropertyTombstoneCleanup true;
@@ -21,6 +21,16 @@
       solid:forClass sync:ManagedDocument;
       sync:managedResourceType crdt:ClientInstallation;
       solid:instanceContainer <{INSTALLATION_CONTAINER_URI}>
+      # Override: Keep installation tombstones longer for audit trails
+      crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration
+   ];
+
+   # Client installation documents index registration
+   solid:hasRegistration [
+      a solid:TypeRegistration; 
+      solid:forClass idx:FullIndex;
+      solid:instanceContainer <{FRAMEWORK_INDEX_CONTAINER_URI}>;
+      idx:indexesClass crdt:ClientInstallation
    ];
 
    # Framework garbage collection index registration  
@@ -28,15 +38,6 @@
       a solid:TypeRegistration;
       solid:forClass idx:GroupIndexTemplate;
       solid:instanceContainer <{FRAMEWORK_INDEX_CONTAINER_URI}>;
-      idx:indexesClass crdt:ClientInstallation;
-      # Override: Keep installation tombstones longer for audit trails
-      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration
-   ];
-
-   # Framework installation index registration
-   solid:hasRegistration [
-      a solid:TypeRegistration; 
-      solid:forClass idx:FullIndex;
-      solid:instanceContainer <{FRAMEWORK_INDEX_CONTAINER_URI}>;
-      idx:indexesClass crdt:ClientInstallation
-   ] .
+      # Garbage collection uses an index for resources of any class
+      idx:indexesClass rdfs:Resource;
+   ].
