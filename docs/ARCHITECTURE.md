@@ -56,6 +56,12 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 - Conflict resolution: Compare timestamps, newer value wins
 - Compatible with any object type (IRIs, literals, blank nodes)
 
+**FWW-Register (First-Writer-Wins Register):**
+- Used for immutable properties where a forgiving approach is preferred over sync failure
+- Examples: Resource identifiers, permanent classifications, initial configurations
+- Conflict resolution: Compare timestamps, first write wins, subsequent writes ignored
+- Provides graceful degradation alternative to Immutable's strict merge failure
+
 **OR-Set (Observed-Remove Set):**
 - Used for multi-value properties where additions and removals must be tracked separately
 - Examples: Recipe keywords, ingredient lists, tag collections
@@ -69,9 +75,10 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 
 **Immutable:**
 - Framework-specific constraint (not a traditional CRDT algorithm)
-- Used for properties that must never change after creation
+- Used for properties that must never change after creation with strict enforcement
 - Examples: Resource creation timestamps, installation identifiers, structural configurations
 - Conflict resolution: Merge fails if different values encountered, forces resource versioning
+- Stricter than FWW-Register - causes sync failure rather than silently ignoring conflicts
 
 **Hybrid Logical Clock (HLC):**
 - Combines logical causality tracking with physical wall-clock timestamps
