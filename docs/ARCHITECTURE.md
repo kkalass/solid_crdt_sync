@@ -8,6 +8,8 @@ The proposed solution addresses both challenges through a declarative, developer
 
 **Implementation Model:** The technical complexity described in this document is intended to be encapsulated within a reusable synchronization library (such as `solid-crdt-sync`). Application developers interact with a simple, declarative API while the library handles all CRDT algorithms, index management, conflict resolution, and Pod communication. The detailed specifications in this document serve as implementation guidance for library authors and reference for understanding the underlying system behavior.
 
+**Scale and Design Constraints:** This framework is designed for personal to small-organization scale collaboration, targeting **2-100 installations** with optimal performance at **2-20 installations**. Primary use cases include personal synchronization across multiple devices (2-5 installations), family collaboration (5-15 installations), and small teams or friend groups (10-20 installations). Extended use cases support small organizations up to 100 installations. Beyond this scale, different architectural assumptions around centralized coordination, professional IT support, and enterprise-grade infrastructure would be more appropriate.
+
 ## 2. Core Principles
 
 * **Local-First:** The application must be fully functional offline, working primarily with data cached on the device. To ensure this principle remains practical for large datasets, the architecture supports optional partial sync strategies. This allows an application to work with a local, consistent cache of the *relevant* data, maintaining speed and offline availability without requiring a full data download.
@@ -75,7 +77,7 @@ This framework uses **state-based CRDTs** rather than operation-based approaches
 - Lower bandwidth but requires more complex infrastructure
 - Examples: Yjs, Automerge operation streams
 
-#### 3.1.3. Framework Application
+#### 3.1.3. Property-Level CRDT Integration
 
 The framework applies these CRDT types at the **property level** within RDF resources:
 - Each property in a resource is governed by a specific CRDT type
@@ -455,10 +457,18 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 Merge contracts are public RDF documents that define how to resolve conflicts when merging data from multiple sources. They act as "rule books" that ensure any two CRDT-enabled applications can merge the same data and arrive at identical results.
 
+**Critical: Contracts Are Hosted Externally, Not in User Pods**
+
+Merge contracts are **published by application authors or this specification at stable internet URIs** (e.g., `https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1`), not stored in user Pods. This separation is essential because:
+- **Stability:** Contracts must remain accessible even if individual user Pods are offline
+- **Interoperability:** Multiple applications can reference the same contract without coordination
+- **Version control:** Application authors manage contract evolution independently of user data
+- **Trust:** Users can inspect the merge rules their data follows by examining public contracts
+
 **How Merge Contracts Work:**
 
 1. **Property-to-CRDT Mapping:** Each RDF property is linked to a specific CRDT algorithm (LWW-Register, OR-Set, etc.)
-2. **Public Discovery:** Resources point to their merge contract via `sync:isGovernedBy`
+2. **External Reference:** Resources point to their merge contract via `sync:isGovernedBy` using stable internet URIs
 3. **Deterministic Merging:** Applications follow the published rules to merge conflicting changes
 4. **Interoperability:** Different applications using the same contracts can safely collaborate
 
@@ -583,12 +593,13 @@ Now let's examine what the `shopping-entry-v1` merge contract actually contains.
 
 2. **Application Rules:** The local `sync:classMapping` defines domain-specific merge behavior for `meal:ShoppingListEntry` properties. All properties use `crdt:LWW_Register` since shopping items are typically single-user managed.
 
-3. **Precedence Resolution:** Conflicts are resolved using deterministic precedence order (why `rdf:List` is used instead of multi-valued properties):
+3. **Precedence Resolution:** Conflicts are resolved using deterministic precedence order following the specificity principle (why `rdf:List` is used instead of multi-valued properties):
    1. **Local Class Mappings** (highest priority) - `sync:classMapping` 
-   2. **Local Predicate Mappings** - `sync:predicateMapping`
-   3. **Imported Libraries** (lowest priority) - `sync:imports` in list order
+   2. **Imported Class Mappings** - from `sync:imports` libraries
+   3. **Local Predicate Mappings** - `sync:predicateMapping`
+   4. **Imported Predicate Mappings** (lowest priority) - from `sync:imports` libraries
    
-   This ordered resolution enables application-specific customization while inheriting framework infrastructure.
+   **Key Principle:** Context-specific rules (class mappings) win over global rules (predicate mappings), regardless of local vs imported source. This ensures that specific behaviors defined for particular contexts aren't accidentally overridden by general global rules.
 
 
 #### 4.2.3. Hybrid Logical Clock Mechanics
@@ -854,29 +865,22 @@ When any installation encounters a populating index during sync:
 
 #### 4.3.4. Installation Index Management and Scalability
 
-**Scalability Challenge:** When thousands of installations exist, validating dormancy and managing reader lists becomes computationally expensive.
+**Installation Management at Target Scale:** Within the framework's design constraints of 2-100 installations, installation management remains straightforward using simple approaches.
 
-**Proposed Solutions:**
+**Scalable Solutions for Target Range:**
 
-*Option A: Sharded Installation Index*
-- Create `idx:FullIndex` for `crdt:ClientInstallation` with automatic sharding
-- Enable efficient lookup and batch lifecycle validation  
-- Index properties: `crdt:lastActiveAt`, `crdt:applicationId`
-- Trade-off: Additional index complexity for improved performance
+*Primary Approach: Direct Reader List Management*
+- Direct OR-Set management of `idx:readBy` lists works efficiently at target scale (2-100 installations)
+- Simple dormancy validation through Type Index scanning of `crdt:ClientInstallation` containers
+- Linear validation costs are acceptable for the target installation count
+- Benefits: Simple implementation, no additional index complexity
 
-*Option B: Hierarchical Reader Lists*
-- Group installations by application ID in reader lists
-- Use nested OR-Sets: `idx:readBy` contains application IDs, applications contain installation lists
-- Enables app-level dormancy detection without individual installation lookup
-- Trade-off: More complex reader list management
+*Optimization for Larger End of Range (50-100 installations):*
+- **Lazy Dormancy Detection:** Only validate installations when encountered during normal operations
+- **TTL-based caching:** Cache installation activity validation results to avoid repeated lookups
+- **Opportunistic cleanup:** Clean up reader lists during regular sync operations rather than dedicated scans
 
-*Option C: Lazy Dormancy Detection*
-- Only validate installations when they appear in reader lists during normal operation
-- Skip global dormancy scans, rely on opportunistic cleanup
-- Use TTL-based caching to avoid repeated validation of same installation
-- Trade-off: Slower cleanup, potential stale reader list entries
-
-**Recommended Approach:** Start with Option C (lazy detection) for simplicity, migrate to Option A (sharded index) when installation counts exceed ~1000 per Pod.
+**Beyond Design Scale:** For scenarios exceeding 100 installations, different architectural patterns (sharded installation indices, hierarchical reader management, centralized coordination) would be more appropriate than extending this framework.
 
 #### 4.3.5. Pod Setup and Configuration Process
 
