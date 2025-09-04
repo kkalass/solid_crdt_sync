@@ -322,11 +322,9 @@ This creates clean separation: compatible applications collaborate safely on man
 
 **Advantages:** Using TypeRegistration with `sync:ManagedDocument` and `sync:managedResourceType` enables managed resource discovery while protecting managed resources from incompatible applications. CRDT-enabled applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), while traditional applications remain unaware of CRDT-managed data, preventing accidental corruption.
 
-### 3.4. Identity and Lifecycle Management
+### 3.4. Installation Identity Management
 
-Before examining the architectural layers, we need to establish the fundamental concepts of identity management and resource lifecycle that underpin the entire framework. These concepts are used throughout all architectural layers.
-
-#### 3.4.1. Identity Management (Client Installation Documents)
+Collaborative CRDT synchronization requires stable client identity management to enable causality tracking, coordinate collaborative operations, and manage installation lifecycles. Each client installation maintains a discoverable identity document that serves as the foundation for all collaborative coordination.
 
 Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` documents. These provide traceability, identity management for Hybrid Logical Clock entries, and collaborative lifecycle management.
 
@@ -372,9 +370,13 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 - **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable` or `crdt:FWW_Register` based on error handling preference
 
 **Installation Cleanup:**
-Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations and make dormant installation tombstoning decisions as part of their sync management phase. For general tombstone mechanics, see Section 3.4.2 below.
+Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations and make dormant installation tombstoning decisions as part of their sync management phase. For general tombstone mechanics, see Section 3.5 below.
 
-#### 3.4.2. Tombstoning Fundamentals
+### 3.5. Tombstoning and Deletion Semantics
+
+Distributed systems require explicit deletion handling to ensure consistent data removal across all clients. The framework implements a comprehensive tombstoning approach that supports both complete resource deletion and granular property value removal while maintaining CRDT convergence properties.
+
+#### 3.5.1. Tombstone Types and Scope
 
 The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
 
@@ -392,7 +394,7 @@ The framework uses two distinct tombstone mechanisms for different deletion scop
 - **Scope:** Applied to individual property values within OR-Set or 2P-Set properties
 - **Use Case:** User removes a keyword, ingredient, or other individual value from a multi-value property
 
-**Unified `crdt:deletedAt` Semantics:**
+#### 3.5.2. Unified Deletion Semantics
 
 The `crdt:deletedAt` predicate is defined globally in the framework's predicate mappings with consistent OR-Set semantics across all contexts:
 
@@ -407,7 +409,7 @@ The `crdt:deletedAt` predicate is defined globally in the framework's predicate 
 - **Merge Behavior:** OR-Set union across all replicas - timestamps can be added (delete) or removed (undelete)
 - **Undeletion Support:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
 
-**Property Tombstone Implementation:**
+#### 3.5.3. Property Tombstone Implementation
 
 Individual values within multi-value properties are deleted using RDF Reification tombstones:
 
@@ -421,6 +423,29 @@ Individual values within multi-value properties are deleted using RDF Reificatio
 ```
 
 **Fragment Identifiers:** Deterministic generation using XXH64 hash of canonical N-Triple prevents conflicts while allowing collaborative tombstone creation.
+
+#### 3.5.4. Design Rationale
+
+This framework deliberately uses fragment identifiers for reification statements rather than the more common blank nodes, reflecting the distributed coordination requirements of CRDT synchronization:
+
+**Traditional RDF Reification:** Typically uses blank nodes since statements are considered "local to document" without inherent web identity:
+```turtle
+# Traditional approach (NOT used in this framework)
+_:tombstone a rdf:Statement;
+  rdf:subject :it;
+  rdf:predicate schema:keywords;
+  rdf:object "quick";
+  crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
+```
+
+**Distributed CRDT Requirements:** The collaborative nature of CRDT synchronization requires deterministic identification of the same logical deletion across installations:
+
+1. **Cross-Installation Coordination:** Multiple client installations must identify the same logical deletion when merging tombstone states
+2. **Merge Efficiency:** Fragment identifiers are more efficient during merge operations than blank node identity resolution
+
+**Technical Alternative:** Blank nodes with canonical form identification (Section 3.2) would also work, but fragment identifiers provide simpler merge processing and better debuggability.
+
+**Key Insight:** While traditional RDF treats reification as document-local metadata, CRDT frameworks require deterministic identification of deletion markers across the collaborative system.
 
 **RDF Reification Choice:** RDF Reification is semantically correct for tombstones because we need to mark statements as deleted without asserting them. RDF-Star syntax would incorrectly assert the triple.
 
