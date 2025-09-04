@@ -1,0 +1,33 @@
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+# Template for Framework Installation Index
+# System-level index for efficient installation management and dormancy detection
+# Placeholders: {INSTALLATION_URI}
+
+<> a idx:FullIndex;
+   sync:isGovernedBy mappings:index-v1;
+   idx:indexesClass crdt:ClientInstallation;
+   idx:indexedProperty [
+     a idx:IndexedProperty;
+     idx:property crdt:lastActiveAt;        # For dormancy detection
+     idx:readBy <{INSTALLATION_URI}>
+   ], [
+     a idx:IndexedProperty;
+     idx:property crdt:belongsToWebID;      # For multi-user scenarios
+     idx:readBy <{INSTALLATION_URI}>
+   ], [
+     a idx:IndexedProperty;
+     idx:property crdt:applicationId;       # For app-specific queries
+     idx:readBy <{INSTALLATION_URI}>
+   ];
+   # Single shard for installation index (typically small dataset)
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 1
+   ];
+   idx:populationState "active";
+   idx:readBy <{INSTALLATION_URI}> .

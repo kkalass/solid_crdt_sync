@@ -1,0 +1,19 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+# Template for Client Installation Document
+# Placeholders: {WEBID_URI}, {APP_ID}, {TIMESTAMP}
+
+<> a sync:ManagedDocument;
+   sync:primaryTopic <#installation>;
+   sync:isGovernedBy mappings:client-installation-v1 .
+
+<#installation> a crdt:ClientInstallation;
+   crdt:belongsToWebID <{WEBID_URI}>;
+   crdt:applicationId <{APP_ID}>;
+   crdt:createdAt "{TIMESTAMP}"^^xsd:dateTime;
+   crdt:lastActiveAt "{TIMESTAMP}"^^xsd:dateTime;
+   crdt:maxInactivityPeriod "P6M"^^xsd:duration .

@@ -1,0 +1,33 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+# Template for Framework Garbage Collection Index
+# System-level index for tracking tombstoned resources requiring cleanup
+# Placeholders: {INSTALLATION_URI}
+
+<> a idx:GroupIndexTemplate;
+   sync:isGovernedBy mappings:index-v1;
+   idx:indexesClass rdfs:Resource;  # Indexes any resource type
+   idx:groupedBy [
+     a idx:GroupingRule;
+     idx:property [
+       a idx:GroupingRuleProperty;
+       idx:sourceProperty crdt:deletedAt;
+       idx:name "deletionYear";
+       idx:format "YYYY"
+       # No idx:missingValue = resources without deletedAt create no groups
+     ];
+     idx:groupTemplate "gc/{deletionYear}/index"
+   ];
+   # Standard sharding for GC index
+   idx:shardingAlgorithm [
+     a idx:ModuloHashSharding;
+     idx:hashAlgorithm "xxhash64";
+     idx:numberOfShards 1
+   ];
+   idx:populationState "active";
+   idx:readBy <{INSTALLATION_URI}> .
