@@ -86,6 +86,8 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 - Each document maintains a clock that advances with each change
 - Enables "newer wins" semantics while protecting against clock manipulation
 
+**Framework Extensibility:** The architecture is designed to support additional CRDT algorithms beyond this initial set. The core infrastructure (Hybrid Logical Clocks, blank node identification, merge contracts) provides the foundation for extending to counters, sequences, and other algorithm families, though complex algorithms may require enhancements to the identification or merge rule systems.
+
 #### 3.1.2. State-Based vs Operation-Based CRDTs
 
 This framework uses **state-based CRDTs** rather than operation-based approaches:
@@ -143,9 +145,9 @@ While the core principles above define the framework's goals, implementing relia
 
 **The Key Insight:** Some blank nodes can become identifiable through the combination of context + properties, enabling safe CRDT operations within specific scopes.
 
-**The Mechanism:** Mapping documents can declare that specific properties serve as identifiers for blank nodes using `sync:isIdentifying true` boolean flags within mapping rules (part of our `sync:` vocabulary for merge contracts). This creates stable identity within a known context scope.
+**The Mechanism:** Mapping documents can declare that specific properties serve as identifiers for blank nodes using `mc:isIdentifying true` boolean flags within mapping rules (part of our `mc:` vocabulary for merge contracts). This creates stable identity within a known context scope.
 
-**The Pattern:** `(context, identifying properties)` creates sufficient identity for safe merging within that scope. The context is the identifier of the subject containing the blank node, and identifying properties are the values of predicates with `sync:isIdentifying true` flags in their rules. With compound keys, the pattern becomes `(context, property1=value1, property2=value2, ...)`.
+**The Pattern:** `(context, identifying properties)` creates sufficient identity for safe merging within that scope. The context is the identifier of the subject containing the blank node, and identifying properties are the values of predicates with `mc:isIdentifying true` flags in their rules. With compound keys, the pattern becomes `(context, property1=value1, property2=value2, ...)`.
 
 **Recursive Context Building:** Context identifiers can be built recursively - an identified blank node can serve as context for nested blank nodes:
 - **Base case:** IRI-identified resource (e.g., `<https://alice.podprovider.org/data/recipes/tomato-soup#it>`)  
@@ -176,7 +178,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 - **CRDT Compatibility:** Limited to atomic operations (LWW-Register only)
 
 **Determining Identifiability:** A blank node becomes identifiable when:
-1. A mapping rule declares some predicate as identifying (`sync:isIdentifying true`)  
+1. A mapping rule declares some predicate as identifying (`mc:isIdentifying true`)  
 2. The blank node has that identifying predicate as one of its properties
 3. The subject that references the blank node is itself identifiable (IRI or previously identified blank node)
 
@@ -195,7 +197,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 #### 3.2.6. Development Implications
 
 - **Data Modeling:** Prefer IRIs over blank nodes when identity-dependent CRDT operations are needed
-- **Mapping Design:** Understand identifiability requirements for each CRDT type and use `sync:isIdentifying` appropriately
+- **Mapping Design:** Understand identifiability requirements for each CRDT type and use `mc:isIdentifying` appropriately
 - **Validation:** Implement mapping validation to prevent invalid configurations
 - **Performance:** Flat resource processing enables parallel merging optimizations
 
@@ -203,7 +205,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 
 **Recommended Practice:** Implementing libraries should perform consistency checks during mapping generation or validation, particularly when mappings are derived from code annotations:
 
-- **Blank Node Identification:** Verify that all blank nodes used with identity-dependent CRDTs (OR-Set, 2P-Set) have appropriate `sync:isIdentifying` declarations
+- **Blank Node Identification:** Verify that all blank nodes used with identity-dependent CRDTs (OR-Set, 2P-Set) have appropriate `mc:isIdentifying` declarations
 - **Mapping Completeness:** Ensure all properties of a class have corresponding merge rules in the mapping contract
 - **CRDT Compatibility:** Validate that each property's declared CRDT type is compatible with its object types (see section 4.2 in CRDT-SPECIFICATION.md)
 - **Generator Feedback:** When using code generation from annotations, provide clear error messages identifying specific properties or patterns that need correction
@@ -232,20 +234,73 @@ class Ingredient {
 }
 
 // Generator produces mapping:
-// sync:rule [ sync:predicate my:name; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-//           [ sync:predicate my:unit; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-//           [ sync:predicate my:amount; crdt:mergeWith crdt:LWW_Register ]
+// mc:rule [ mc:predicate my:name; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
+//           [ mc:predicate my:unit; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
+//           [ mc:predicate my:amount; algo:mergeWith algo:LWW_Register ]
 ```
 
 This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
 
-### 3.3. Solid Discovery Integration
+### 3.3. Resource/Document Abstraction Layers
+
+The framework operates on two distinct but coordinated abstraction layers that resolve the fundamental tension between developer-friendly resource-oriented thinking and protocol-efficient document-oriented synchronization.
+
+#### 3.3.1. The Fundamental Principle
+
+**Core Rule:** *If the resource uses a fragment identifier, then sync/merge control operates on the entire document. The resource content/indexing operates on the specific resource, regardless of whether that resource is the document's primary topic, the document itself, or any other resource within that document.*
+
+This principle creates a clean separation between:
+
+- **Logical Layer (Developer-Facing):** Resource-oriented operations, properties, and indexing
+- **Physical Layer (Sync Protocol):** Document-oriented change detection, conflict resolution, and atomic synchronization
+
+#### 3.3.2. Abstraction Layer Details
+
+**Developer/Application Layer:**
+- **Think in resources:** `recipe#it`, `shoppingList#item1`, properties like `schema:name`
+- **Index entries contain resource properties** for intuitive querying and discovery  
+- **Type registrations use semantic resource types** (`schema:Recipe`, `meal:ShoppingListEntry`)
+- **APIs work with resource identities** and individual property values
+- **Resource type registration:** Implementations provide mechanisms for developers to associate resource types with their governing mapping documents, establishing the connection between application classes and CRDT merge contracts
+
+**Framework/Sync Layer:**  
+- **Operate on documents as atomic units** for conflict-free synchronization
+- **HLC hashes track document-level changes** for efficient change detection
+- **Merge conflicts resolved at document granularity** for consistency
+- **Deletion is document-level** with all-or-nothing cleanup semantics
+
+#### 3.3.3. Indexing Implications
+
+**`idx:indexesClass` References:** 
+- Always refers to **resource classes** (`schema:Recipe`, `idx:Shard`, `sync:ManagedDocument`)
+- If resources are documents themselves (e.g., `idx:FullIndex`), all operations are document-level
+- If resources are fragments (e.g., `schema:Recipe`), sync operations are on the containing document, while resource operations are on the specific resource
+
+**Index Content:**
+- Contains **resource-level properties** for meaningful queries
+- Enables querying by resource semantic properties (`schema:name`, `meal:quantity`)  
+- Change detection remains **document-level** via HLC hashes
+
+**Garbage Collection:**
+- Tracks **document tombstones** (not resource tombstones)
+- Type registrations specify **semantic resource types** for policy configuration
+- Cleanup operates on **complete documents** when retention periods expire
+
+#### 3.3.4. Protocol Consistency
+
+This dual-layer approach ensures:
+- **Atomic consistency:** All changes to resources within a document are synchronized together
+- **Developer intuition:** APIs and indices work with familiar resource-oriented concepts
+- **Efficient sync:** Protocol transfers and conflicts operate on document granularity
+- **Clean semantics:** Fragment resources automatically inherit document-level sync behavior
+
+### 3.4. Solid Discovery Integration
 
 CRDT-managed resources contain synchronization metadata and follow structural conventions that traditional RDF applications don't understand, creating a risk of data corruption. This section describes how the architecture solves this problem through discovery isolation.
 
 CRDT-enabled applications use a modified Solid discovery approach that provides controlled access to managed resources while protecting them from incompatible applications. This isolation strategy prevents data corruption while maintaining standard Solid discoverability principles.
 
-#### 3.3.1. Discovery Isolation Strategy
+#### 3.4.1. Discovery Isolation Strategy
 
 **The Challenge:** Traditional Solid discovery would expose CRDT-managed data to all applications, risking corruption by applications that don't understand CRDT metadata or Hybrid Logical Clocks.
 
@@ -258,7 +313,7 @@ CRDT-enabled applications use a modified Solid discovery approach that provides 
 
 This creates clean separation: compatible applications collaborate safely on managed data, while traditional apps work with unmanaged data, preventing cross-contamination.
 
-#### 3.3.2. Managed Resource Discovery Protocol
+#### 3.4.2. Managed Resource Discovery Protocol
 
 1. **Standard Discovery:** Follow WebID → Profile Document → Public Type Index ([Type Index](https://github.com/solid/type-indexes)):
 
@@ -299,7 +354,7 @@ This creates clean separation: compatible applications collaborate safely on man
 ```turtle
 # Also in Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 
 <> solid:hasRegistration [
       a solid:TypeRegistration;
@@ -322,7 +377,7 @@ This creates clean separation: compatible applications collaborate safely on man
 
 **Advantages:** Using TypeRegistration with `sync:ManagedDocument` and `sync:managedResourceType` enables managed resource discovery while protecting managed resources from incompatible applications. CRDT-enabled applications can find both data and indices through standard Solid mechanisms ([WebID Profile](https://www.w3.org/TR/webid/), [Type Index](https://github.com/solid/type-indexes)), while traditional applications remain unaware of CRDT-managed data, preventing accidental corruption.
 
-### 3.4. Installation Identity Management
+### 3.5. Installation Identity Management
 
 Collaborative CRDT synchronization requires stable client identity management to enable causality tracking, coordinate collaborative operations, and manage installation lifecycles. Each client installation maintains a discoverable identity document that serves as the foundation for all collaborative coordination.
 
@@ -338,7 +393,7 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 
 ```turtle
 <> a sync:ManagedDocument;
-   sync:primaryTopic <#installation>;
+   foaf:primaryTopic <#installation>;
    sync:isGovernedBy mappings:client-installation-v1 .
 
 <#installation> a crdt:ClientInstallation;
@@ -370,23 +425,36 @@ Installation IDs are IRIs that reference discoverable `crdt:ClientInstallation` 
 - **`crdt:belongsToWebID`**, **`crdt:applicationId`**, **`crdt:createdAt`:** Use `crdt:Immutable` or `crdt:FWW_Register` based on error handling preference
 
 **Installation Cleanup:**
-Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations and make dormant installation tombstoning decisions as part of their sync management phase. For general tombstone mechanics, see Section 3.5 below.
+Inactive installations are tombstoned using `crdt:deletedAt` when inactive beyond their `crdt:maxInactivityPeriod`. Other installations monitor `crdt:lastActiveAt` during collaborative operations and make dormant installation tombstoning decisions as part of their sync management phase. For general tombstone mechanics, see Section 3.6 below.
 
-### 3.5. Tombstoning and Deletion Semantics
+### 3.6. Tombstoning and Deletion Semantics
 
 Distributed systems require explicit deletion handling to ensure consistent data removal across all clients. The framework implements a comprehensive tombstoning approach that supports both complete resource deletion and granular property value removal while maintaining CRDT convergence properties.
 
-#### 3.5.1. Tombstone Types and Scope
+#### 3.6.1. Tombstone Types and Scope
 
 The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
 
 **Two Types of Tombstones:**
 
-**1. Resource Tombstones** (Entire Document Deletion):
-- **Purpose:** Mark complete resources as deleted (e.g., deleting an entire recipe or even installation document)
-- **Property:** `crdt:deletedAt` with OR-Set semantics
-- **Scope:** Applied to the document itself, affects the entire resource
-- **Use Case:** User deletes a recipe, shopping list entry, or other complete resource
+**1. Document Tombstones** (Entire Document Deletion):
+- **Purpose:** Mark complete documents as deleted, affecting all resources contained within
+- **Property:** `crdt:deletedAt` with OR-Set semantics applied to the primary resource IRI
+- **Scope:** Applied to the primary resource identifier `<doc#it>`, marking the entire document for cleanup
+- **Use Case:** Application-controlled cleanup of documents (recipes, shopping lists, etc.)
+
+```turtle
+# Document tombstone example - applied to primary resource, affects entire document
+<shopping-entry-123#it> crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
+```
+
+**Document-Level Deletion Semantics:**
+When the primary resource (`<doc#it>`) is marked with `crdt:deletedAt`, the framework treats this as a signal to delete the entire document during garbage collection. All resources within the document (any fragment identifiers) are considered deleted together. This approach:
+
+- **Simplifies cleanup logic:** One deletion marker controls entire document lifecycle
+- **Preserves application control:** Applications decide what and when to delete
+- **Supports multi-resource documents:** Multiple fragments can coexist but are managed as a unit
+- **Aligns with usage patterns:** Most deletion scenarios involve removing complete "things" rather than individual fragments
 
 **2. Property Tombstones** (Individual Value Deletion):
 - **Purpose:** Mark specific values within multi-value properties as deleted (e.g., removing "quick" from recipe keywords)
@@ -394,13 +462,13 @@ The framework uses two distinct tombstone mechanisms for different deletion scop
 - **Scope:** Applied to individual property values within OR-Set or 2P-Set properties
 - **Use Case:** User removes a keyword, ingredient, or other individual value from a multi-value property
 
-#### 3.5.2. Unified Deletion Semantics
+#### 3.6.2. Unified Deletion Semantics
 
 The `crdt:deletedAt` predicate is defined globally in the framework's predicate mappings with consistent OR-Set semantics across all contexts:
 
 ```turtle
-# In crdt-v1.ttl deletion mappings
-[ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ]
+# In core-v1.ttl deletion mappings
+[ mc:predicate crdt:deletedAt; algo:mergeWith algo:OR_Set ]
 ```
 
 **Key Properties:**
@@ -409,7 +477,35 @@ The `crdt:deletedAt` predicate is defined globally in the framework's predicate 
 - **Merge Behavior:** OR-Set union across all replicas - timestamps can be added (delete) or removed (undelete)
 - **Undeletion Support:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
 
-#### 3.5.3. Property Tombstone Implementation
+**Deletion API Design Philosophy:**
+
+Deletion in this framework is conceptually straightforward: adding `crdt:deletedAt` triples to resources. Framework deletion methods serve as syntactic sugar for this fundamental operation:
+
+```dart
+// Conceptually equivalent operations for document deletion:
+syncLibrary.deleteDocument(documentUri);
+// ↑ Convenience method - marks primary resource, triggers document cleanup
+
+syncLibrary.addTriple('${documentUri}#it', 'crdt:deletedAt', timestamp);  
+// ↑ Explicit triple addition - same semantic effect
+```
+
+**Key Principles:**
+- **Developer Control:** Applications control deletion through either explicit triple manipulation or convenience APIs
+- **Consistent Semantics:** Framework handles distributed coordination identically regardless of how `crdt:deletedAt` triples are added
+- **Data-Centric Design:** Deletion becomes "just another state change" rather than a special operation outside the data model
+
+**Application vs System Deletion:**
+
+The framework distinguishes between application-level "deletion" semantics and system-level cleanup operations:
+
+- **Application Layer:** Developers typically implement domain-specific soft deletion (`status: "archived"`, `visibility: "hidden"`) using their own vocabulary and business logic
+- **System Layer:** Framework deletion (`crdt:deletedAt`) is for true cleanup - storage optimization, retention compliance, and resource lifecycle management
+- **Layered Approach:** Applications may use both - soft deletion for user-facing features, framework deletion for backend cleanup policies
+
+This separation allows developers to maintain full control over user-visible deletion semantics while leveraging the framework's sophisticated distributed cleanup infrastructure when genuine resource removal is required.
+
+#### 3.6.3. Property Tombstone Implementation
 
 Individual values within multi-value properties are deleted using RDF Reification tombstones:
 
@@ -424,7 +520,7 @@ Individual values within multi-value properties are deleted using RDF Reificatio
 
 **Fragment Identifiers:** Deterministic generation using XXH64 hash of canonical N-Triple prevents conflicts while allowing collaborative tombstone creation.
 
-#### 3.5.4. Design Rationale
+#### 3.6.4. Design Rationale
 
 This framework deliberately uses fragment identifiers for reification statements rather than the more common blank nodes, reflecting the distributed coordination requirements of CRDT synchronization:
 
@@ -530,31 +626,31 @@ Merge contracts are **published by application authors or this specification at 
 The framework supports two different ways to define merge rules, each serving different purposes:
 
 **Property Mapping (Class-Scoped Rules):**
-- Rules defined within `sync:ClassMapping` apply **only within that specific class context**
+- Rules defined within `mc:ClassMapping` apply **only within that specific class context**
 - Example: `rdf:subject` might use LWW-Register when within `rdf:Statement` resources, but different rules elsewhere
 - **Use case:** When the same predicate needs different merge behavior in different contexts
 
 ```turtle
 # Property mapping: rdf:subject behavior scoped to rdf:Statement context
-mappings:statement-v1 a sync:ClassMapping;
-   sync:appliesToClass rdf:Statement;
-   sync:rule
-     [ sync:predicate rdf:subject; crdt:mergeWith crdt:LWW_Register ] .
+mappings:statement-v1 a mc:ClassMapping;
+   mc:appliesToClass rdf:Statement;
+   mc:rule
+     [ mc:predicate rdf:subject; algo:mergeWith algo:LWW_Register ] .
 ```
 
 **Predicate Mapping (Global Rules):**
-- Rules defined within `sync:PredicateMapping` apply **globally across all contexts**
+- Rules defined within `mc:PredicateMapping` apply **globally across all contexts**
 - Example: `crdt:installationId` **always** uses LWW-Register regardless of which resource contains it
 - **Use case:** Framework-level predicates that need consistent behavior everywhere
 
 ```turtle
 # Predicate mapping: Global behavior across all contexts
-<#clock-mappings> a sync:PredicateMapping;
-   sync:rule
-     [ sync:predicate crdt:installationId; crdt:mergeWith crdt:LWW_Register; sync:isIdentifying true ],
-     [ sync:predicate crdt:logicalTime; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:physicalTime; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate crdt:deletedAt; crdt:mergeWith crdt:OR_Set ] .
+<#clock-mappings> a mc:PredicateMapping;
+   mc:rule
+     [ mc:predicate crdt:installationId; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
+     [ mc:predicate crdt:logicalTime; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate crdt:physicalTime; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate crdt:deletedAt; algo:mergeWith algo:OR_Set ] .
 ```
 
 **Why Both Are Needed:**
@@ -571,7 +667,7 @@ This section demonstrates how the hierarchical import system works in practice, 
 
 ##### 4.2.2.1. Framework Import Mechanism
 
-The framework provides a reusable mapping library (`mappings:crdt-v1`) that defines standard behavior for all CRDT infrastructure predicates. Applications import this library and add their domain-specific rules on top.
+The framework provides a reusable mapping library (`mappings:core-v1`) that defines standard behavior for all CRDT infrastructure predicates. Applications import this library and add their domain-specific rules on top.
 
 ##### 4.2.2.2. Complete Example: Shopping List Entry
 
@@ -615,26 +711,28 @@ Now let's examine what the `shopping-entry-v1` merge contract actually contains.
 ```turtle
 # At https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
+@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 @prefix schema: <https://schema.org/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
-<> a sync:DocumentMapping;
+<> a mc:DocumentMapping;
    # Import the standard CRDT vocabulary mappings (framework-provided)
-   sync:imports ( mappings:crdt-v1 );
+   mc:imports ( mappings:core-v1 );
    
    # Define shopping-specific property mappings
-   sync:classMapping ( [
-     a sync:ClassMapping;
-     sync:appliesToClass meal:ShoppingListEntry;
-     sync:rule
-       [ sync:predicate schema:name; crdt:mergeWith crdt:LWW_Register ],
-       [ sync:predicate meal:quantity; crdt:mergeWith crdt:LWW_Register ],
-       [ sync:predicate meal:unit; crdt:mergeWith crdt:LWW_Register ],
-       [ sync:predicate meal:derivedFrom; crdt:mergeWith crdt:LWW_Register ],
-       [ sync:predicate meal:requiredForDate; crdt:mergeWith crdt:LWW_Register ],
-       [ sync:predicate schema:dateCreated; crdt:mergeWith crdt:LWW_Register ]
+   mc:classMapping ( [
+     a mc:ClassMapping;
+     mc:appliesToClass meal:ShoppingListEntry;
+     mc:rule
+       [ mc:predicate schema:name; algo:mergeWith algo:LWW_Register ],
+       [ mc:predicate meal:quantity; algo:mergeWith algo:LWW_Register ],
+       [ mc:predicate meal:unit; algo:mergeWith algo:LWW_Register ],
+       [ mc:predicate meal:derivedFrom; algo:mergeWith algo:LWW_Register ],
+       [ mc:predicate meal:requiredForDate; algo:mergeWith algo:LWW_Register ],
+       [ mc:predicate schema:dateCreated; algo:mergeWith algo:LWW_Register ]
    ] ) .
 ```
 
@@ -642,15 +740,15 @@ Now let's examine what the `shopping-entry-v1` merge contract actually contains.
 
 **How Import Resolution Works:**
 
-1. **Framework Import:** `sync:imports ( mappings:crdt-v1 )` brings in standard CRDT framework mappings for infrastructure predicates like `crdt:installationId`, `crdt:deletedAt`, `crdt:logicalTime`. These use global predicate mappings for consistent behavior across all contexts.
+1. **Framework Import:** `mc:imports ( mappings:core-v1 )` brings in standard CRDT framework mappings for infrastructure predicates like `crdt:installationId`, `crdt:deletedAt`, `crdt:logicalTime`. These use global predicate mappings for consistent behavior across all contexts.
 
-2. **Application Rules:** The local `sync:classMapping` defines domain-specific merge behavior for `meal:ShoppingListEntry` properties. All properties use `crdt:LWW_Register` since shopping items are typically single-user managed.
+2. **Application Rules:** The local `mc:classMapping` defines domain-specific merge behavior for `meal:ShoppingListEntry` properties. All properties use `algo:LWW_Register` since shopping items are typically single-user managed.
 
 3. **Precedence Resolution:** Conflicts are resolved using deterministic precedence order following the specificity principle (why `rdf:List` is used instead of multi-valued properties):
-   1. **Local Class Mappings** (highest priority) - `sync:classMapping` 
-   2. **Imported Class Mappings** - from `sync:imports` libraries
-   3. **Local Predicate Mappings** - `sync:predicateMapping`
-   4. **Imported Predicate Mappings** (lowest priority) - from `sync:imports` libraries
+   1. **Local Class Mappings** (highest priority) - `mc:classMapping` 
+   2. **Imported Class Mappings** - from `mc:imports` libraries
+   3. **Local Predicate Mappings** - `mc:predicateMapping`
+   4. **Imported Predicate Mappings** (lowest priority) - from `mc:imports` libraries
    
    **Key Principle:** Context-specific rules (class mappings) win over global rules (predicate mappings), regardless of local vs imported source. This ensures that specific behaviors defined for particular contexts aren't accidentally overridden by general global rules.
 
@@ -1142,7 +1240,7 @@ This document contains entries pointing to shopping list data resources from Aug
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
 <> a idx:Shard;
@@ -1204,7 +1302,7 @@ This document contains entries for recipe resources. Since recipes are used with
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 @prefix schema: <https://schema.org/> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
@@ -1436,12 +1534,12 @@ Resource creation must be resumable after interruptions (network failures, app t
 
 ### 5.6. Framework Garbage Collection Index
 
-System-level index for tracking tombstoned resources that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data resources marked for deletion, but **not property tombstones** which are handled during sync-time processing.
+System-level index for tracking tombstoned documents that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data documents marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
 #### 5.6.1. Design Overview
 
 **Centralized Cleanup Strategy:**
-Rather than requiring cleanup processes to scan entire data containers looking for tombstoned resources, complete resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations.
+Rather than requiring cleanup processes to scan entire data containers looking for tombstoned documents, primary resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations. When cleanup occurs, the entire document (including all fragment resources) is removed from Pod storage.
 
 **GroupIndexTemplate Implementation:**
 The GC index leverages the enhanced GroupingRule system to achieve conditional registration - only resources with `crdt:deletedAt` timestamps get indexed, organized by deletion year for efficient cleanup operations.
@@ -1506,12 +1604,12 @@ Uses `rdfs:Resource` as `idx:indexesClass` to handle any resource type. The fram
 
 #### 5.6.4. Cleanup Operations
 
-**Resource Garbage Collection Process:**
-1. **Automatic Registration:** When complete resources (documents) receive `crdt:deletedAt` timestamp, automatically add entry to GC index
-2. **Periodic Cleanup:** Background processes scan GC index for tombstoned resources older than configured retention periods
-3. **Type-Specific Cleanup:** Route different resource types to appropriate cleanup logic based on `rdf:type`
-4. **Safe Deletion:** Remove entire resource files from Pod after verifying retention period has passed
-5. **GC Index Maintenance:** Remove entries for successfully deleted resources from GC index
+**Document Garbage Collection Process:**
+1. **Automatic Registration:** When documents receive `crdt:deletedAt` timestamp, automatically add entry to GC index
+2. **Periodic Cleanup:** Background processes scan GC index for tombstoned documents older than configured retention periods
+3. **Type-Specific Cleanup:** Route different document types to appropriate cleanup logic based on document `rdf:type`
+4. **Safe Deletion:** Remove entire document files from Pod after verifying retention period has passed (includes all fragment resources)
+5. **GC Index Maintenance:** Remove entries for successfully deleted documents from GC index
 
 **Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
 
@@ -1705,7 +1803,7 @@ The framework provides robust error handling for lifecycle management failures, 
 ```turtle
 # Framework tracks setup progress to enable resumption
 <> a sync:ManagedDocument;
-   sync:primaryTopic <#installation>;
+   foaf:primaryTopic <#installation>;
    sync:isGovernedBy mappings:client-installation-v1 .
 
 <#installation> a crdt:ClientInstallation;
@@ -2011,6 +2109,12 @@ This architecture aligns with the goals of the **W3C CRDT for RDF Community Grou
 ## 11. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
+
+* **Extended CRDT Algorithm Support:** While the v1 framework focuses on fundamental property-level CRDTs, production readiness will require additional algorithms including:
+  - Counter algorithms (G-Counter, PN-Counter) for numeric aggregation and collaborative counting
+  - Sequence algorithms (RGA, Fractional Indexing) for ordered collections and collaborative text editing
+  - Advanced set and map variants (LWW-Map, OR-Map) for specialized dictionary use cases
+  - The current architecture should accommodate most extensions, though sequence algorithms may require positional metadata extensions to the identification system
 
 * **Legacy Data Import (Optional Extension):** A user-controlled import process to bring existing Solid data into framework management. This would be implemented as an optional library feature requiring explicit user consent and would include:
   - Discovery of existing data through traditional Type Index registrations (e.g., `solid:forClass schema:Recipe`)

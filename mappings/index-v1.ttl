@@ -1,63 +1,65 @@
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
+@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
 # CRDT mappings for index documents (FullIndex, GroupIndexTemplate, GroupIndex)
 # Used by framework for index metadata synchronization
 
-<> a sync:DocumentMapping;
+<> a mc:DocumentMapping;
    # Import base CRDT framework
-   sync:imports ( mappings:crdt-v1 ) ;
+   mc:imports ( mappings:core-v1 ) ;
    # Define index-specific class mappings
-   sync:classMapping ( <#full-index> <#group-index-template> <#group-index> <#indexed-property> <#modulo-hash-sharding> ) .
+   mc:classMapping ( <#full-index> <#group-index-template> <#group-index> <#indexed-property> <#modulo-hash-sharding> ) .
 
 # FullIndex documents
-<#full-index> a sync:ClassMapping;
-   sync:appliesToClass idx:FullIndex;
-   sync:rule
-     [ sync:predicate idx:indexesClass; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:indexedProperty; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate idx:hasShard; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate idx:shardingAlgorithm; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:readBy; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate idx:deprecatedAt; crdt:mergeWith crdt:LWW_Register ] .
+<#full-index> a mc:ClassMapping;
+   mc:appliesToClass idx:FullIndex;
+   mc:rule
+     [ mc:predicate idx:indexesClass; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:indexedProperty; algo:mergeWith algo:OR_Set ],
+     [ mc:predicate idx:hasShard; algo:mergeWith algo:OR_Set ],
+     [ mc:predicate idx:shardingAlgorithm; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ],
+     [ mc:predicate idx:deprecatedAt; algo:mergeWith algo:LWW_Register ] .
 
 # GroupIndexTemplate documents
-<#group-index-template> a sync:ClassMapping;
-   sync:appliesToClass idx:GroupIndexTemplate;
-   sync:rule
-     [ sync:predicate idx:indexesClass; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:indexedProperty; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate idx:shardingAlgorithm; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:groupedBy; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:readBy; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate idx:deprecatedAt; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate idx:populationState; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate idx:hasPopulatingShard; crdt:mergeWith crdt:OR_Set ] .
+<#group-index-template> a mc:ClassMapping;
+   mc:appliesToClass idx:GroupIndexTemplate;
+   mc:rule
+     [ mc:predicate idx:indexesClass; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:indexedProperty; algo:mergeWith algo:OR_Set ],
+     [ mc:predicate idx:shardingAlgorithm; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:groupedBy; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ],
+     [ mc:predicate idx:deprecatedAt; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate idx:hasPopulatingShard; algo:mergeWith algo:OR_Set ] .
 
 # GroupIndex documents
-<#group-index> a sync:ClassMapping;
-   sync:appliesToClass idx:GroupIndex;
-   sync:rule
-     [ sync:predicate idx:basedOn; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:readBy; crdt:mergeWith crdt:OR_Set ],
-     [ sync:predicate idx:populationState; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate idx:deprecatedAt; crdt:mergeWith crdt:LWW_Register ] .
+<#group-index> a mc:ClassMapping;
+   mc:appliesToClass idx:GroupIndex;
+   mc:rule
+     [ mc:predicate idx:basedOn; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ],
+     [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate idx:deprecatedAt; algo:mergeWith algo:LWW_Register ] .
 
 # IndexedProperty configuration objects within indices
-<#indexed-property> a sync:ClassMapping;
-   sync:appliesToClass idx:IndexedProperty;
-   sync:rule
-     [ sync:predicate idx:property; crdt:mergeWith crdt:Immutable ],  # Which property to index
-     [ sync:predicate idx:readBy; crdt:mergeWith crdt:OR_Set ] .      # Which installations read this property
+<#indexed-property> a mc:ClassMapping;
+   mc:appliesToClass idx:IndexedProperty;
+   mc:rule
+     [ mc:predicate idx:property; algo:mergeWith algo:Immutable ],  # Which property to index
+     [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ] .      # Which installations read this property
 
 
 # ModuloHashSharding algorithm configuration
-<#modulo-hash-sharding> a sync:ClassMapping;
-   sync:appliesToClass idx:ModuloHashSharding;
-   sync:rule
-     [ sync:predicate idx:hashAlgorithm; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:numberOfShards; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:configVersion; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate idx:autoScaleThreshold; crdt:mergeWith crdt:LWW_Register ] .
+<#modulo-hash-sharding> a mc:ClassMapping;
+   mc:appliesToClass idx:ModuloHashSharding;
+   mc:rule
+     [ mc:predicate idx:hashAlgorithm; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:numberOfShards; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:configVersion; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate idx:autoScaleThreshold; algo:mergeWith algo:LWW_Register ] .

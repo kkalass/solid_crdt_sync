@@ -1,17 +1,24 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
 # Template for Framework Garbage Collection Index
-# System-level index for tracking tombstoned resources requiring cleanup
+# System-level index for tracking tombstoned documents requiring cleanup
+# Indexes document types that can be deleted: ManagedDocument, FullIndex, GroupIndex, Shard
 # Placeholders: {INSTALLATION_URI}
 
 <> a idx:GroupIndexTemplate;
    sync:isGovernedBy mappings:index-v1;
-   idx:indexesClass rdfs:Resource;  # Indexes any resource type
+   # Minimal clock ensures template participates in CRDT merging but loses tie-breaking
+   crdt:hasClockEntry [
+     crdt:installationId <{INSTALLATION_URI}>;
+     crdt:logicalTime 1;
+     crdt:physicalTime 0
+   ] ;
+   idx:indexesClass sync:ManagedDocument, idx:FullIndex, idx:GroupIndex, idx:GroupIndexTemplate, idx:Shard ;  # Document types that can be deleted
    idx:groupedBy [
      a idx:GroupingRule;
      idx:property [

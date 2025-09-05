@@ -1,0 +1,51 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
+@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
+@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+
+# Core merge contract mappings for CRDT framework infrastructure
+# This DocumentMapping provides essential merge rules that most applications need
+
+<> a mc:DocumentMapping;
+   # Define class mappings for framework components
+   mc:classMapping ( <#managed-document> <#statement> ) ;
+   # Define predicate mappings for framework components (ordered list)
+   mc:predicateMapping ( <#clock-mappings> <#deletion-mappings> ) .
+
+# ManagedDocument is the wrapper for all CRDT-managed resources
+<#managed-document> a mc:ClassMapping;
+   mc:appliesToClass sync:ManagedDocument;
+   mc:rule
+     [ mc:predicate foaf:primaryTopic; algo:mergeWith algo:Immutable ],  # The resource being managed
+     [ mc:predicate sync:isGovernedBy; algo:mergeWith algo:Immutable ],  # Merge contract reference
+     [ mc:predicate sync:managedResourceType; algo:mergeWith algo:Immutable ],  # Resource type for discovery
+     [ mc:predicate idx:belongsToIndexShard; algo:mergeWith algo:OR_Set ] .  # Index shard memberships
+
+# Merge contract for RDF reified statements used as tombstones in CRDT sets
+<#statement> a mc:ClassMapping;
+   mc:appliesToClass rdf:Statement;
+   mc:rule
+     # The subject, predicate, and object of the reified statement are immutable identifiers
+     [ mc:predicate rdf:subject; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate rdf:predicate; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate rdf:object; algo:mergeWith algo:LWW_Register ] .
+
+# Standard mapping for predicates of Hybrid Logical Clock entries (typeless blank nodes)  
+<#clock-mappings> a mc:PredicateMapping;
+   mc:rule
+     [ mc:predicate crdt:installationId; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
+     [ mc:predicate crdt:logicalTime; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate crdt:physicalTime; algo:mergeWith algo:LWW_Register ] .
+
+# Standard mapping for deletion semantics across all CRDT contexts
+<#deletion-mappings> a mc:PredicateMapping;
+   mc:rule
+     # Global deletion semantics - applies to all contexts where crdt:deletedAt is used
+     # Supports both document tombstones (document-level deletion) and property tombstones with unified OR-Set semantics
+     # Document-level: crdt:deletedAt triggers all-or-nothing cleanup of entire document and all contained resources
+     # Property-level: crdt:deletedAt on RDF reification statements for individual value removal
+     [ mc:predicate crdt:deletedAt; algo:mergeWith algo:OR_Set ] .

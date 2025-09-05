@@ -1,30 +1,32 @@
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
+@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
 # CRDT mappings for shard documents
 # Used by framework for shard synchronization and entry management
 
-<> a sync:DocumentMapping;
+<> a mc:DocumentMapping;
    # Import base CRDT framework
-   sync:imports ( mappings:crdt-v1 ) ;
+   mc:imports ( mappings:core-v1 ) ;
    # Define shard-specific class mappings
-   sync:classMapping ( <#shard> ) ;
+   mc:classMapping ( <#shard> ) ;
    # Define predicate mappings for shard entry properties (since ShardEntry is not explicitly typed)
-   sync:predicateMapping ( <#shard-entry-mappings> ) .
+   mc:predicateMapping ( <#shard-entry-mappings> ) .
 
 # Shard documents
-<#shard> a sync:ClassMapping;
-   sync:appliesToClass idx:Shard;
-   sync:rule
-     [ sync:predicate idx:belongsToIndex; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:shardKey; crdt:mergeWith crdt:Immutable ],
-     [ sync:predicate idx:populationState; crdt:mergeWith crdt:LWW_Register ],
-     [ sync:predicate idx:containsEntry; crdt:mergeWith crdt:OR_Set ] .
+<#shard> a mc:ClassMapping;
+   mc:appliesToClass idx:Shard;
+   mc:rule
+     [ mc:predicate idx:belongsToIndex; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:shardKey; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ],
+     [ mc:predicate idx:containsEntry; algo:mergeWith algo:OR_Set ] .
 
 # Predicate mappings for ShardEntry properties (since ShardEntry is not explicitly typed)
-<#shard-entry-mappings> a sync:PredicateMapping;
-   sync:rule
-     [ sync:predicate idx:resource; crdt:mergeWith crdt:Immutable ],           # Resource IRI
-     [ sync:predicate crdt:hybridLogicalClockHash; crdt:mergeWith crdt:LWW_Register ] .  # Clock hash for change detection
+<#shard-entry-mappings> a mc:PredicateMapping;
+   mc:rule
+     [ mc:predicate idx:resource; algo:mergeWith algo:Immutable ],           # Resource IRI
+     [ mc:predicate crdt:hybridLogicalClockHash; algo:mergeWith algo:LWW_Register ] .  # Clock hash for change detection

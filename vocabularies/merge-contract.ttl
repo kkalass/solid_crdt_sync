@@ -1,0 +1,86 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
+
+# --- Ontology Definition ---
+
+<https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract> a owl:Ontology;
+    rdfs:label "CRDT Merge Contract Definition Language";
+    rdfs:comment "A vocabulary for defining merge contracts and mapping rules for CRDT synchronization." .
+
+# --- Class Definitions ---
+
+mc:Mapping a rdfs:Class;
+    rdfs:label "Mapping";
+    rdfs:comment "An abstract base class for a resource that defines a set of merge rules." .
+
+mc:ClassMapping a rdfs:Class;
+    rdfs:label "Class Mapping";
+    rdfs:comment "A resource that defines the merge behavior for a specific class of data (e.g., schema:Recipe).";
+    rdfs:subClassOf mc:Mapping .
+
+mc:DocumentMapping a rdfs:Class;
+    rdfs:label "Document Mapping";
+    rdfs:comment "A resource that defines the complete merge behavior for all resources within a document, by importing other DocumentMappings and defining local ClassMappings and PredicateMappings.";
+    rdfs:subClassOf mc:Mapping .
+
+mc:PredicateMapping a rdfs:Class;
+    rdfs:label "Predicate Mapping";
+    rdfs:comment "A resource that defines merge behavior for resources based on the predicates they appear with, useful for typeless blank nodes and predicate-based identification patterns.";
+    rdfs:subClassOf mc:Mapping .
+
+mc:Rule a rdfs:Class;
+    rdfs:label "Mapping Rule";
+    rdfs:comment "A declarative rule that links a specific predicate/property to a CRDT merge algorithm." .
+
+# --- Property Definitions ---
+
+mc:appliesToClass a rdf:Property;
+    rdfs:label "applies to class";
+    rdfs:comment "Links a Mapping to the class of resource it defines rules for.";
+    rdfs:domain mc:Mapping;
+    rdfs:range rdfs:Class .
+
+mc:appliesToPredicate a rdf:Property;
+    rdfs:label "applies to predicate";
+    rdfs:comment "Links a Mapping to a specific predicate, allowing mapping of resources that appear as objects of this predicate regardless of their type. Useful for typeless blank nodes.";
+    rdfs:domain mc:Mapping;
+    rdfs:range rdf:Property .
+
+mc:imports a rdf:Property;
+    rdfs:label "imports";
+    rdfs:comment "An ordered list (rdf:List) of DocumentMapping libraries to import, inheriting all their class and predicate mappings. Precedence: Local ClassMapping > Local PredicateMapping > Imported DocumentMapping (list order). Used for importing standard mapping libraries like CRDT or RDF vocabularies.";
+    rdfs:domain mc:DocumentMapping;
+    rdfs:range rdf:List .
+
+mc:classMapping a rdf:Property;
+    rdfs:label "class mapping";
+    rdfs:comment "An ordered list (rdf:List) of ClassMapping resources (either local or external) that define merge behavior for specific classes of resources. Precedence: Local ClassMapping > Local PredicateMapping > Imported DocumentMapping, with list order within each scope.";
+    rdfs:domain mc:DocumentMapping;
+    rdfs:range rdf:List .
+
+mc:predicateMapping a rdf:Property;
+    rdfs:label "predicate mapping";
+    rdfs:comment "An ordered list (rdf:List) of PredicateMapping resources (either local or external) that define merge behavior for resources based on predicates. Precedence: Local ClassMapping > Local PredicateMapping > Imported DocumentMapping, with list order within each scope.";
+    rdfs:domain mc:DocumentMapping;
+    rdfs:range rdf:List .
+
+mc:rule a rdf:Property;
+    rdfs:label "mapping rule";
+    rdfs:comment "Links a PredicateMappings or ClassMapping to a specific mapping Rule for one of its predicates.";
+    rdfs:domain mc:PredicateMapping, mc:ClassMapping;
+    rdfs:range mc:Rule .
+
+mc:predicate a rdf:Property;
+    rdfs:label "predicate";
+    rdfs:comment "Specifies the RDF predicate that a PropertyMapping applies to.";
+    rdfs:domain mc:Rule;
+    rdfs:range rdf:Property .
+
+mc:isIdentifying a rdf:Property;
+    rdfs:label "is identifying";
+    rdfs:comment "A boolean flag used within mc:Rule to declare whether a specific predicate can be used to identify blank nodes within contexts. This enables context-based blank node identification for CRDT operations that require object identity (e.g., OR-Set, 2P-Set tombstone matching). When true, the predicate serves as part of a compound identification key along with other identifying predicates from any applicable mapping scope.";
+    rdfs:domain mc:Rule;
+    rdfs:range xsd:boolean .

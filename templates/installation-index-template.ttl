@@ -1,5 +1,5 @@
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 
@@ -9,6 +9,12 @@
 
 <> a idx:FullIndex;
    sync:isGovernedBy mappings:index-v1;
+   # Minimal clock ensures template participates in CRDT merging but loses tie-breaking
+   crdt:hasClockEntry [
+     crdt:installationId <{INSTALLATION_URI}>;
+     crdt:logicalTime 1;
+     crdt:physicalTime 0
+   ] ;
    idx:indexesClass crdt:ClientInstallation;
    idx:indexedProperty [
      a idx:IndexedProperty;

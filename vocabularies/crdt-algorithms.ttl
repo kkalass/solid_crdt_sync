@@ -1,0 +1,53 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
+@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+
+# --- Ontology Definition ---
+
+<https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms> a owl:Ontology;
+    rdfs:label "CRDT Algorithms Vocabulary";
+    rdfs:comment "A vocabulary defining merge algorithms and strategies for state-based CRDTs on RDF data. These algorithms specify how conflicting values should be resolved during synchronization." .
+
+# --- Base Algorithm Class ---
+
+algo:Algorithm a rdfs:Class;
+    rdfs:label "CRDT Algorithm";
+    rdfs:comment "An abstract base class for a specific CRDT merge algorithm." .
+
+# --- Algorithm Implementations ---
+
+algo:LWW_Register a rdfs:Class;
+    rdfs:label "LWW-Register";
+    rdfs:comment "A Last-Writer-Wins Register CRDT, for single-value properties.";
+    rdfs:subClassOf algo:Algorithm .
+
+algo:FWW_Register a rdfs:Class;
+    rdfs:label "FWW-Register";
+    rdfs:comment "A First-Writer-Wins Register CRDT for properties that should not change after creation. When conflicting values are encountered, the first written value (by timestamp) is preserved and subsequent writes are ignored.";
+    rdfs:subClassOf algo:Algorithm .
+
+algo:OR_Set a rdfs:Class;
+    rdfs:label "OR-Set";
+    rdfs:comment "An Observed-Remove Set CRDT, for multi-value properties that allows items to be re-added after deletion.";
+    rdfs:subClassOf algo:Algorithm .
+
+algo:2P_Set a rdfs:Class;
+    rdfs:label "2P-Set";
+    rdfs:comment "A Two-Phase Set CRDT, for multi-value properties where removal is permanent.";
+    rdfs:subClassOf algo:Algorithm .
+
+algo:Immutable a rdfs:Class;
+    rdfs:label "Immutable";
+    rdfs:comment "A CRDT algorithm for properties that must never change after creation. Sync fails if different values are encountered, forcing creation of new resource versions.";
+    rdfs:subClassOf algo:Algorithm .
+
+# --- Algorithm Selection Property ---
+
+algo:mergeWith a rdf:Property;
+    rdfs:label "merge with";
+    rdfs:comment "Links a sync:Rule to the specific CRDT Algorithm to be used for merging.";
+    rdfs:domain sync:Rule;
+    rdfs:range algo:Algorithm .

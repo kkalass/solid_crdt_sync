@@ -39,8 +39,13 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 - `examples/interface.dart` - Main API design showing SyncStrategy pattern
 
 ### RDF Vocabularies
-- `vocabularies/` - Custom RDF vocabularies (crdt.ttl, idx.ttl, sync.ttl)
-- `mappings/` - Semantic mapping files for CRDT merge contracts
+- `vocabularies/` - Custom RDF vocabularies:
+  - `crdt-algorithms.ttl` - CRDT merge algorithms (`algo:` namespace: LWW-Register, OR-Set, etc.)
+  - `crdt-mechanics.ttl` - Framework infrastructure (`crdt:` namespace: clocks, installations, deletion)
+  - `idx.ttl`, `sync.ttl` - Indexing and synchronization vocabularies
+- `mappings/` - Semantic mapping files for CRDT merge contracts:
+  - `core-v1.ttl` - Essential CRDT mappings imported by all other mapping files
+  - Application-specific mapping files (client-installation-v1.ttl, etc.)
 
 ### Tools
 - `tool/` - Dart utilities for testing, versioning, and releases
@@ -70,6 +75,13 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 - Listener interfaces (IndexChangeListener, DataChangeListener)
 - Developer controls local storage, library handles sync
 - On-demand fetching for large datasets
+
+### Deletion Handling
+- Framework deletion is for system-level cleanup (storage optimization, retention policies)
+- Applications typically implement domain-specific soft deletion (`archived: true`, `hidden: true`) 
+- Framework APIs: `deleteDocument()` methods are syntactic sugar for adding `crdt:deletedAt` triples
+- Document-level deletion: deleting primary resource triggers cleanup of entire document
+- Layered approach: applications can use both soft deletion (user-facing) and framework deletion (backend cleanup)
 
 ## Testing Approach
 

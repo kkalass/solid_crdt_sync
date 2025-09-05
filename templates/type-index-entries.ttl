@@ -1,7 +1,7 @@
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
+@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # Template for Type Index entries required by the framework
@@ -9,8 +9,8 @@
 # Placeholders: {INSTALLATION_CONTAINER_URI}, {FRAMEWORK_INDEX_CONTAINER_URI}
 
 # Framework retention policies (global defaults)
-<> crdt:resourceTombstoneRetentionPeriod "P1Y"^^xsd:duration;
-   crdt:enableResourceTombstoneCleanup true;
+<> crdt:documentTombstoneRetentionPeriod "P1Y"^^xsd:duration;
+   crdt:enableDocumentTombstoneCleanup true;
    crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
    crdt:enablePropertyTombstoneCleanup true;
    crdt:maxInactivityPeriod "P6M"^^xsd:duration;
@@ -21,8 +21,8 @@
       solid:forClass sync:ManagedDocument;
       sync:managedResourceType crdt:ClientInstallation;
       solid:instanceContainer <{INSTALLATION_CONTAINER_URI}>
-      # Override: Keep installation tombstones longer for audit trails
-      crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration
+      # Override: Keep installation document tombstones longer for audit trails
+      crdt:documentTombstoneRetentionPeriod "P2Y"^^xsd:duration
    ];
 
    # Client installation documents index registration
@@ -38,6 +38,6 @@
       a solid:TypeRegistration;
       solid:forClass idx:GroupIndexTemplate;
       solid:instanceContainer <{FRAMEWORK_INDEX_CONTAINER_URI}>;
-      # Garbage collection uses an index for resources of any class
-      idx:indexesClass rdfs:Resource;
+      # Garbage collection tracks specific document types that can be deleted
+      idx:indexesClass sync:ManagedDocument, idx:FullIndex, idx:GroupIndex, idx:GroupIndexTemplate, idx:Shard;
    ].

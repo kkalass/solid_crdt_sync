@@ -2,13 +2,27 @@
 
 This document tracks substantial topics identified for future discussion and potential implementation. These represent areas where the current specification could be enhanced or optimized, but require deeper analysis and design work.
 
-## 1. Restore Consistency
+## 1. Extended CRDT Algorithm Support (v1 Requirement)
+
+**Status**: v1 Completion Requirement  
+**Current Gap**: Framework focuses on basic property-level CRDTs but requires additional algorithms for production readiness.
+
+**Critical v1 Algorithms Needed**:
+- **Counter algorithms (G-Counter, PN-Counter)**: For numeric aggregation and collaborative counting use cases
+- **Sequence algorithms (RGA, Fractional Indexing)**: For ordered collections and collaborative text editing
+- **Advanced set and map variants (LWW-Map, OR-Map)**: For specialized dictionary use cases
+
+**Architecture Assessment**: The current infrastructure (Hybrid Logical Clocks, blank node identification, merge contracts) should accommodate most extensions, though sequence algorithms may require positional metadata extensions to the identification system.
+
+**Implementation Strategy**: These algorithms should be implementable within the existing framework without fundamental architectural changes, making them suitable for v1 completion.
+
+## 2. Restore Consistency
 
 The architecture has been growing a lot, and many good things were added or updated, but I think we have started losing consistency and started to contradict ourselves.
 I think that the most important upcoming topic is, to get back on track and try to get everything consistent and correct that we have defined so far, without
 really adding anything new to the spec.
 
-## 2. Custom Tombstone Format vs RDF Reification
+## 3. Custom Tombstone Format vs RDF Reification
 
 **Status**: Open Question  
 **Current Approach**: Uses RDF Reification for semantic correctness but with significant overhead.
@@ -25,7 +39,7 @@ really adding anything new to the spec.
 
 ---
 
-## 3. Hybrid Logical Clock Optimization for Tombstones
+## 4. Hybrid Logical Clock Optimization for Tombstones
 
 **Status**: Open Question  
 **Current Limitation**: Document-level Hybrid Logical Clocks prevent tombstone compaction.
@@ -45,7 +59,7 @@ really adding anything new to the spec.
 
 ---
 
-## 4. Hybrid Approach Specification
+## 5. Hybrid Approach Specification
 
 **Status**: Open Question  
 **Current Issue**: "Hybrid Approach" mentioned in compaction section but not fully specified.
@@ -66,7 +80,7 @@ really adding anything new to the spec.
 
 ---
 
-## 5. RDF Collections and Extended CRDT Algorithms
+## 6. RDF Collections and Extended CRDT Algorithms
 
 **Status**: Open Question  
 **Current Gap**: Framework focuses on basic CRDT types but doesn't address complex RDF structures or additional CRDT algorithms.
@@ -94,7 +108,7 @@ really adding anything new to the spec.
 **Related**: Current CRDT-SPECIFICATION.md sections 3.1-3.3 cover only basic types, section 8 mentions "Blank Nodes" as open question
 
 --- 
-## 6. Automated Metadata Partitioning for Scalability
+## 7. Automated Metadata Partitioning for Scalability
 
 **Status:** Future Topic (Advanced Research)
 
@@ -141,7 +155,7 @@ This would allow the vast majority of sync operations to only involve the small,
 
 ---
 
-## 7. Private Type Index Support
+## 8. Private Type Index Support
 
 **Status**: Future Enhancement  
 **Current Limitation**: Framework currently uses only the Public Type Index, making all CRDT-managed resources discoverable by other applications.
@@ -167,7 +181,7 @@ This would allow the vast majority of sync operations to only involve the small,
 
 ---
 
-## 8. Incorporate Gemini Pro's Feedback:
+## 9. Incorporate Gemini Pro's Feedback:
 
 > ---
 > Points for Discussion and Consideration
@@ -191,7 +205,7 @@ Agreed - we should find some efficient way to attach Hybrid Logical Clocks. Or w
 
 
 
-## 9. Framework Version Compatibility and Migration
+## 10. Framework Version Compatibility and Migration
 
 **Status**: Open Question - Major Architectural Challenge  
 **Current Limitation**: Framework lacks comprehensive version compatibility and migration strategy for collaborative environments.
@@ -251,7 +265,7 @@ Agreed - we should find some efficient way to attach Hybrid Logical Clocks. Or w
 
 ---
 
-## 10. Multi-Pod Application Integration
+## 11. Multi-Pod Application Integration
 
 **Status**: Future Enhancement (v2/v3 Candidate)  
 **Current Limitation**: Framework focuses on single-Pod CRDT synchronization but doesn't address applications that need to integrate data from multiple Pods, including Pods not owned by the user.

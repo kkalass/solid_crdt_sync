@@ -3,52 +3,25 @@
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
 
 # --- Ontology Definition ---
 
 <https://kkalass.github.io/solid_crdt_sync/vocab/crdt> a owl:Ontology;
-    rdfs:label "CRDT Mechanics Vocabulary";
-    rdfs:comment "A vocabulary to describe the low-level, generic mechanics and data structures required for state-based CRDTs on RDF data." .
+    rdfs:label "CRDT Framework Mechanics Vocabulary";
+    rdfs:comment "A vocabulary defining the low-level operational mechanics and infrastructure properties required for CRDT synchronization coordination, including hybrid logical clocks, installation management, and deletion handling." .
 
-# --- Class Definitions ---
-
-crdt:Algorithm a rdfs:Class;
-    rdfs:label "CRDT Algorithm";
-    rdfs:comment "An abstract base class for a specific CRDT merge algorithm." .
-
-crdt:LWW_Register a rdfs:Class;
-    rdfs:label "LWW-Register";
-    rdfs:comment "A Last-Writer-Wins Register CRDT, for single-value properties.";
-    rdfs:subClassOf crdt:Algorithm .
-
-crdt:OR_Set a rdfs:Class;
-    rdfs:label "OR-Set";
-    rdfs:comment "An Observed-Remove Set CRDT, for multi-value properties that allows items to be re-added after deletion.";
-    rdfs:subClassOf crdt:Algorithm .
-
-crdt:2P_Set a rdfs:Class;
-    rdfs:label "2P-Set";
-    rdfs:comment "A Two-Phase Set CRDT, for multi-value properties where removal is permanent.";
-    rdfs:subClassOf crdt:Algorithm .
-
-crdt:Sequence a rdfs:Class;
-    rdfs:label "Sequence";
-    rdfs:comment "A Sequence CRDT for maintaining an ordered list of items.";
-    rdfs:subClassOf crdt:Algorithm .
+# --- Framework Infrastructure Classes ---
 
 crdt:ClockEntry a rdfs:Class;
     rdfs:label "Clock Entry";
     rdfs:comment "A single entry in a Hybrid Logical Clock (HLC), mapping an installation ID to both its logical time (causality counter) and physical time (wall-clock timestamp for tie-breaking)." .
 
-# --- Property Definitions ---
+crdt:ClientInstallation a rdfs:Class;
+    rdfs:label "Client Installation";
+    rdfs:comment "A unique installation of a CRDT-enabled application, providing traceability and identity for Hybrid Logical Clock entries across the distributed system." .
 
-crdt:mergeWith a rdf:Property;
-    rdfs:label "merge with";
-    rdfs:comment "Links a sync:Rule to the specific CRDT Algorithm to be used for merging.";
-    rdfs:domain sync:Rule;
-    rdfs:range crdt:Algorithm .
+# --- Hybrid Logical Clock Properties ---
 
 crdt:hasClockEntry a rdf:Property;
     rdfs:label "has clock entry";
@@ -80,23 +53,7 @@ crdt:clockHash a rdf:Property;
     rdfs:domain rdfs:Resource;
     rdfs:range xsd:string .
 
-crdt:ClientInstallation a rdfs:Class;
-    rdfs:label "Client Installation";
-    rdfs:comment "A unique installation of a CRDT-enabled application, providing traceability and identity for Hybrid Logical Clock entries across the distributed system." .
-
-crdt:Immutable a rdfs:Class;
-    rdfs:label "Immutable";
-    rdfs:comment "A CRDT algorithm for properties that must never change after creation. Sync fails if different values are encountered, forcing creation of new resource versions.";
-    rdfs:subClassOf crdt:Algorithm .
-
-crdt:FWW_Register a rdfs:Class;
-    rdfs:label "FWW-Register";
-    rdfs:comment "A First-Writer-Wins Register CRDT for properties that should not change after creation. When conflicting values are encountered, the first written value (by timestamp) is preserved and subsequent writes are ignored.";
-    rdfs:subClassOf crdt:Algorithm .
-
-
-
-# --- Property Definitions (continued) ---
+# --- Installation Management Properties ---
 
 crdt:belongsToWebID a rdf:Property;
     rdfs:label "belongs to WebID";
@@ -122,16 +79,31 @@ crdt:lastActiveAt a rdf:Property;
     rdfs:domain crdt:ClientInstallation;
     rdfs:range xsd:dateTime .
 
+crdt:maxInactivityPeriod a rdf:Property;
+    rdfs:label "maximum inactivity period";
+    rdfs:comment "Duration after which this installation should be considered for tombstoning if no activity is detected. Expressed as ISO 8601 duration (e.g., 'P6M' for 6 months). If not specified, uses framework default.";
+    rdfs:domain crdt:ClientInstallation;
+    rdfs:range xsd:duration .
 
-crdt:resourceTombstoneRetentionPeriod a rdf:Property;
-    rdfs:label "resource tombstone retention period";
-    rdfs:comment "Duration to retain resource tombstones (complete deleted documents) before garbage collection. Expressed as ISO 8601 duration (e.g., 'P2Y' for 2 years). Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides). Longer retention recommended due to high impact of zombie deletions affecting recreated resources.";
+# --- Deletion and Cleanup Properties ---
+
+crdt:deletedAt a rdf:Property;
+    rdfs:label "deleted at";
+    rdfs:comment "Framework-managed timestamp marking when a document or property value was deleted. Uses OR-Set semantics to support deletion/undeletion cycles for IRI reuse scenarios. Applied to documents (all-or-nothing cleanup of entire document and all contained resources) and individual property values (via RDF Reification statements). Applications control deletion through framework APIs rather than directly manipulating this property. Resource/value is considered deleted if this property has any values. For cleanup, use the latest timestamp plus retention period.";
+    rdfs:domain [ a owl:Class; owl:unionOf (rdfs:Resource rdf:Statement) ];
+    rdfs:range xsd:dateTime .
+
+# --- Retention Policy Configuration ---
+
+crdt:documentTombstoneRetentionPeriod a rdf:Property;
+    rdfs:label "document tombstone retention period";
+    rdfs:comment "Duration to retain document tombstones (complete deleted documents) before garbage collection. Expressed as ISO 8601 duration (e.g., 'P2Y' for 2 years). Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides). Longer retention recommended due to high impact of zombie deletions affecting recreated documents.";
     rdfs:domain [ a owl:Class; owl:unionOf (solid:TypeIndex solid:TypeRegistration) ];
     rdfs:range xsd:duration .
 
-crdt:enableResourceTombstoneCleanup a rdf:Property;
-    rdfs:label "enable resource tombstone cleanup";
-    rdfs:comment "Boolean flag indicating whether the framework should automatically clean up resource tombstones after the retention period. Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides).";
+crdt:enableDocumentTombstoneCleanup a rdf:Property;
+    rdfs:label "enable document tombstone cleanup";
+    rdfs:comment "Boolean flag indicating whether the framework should automatically clean up document tombstones after the retention period. Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides).";
     rdfs:domain [ a owl:Class; owl:unionOf (solid:TypeIndex solid:TypeRegistration) ];
     rdfs:range xsd:boolean .
 
@@ -146,16 +118,3 @@ crdt:enablePropertyTombstoneCleanup a rdf:Property;
     rdfs:comment "Boolean flag indicating whether the framework should automatically clean up property tombstones after the retention period. Applied to Type Index (for defaults) or Type Index registrations (for per-type overrides).";
     rdfs:domain [ a owl:Class; owl:unionOf (solid:TypeIndex solid:TypeRegistration) ];
     rdfs:range xsd:boolean .
-
-
-crdt:maxInactivityPeriod a rdf:Property;
-    rdfs:label "maximum inactivity period";
-    rdfs:comment "Duration after which this installation should be considered for tombstoning if no activity is detected. Expressed as ISO 8601 duration (e.g., 'P6M' for 6 months). If not specified, uses framework default.";
-    rdfs:domain crdt:ClientInstallation;
-    rdfs:range xsd:duration .
-
-crdt:deletedAt a rdf:Property;
-    rdfs:label "deleted at";
-    rdfs:comment "Timestamp marking when a resource or property value was deleted. Uses OR-Set semantics to support deletion/undeletion cycles for IRI reuse scenarios. Applied to both complete resources (document-level) and individual property values (via RDF Reification statements). Resource/value is considered deleted if this property has any values. For cleanup, use the latest timestamp plus retention period.";
-    rdfs:domain [ a owl:Class; owl:unionOf (rdfs:Resource rdf:Statement) ];
-    rdfs:range xsd:dateTime .

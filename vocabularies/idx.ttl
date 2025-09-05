@@ -69,7 +69,7 @@ idx:belongsToIndexShard a rdf:Property;
 
 idx:indexesClass a rdf:Property;
     rdfs:label "indexes class";
-    rdfs:comment "States which class of resource an index is for (e.g., schema:Recipe).";
+    rdfs:comment "Specifies which class of resource this index tracks (e.g., schema:Recipe, idx:Shard, sync:ManagedDocument). Index entries contain resource-level properties for querying, while sync operations depend on resource type: if resources are documents themselves (e.g., idx:FullIndex), all operations are document-level; if resources use fragment identifiers (e.g., schema:Recipe), sync operations are on the containing document while resource operations are on the specific resource.";
     rdfs:domain [ a owl:Class; owl:unionOf (idx:FullIndex idx:GroupIndexTemplate) ];
     rdfs:range rdfs:Class .
 

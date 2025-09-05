@@ -50,6 +50,7 @@ Hybrid Logical Clocks (HLC) combine the benefits of logical clocks (causality tr
 - **Missing/empty clock**: Treated as Hybrid Logical Clock with all zeros (logical=0, physical=0, no installation entries)
 - **One-side empty**: Empty clock is always dominated by any present clock (loses merge comparison)
 - **Both-sides empty**: If values are equal, no conflict. If values differ, local value wins (deterministic local-wins policy)
+- **Template clock recommendation**: Templates should use minimal clocks (logical=1, physical=0) instead of empty clocks to ensure proper CRDT participation while guaranteeing loss in tie-breaking scenarios
 - **Semantic meaning**: Missing clock indicates "this installation has never modified this property"
 
 ### 2.3. Hybrid Logical Clock Operations
