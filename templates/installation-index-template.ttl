@@ -18,15 +18,15 @@
    idx:indexesClass crdt:ClientInstallation;
    idx:indexedProperty [
      a idx:IndexedProperty;
-     idx:property crdt:lastActiveAt;        # For dormancy detection
+     idx:trackedProperty crdt:lastActiveAt;        # For dormancy detection
      idx:readBy <{INSTALLATION_URI}>
    ], [
      a idx:IndexedProperty;
-     idx:property crdt:belongsToWebID;      # For multi-user scenarios
+     idx:trackedProperty crdt:belongsToWebID;      # For multi-user scenarios
      idx:readBy <{INSTALLATION_URI}>
    ], [
      a idx:IndexedProperty;
-     idx:property crdt:applicationId;       # For app-specific queries
+     idx:trackedProperty crdt:applicationId;       # For app-specific queries
      idx:readBy <{INSTALLATION_URI}>
    ];
    # Single shard for installation index (typically small dataset)

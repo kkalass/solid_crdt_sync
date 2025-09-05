@@ -20,7 +20,7 @@
       a solid:TypeRegistration;
       solid:forClass sync:ManagedDocument;
       sync:managedResourceType crdt:ClientInstallation;
-      solid:instanceContainer <{INSTALLATION_CONTAINER_URI}>
+      solid:instanceContainer <{INSTALLATION_CONTAINER_URI}>;
       # Override: Keep installation document tombstones longer for audit trails
       crdt:documentTombstoneRetentionPeriod "P2Y"^^xsd:duration
    ];

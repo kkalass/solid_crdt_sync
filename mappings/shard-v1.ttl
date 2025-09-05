@@ -20,8 +20,7 @@
 <#shard> a mc:ClassMapping;
    mc:appliesToClass idx:Shard;
    mc:rule
-     [ mc:predicate idx:belongsToIndex; algo:mergeWith algo:Immutable ],
-     [ mc:predicate idx:shardKey; algo:mergeWith algo:Immutable ],
+     [ mc:predicate idx:isShardOf; algo:mergeWith algo:Immutable ],
      [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ],
      [ mc:predicate idx:containsEntry; algo:mergeWith algo:OR_Set ] .
 
@@ -29,4 +28,4 @@
 <#shard-entry-mappings> a mc:PredicateMapping;
    mc:rule
      [ mc:predicate idx:resource; algo:mergeWith algo:Immutable ],           # Resource IRI
-     [ mc:predicate crdt:hybridLogicalClockHash; algo:mergeWith algo:LWW_Register ] .  # Clock hash for change detection
+     [ mc:predicate crdt:clockHash; algo:mergeWith algo:LWW_Register ] .  # Clock hash for change detection

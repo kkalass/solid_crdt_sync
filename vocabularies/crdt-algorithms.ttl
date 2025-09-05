@@ -21,12 +21,12 @@ algo:Algorithm a rdfs:Class;
 
 algo:LWW_Register a rdfs:Class;
     rdfs:label "LWW-Register";
-    rdfs:comment "A Last-Writer-Wins Register CRDT, for single-value properties.";
+    rdfs:comment "A Last-Writer-Wins Register CRDT, for single-value properties. When applied to multi-value properties, treats the complete value set atomically - the most recent complete value set wins, replacing all previous values entirely.";
     rdfs:subClassOf algo:Algorithm .
 
 algo:FWW_Register a rdfs:Class;
     rdfs:label "FWW-Register";
-    rdfs:comment "A First-Writer-Wins Register CRDT for properties that should not change after creation. When conflicting values are encountered, the first written value (by timestamp) is preserved and subsequent writes are ignored.";
+    rdfs:comment "A First-Writer-Wins Register CRDT for properties that should not change after creation. When conflicting values are encountered, the first written value (by timestamp) is preserved and subsequent writes are ignored. For multi-value properties, preserves the first complete value set and ignores subsequent attempts to modify the set.";
     rdfs:subClassOf algo:Algorithm .
 
 algo:OR_Set a rdfs:Class;
@@ -41,7 +41,7 @@ algo:2P_Set a rdfs:Class;
 
 algo:Immutable a rdfs:Class;
     rdfs:label "Immutable";
-    rdfs:comment "A CRDT algorithm for properties that must never change after creation. Sync fails if different values are encountered, forcing creation of new resource versions.";
+    rdfs:comment "A CRDT algorithm for properties that must never change after creation. Sync fails if different values are encountered, forcing creation of new resource versions. For multi-value properties, the complete value set is treated as immutable - any attempt to add, remove, or modify values causes merge failure. Unlike FWW-Register which silently ignores conflicts, Immutable enforces strict consistency by rejecting conflicting changes.";
     rdfs:subClassOf algo:Algorithm .
 
 # --- Algorithm Selection Property ---

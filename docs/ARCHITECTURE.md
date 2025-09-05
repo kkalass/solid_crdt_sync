@@ -54,12 +54,14 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 - Used for single-value properties where the most recent write should win
 - Examples: Recipe name, creation timestamp, status field
 - Conflict resolution: Compare timestamps, newer value wins
+- **Multi-value behavior:** Treats complete value set atomically - most recent set wins, replaces all previous values
 - Compatible with any object type (IRIs, literals, blank nodes)
 
 **FWW-Register (First-Writer-Wins Register):**
-- Used for immutable properties where a forgiving approach is preferred over sync failure
+- Used for immutable properties where "first to set wins" semantics are desired
 - Examples: Resource identifiers, permanent classifications, initial configurations
 - Conflict resolution: Compare timestamps, first write wins, subsequent writes ignored
+- **Multi-value behavior:** Preserves the first complete value set, ignores subsequent modifications
 - Provides graceful degradation alternative to Immutable's strict merge failure
 
 **OR-Set (Observed-Remove Set):**
@@ -77,8 +79,9 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 - Framework-specific constraint (not a traditional CRDT algorithm)
 - Used for properties that must never change after creation with strict enforcement
 - Examples: Resource creation timestamps, installation identifiers, structural configurations
+- **Multi-value behavior:** Complete value set treated as immutable - any modification causes merge failure
 - Conflict resolution: Merge fails if different values encountered, forces resource versioning
-- Stricter than FWW-Register - causes sync failure rather than silently ignoring conflicts
+- **Key distinction from FWW-Register:** Immutable causes sync failure for conflicts, FWW-Register silently ignores them
 
 **Hybrid Logical Clock (HLC):**
 - Combines logical causality tracking with physical wall-clock timestamps
@@ -87,6 +90,45 @@ Before examining RDF-specific challenges, it's essential to understand the core 
 - Enables "newer wins" semantics while protecting against clock manipulation
 
 **Framework Extensibility:** The architecture is designed to support additional CRDT algorithms beyond this initial set. The core infrastructure (Hybrid Logical Clocks, blank node identification, merge contracts) provides the foundation for extending to counters, sequences, and other algorithm families, though complex algorithms may require enhancements to the identification or merge rule systems.
+
+#### 3.1.4. Multi-Value Property Examples
+
+Understanding how different CRDT types handle multi-value properties is crucial for correct usage:
+
+**Immutable Multi-Value Example (Garbage Collection Index):**
+```turtle
+# Template defines multiple document types - this complete set is immutable
+idx:indexesClass sync:ManagedDocument, idx:FullIndex, idx:GroupIndex, idx:GroupIndexTemplate, idx:Shard;
+```
+- **Merge behavior:** If any installation attempts to change this set (add/remove types), merge fails
+- **Use case:** Structural configurations that must remain consistent across all installations
+- **Error handling:** Forces resource versioning or manual intervention
+
+**FWW-Register Multi-Value Example (Installation Configuration):**
+```turtle
+# First installation to set supported features wins
+app:supportedFeatures "recipes", "meal-planning", "shopping-lists";
+```
+- **Merge behavior:** First complete set wins, subsequent modifications ignored
+- **Use case:** Initial configurations where "first to configure wins" behavior is desired  
+- **Error handling:** Graceful degradation, no sync failure
+
+**LWW-Register Multi-Value Example (Accidental Usage):**
+```turtle
+# If mistakenly used for multi-value property
+recipe:keywords "quick", "easy", "vegetarian";  # Alice's version
+recipe:keywords "healthy", "dinner";           # Bob's later version  
+# Result: Bob's complete set wins - Alice's keywords completely replaced
+```
+- **Merge behavior:** Most recent complete set wins, all previous values discarded
+- **Use case:** Generally incorrect for multi-value properties - should use OR-Set instead
+- **Error handling:** No sync failure, but likely unintended data loss
+
+**Key Decision Points:** 
+- Choose **Immutable** when strict consistency is critical and conflicts indicate serious configuration errors
+- Choose **FWW-Register** when graceful degradation and "first wins" semantics are desired  
+- Choose **LWW-Register** only for truly single-value properties - avoid for multi-value to prevent data loss
+- Choose **OR-Set** for collaborative multi-value properties where individual additions/removals matter
 
 #### 3.1.2. State-Based vs Operation-Based CRDTs
 
@@ -208,6 +250,7 @@ For example, Hybrid Logical Clock entries are identified by `(document_IRI, crdt
 - **Blank Node Identification:** Verify that all blank nodes used with identity-dependent CRDTs (OR-Set, 2P-Set) have appropriate `mc:isIdentifying` declarations
 - **Mapping Completeness:** Ensure all properties of a class have corresponding merge rules in the mapping contract
 - **CRDT Compatibility:** Validate that each property's declared CRDT type is compatible with its object types (see section 4.2 in CRDT-SPECIFICATION.md)
+- **Multi-Value Semantics:** Verify understanding of how each CRDT type handles multi-value properties (LWW-Register = atomic set replacement, Immutable = complete set immutable, FWW-Register = first complete set wins, OR-Set = collaborative set operations)
 - **Generator Feedback:** When using code generation from annotations, provide clear error messages identifying specific properties or patterns that need correction
 
 **Example Generator Check:**
@@ -1151,10 +1194,10 @@ Rather than expensive Type Index container scanning, the framework maintains a d
    sync:isGovernedBy mappings:index-v1;
    idx:indexesClass crdt:ClientInstallation;
    idx:indexedProperty [
-     idx:property crdt:lastActiveAt;        # For dormancy detection
+     idx:trackedProperty crdt:lastActiveAt;        # For dormancy detection
      idx:readBy <installation-1>, <installation-2>
    ], [
-     idx:property crdt:maxInactivityPeriod; # For cleanup thresholds
+     idx:trackedProperty crdt:maxInactivityPeriod; # For cleanup thresholds
      idx:readBy <installation-1>, <installation-2>  
    ] .
 ```
@@ -1273,15 +1316,15 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
    # Include properties needed for recipe browsing UI
    idx:indexedProperty [
      a idx:IndexedProperty;
-     idx:property schema:name;
+     idx:trackedProperty schema:name;
      idx:readBy <installation-1>, <installation-2>
    ], [
      a idx:IndexedProperty;
-     idx:property schema:keywords;
+     idx:trackedProperty schema:keywords;
      idx:readBy <installation-1>, <installation-2>
    ], [
      a idx:IndexedProperty;
-     idx:property schema:totalTime;
+     idx:trackedProperty schema:totalTime;
      idx:readBy <installation-1>, <installation-2>
    ];
    # Default sharding for the recipe collection
@@ -1587,11 +1630,11 @@ Uses `rdfs:Resource` as `idx:indexesClass` to handle any resource type. The fram
    # Index covers all tombstoned resource types
    idx:indexedProperty [
      a idx:IndexedProperty;
-     idx:property crdt:deletedAt;          # Deletion timestamps for all resources
+     idx:trackedProperty crdt:deletedAt;          # Deletion timestamps for all resources
      idx:readBy <installation-1>, <installation-2>, <installation-3>
    ], [
      a idx:IndexedProperty;
-     idx:property rdf:type;                # Resource type for cleanup process routing  
+     idx:trackedProperty rdf:type;                # Resource type for cleanup process routing  
      idx:readBy <installation-1>, <installation-2>, <installation-3>
    ] ;
    idx:shardingAlgorithm [
@@ -1709,12 +1752,12 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
    sync:isGovernedBy mappings:index-v1;
    idx:indexedProperty [
      a idx:IndexedProperty;
-     idx:property schema:name;
+     idx:trackedProperty schema:name;
      idx:readBy <installation-1>, <installation-2>  # OR-Set of active readers
    ],
    [
      a idx:IndexedProperty;
-     idx:property schema:keywords;
+     idx:trackedProperty schema:keywords;
      idx:readBy <installation-1>  # Only one reader remaining
    ];
    idx:readBy <installation-1>, <installation-2>, <installation-3> .  # Index-level readers
@@ -1938,10 +1981,10 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
    sync:isGovernedBy mappings:index-v1;
    idx:indexesClass crdt:ClientInstallation;
    idx:indexedProperty [
-     idx:property crdt:lastActiveAt;        # For dormancy detection
+     idx:trackedProperty crdt:lastActiveAt;        # For dormancy detection
      idx:readBy <installation-1>, <installation-2>
    ], [
-     idx:property crdt:maxInactivityPeriod; # For cleanup thresholds  
+     idx:trackedProperty crdt:maxInactivityPeriod; # For cleanup thresholds  
      idx:readBy <installation-1>, <installation-2>
    ];
    idx:shardingAlgorithm [

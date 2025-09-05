@@ -12,7 +12,7 @@
    # Import base CRDT framework
    mc:imports ( mappings:core-v1 ) ;
    # Define index-specific class mappings
-   mc:classMapping ( <#full-index> <#group-index-template> <#group-index> <#indexed-property> <#modulo-hash-sharding> ) .
+   mc:classMapping ( <#full-index> <#group-index-template> <#group-index> <#indexed-property> <#grouping-rule> <#grouping-rule-property> <#modulo-hash-sharding> ) .
 
 # FullIndex documents
 <#full-index> a mc:ClassMapping;
@@ -51,9 +51,24 @@
 <#indexed-property> a mc:ClassMapping;
    mc:appliesToClass idx:IndexedProperty;
    mc:rule
-     [ mc:predicate idx:property; algo:mergeWith algo:Immutable ],  # Which property to index
+     [ mc:predicate idx:trackedProperty; algo:mergeWith algo:Immutable ],  # Which property to index
      [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ] .      # Which installations read this property
 
+# GroupingRule configuration for partitioned indices
+<#grouping-rule> a mc:ClassMapping;
+   mc:appliesToClass idx:GroupingRule;
+   mc:rule
+     [ mc:predicate idx:property; algo:mergeWith algo:OR_Set ],           # GroupingRuleProperty instances
+     [ mc:predicate idx:groupTemplate; algo:mergeWith algo:Immutable ] .  # Template for group IRI construction
+
+# GroupingRuleProperty configuration within grouping rules
+<#grouping-rule-property> a mc:ClassMapping;
+   mc:appliesToClass idx:GroupingRuleProperty;
+   mc:rule
+     [ mc:predicate idx:sourceProperty; algo:mergeWith algo:Immutable ],  # Source property to extract from
+     [ mc:predicate idx:name; algo:mergeWith algo:Immutable ],            # Variable name for template
+     [ mc:predicate idx:format; algo:mergeWith algo:LWW_Register ],       # Optional format string
+     [ mc:predicate idx:missingValue; algo:mergeWith algo:LWW_Register ] . # Default value for missing properties
 
 # ModuloHashSharding algorithm configuration
 <#modulo-hash-sharding> a mc:ClassMapping;

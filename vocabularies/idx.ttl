@@ -205,8 +205,8 @@ idx:resource a rdf:Property;
     rdfs:domain idx:ShardEntry;
     rdfs:range rdfs:Resource .
 
-idx:property a rdf:Property;
-    rdfs:label "property";
-    rdfs:comment "Specifies which property is being tracked in an indexed property configuration object.";
+idx:trackedProperty a rdf:Property;
+    rdfs:label "tracked property";
+    rdfs:comment "Specifies which RDF property is being tracked in an indexed property configuration object.";
     rdfs:domain idx:IndexedProperty;
     rdfs:range rdf:Property .
