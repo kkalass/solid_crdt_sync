@@ -96,12 +96,14 @@ The remainder of this document provides detailed technical foundations and imple
 - **Section 4 (Foundations)**: Technical mechanisms that enable the architecture
 - **Section 5 (Four-Layer Architecture)**: Detailed explanation of each architectural layer  
 - **Section 6 (Lifecycle Management)**: Practical Pod setup and operational procedures
-- **Appendices**: Implementation specifications and error handling patterns
+- **Appendices**: Implementation specifications and error handling patterns (see [ERROR-HANDLING.md](ERROR-HANDLING.md) for comprehensive resilience strategies)
 
 **For Different Audiences:**
 - **Architects/Decision Makers**: Sections 1-3 provide sufficient overview for technology decisions
 - **Application Developers**: Add Section 5 for understanding the development model
 - **Library Implementers**: Full document provides complete technical specification
+
+**Transitioning to Implementation Details**: While the previous sections established the conceptual framework and architectural decisions, the following sections dive into the specific technical mechanisms that make this architecture work. Understanding these foundations is essential for implementing the framework correctly, particularly the CRDT algorithms, RDF identity resolution, and synchronization protocols that enable conflict-free collaboration.
 
 ## 4. Foundations
 
@@ -340,9 +342,9 @@ class Ingredient {
 }
 
 // Generator produces mapping:
-// mc:rule [ mc:predicate my:name; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
-//           [ mc:predicate my:unit; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
-//           [ mc:predicate my:amount; algo:mergeWith algo:LWW_Register ]
+// mc:rule [ mc:predicate recipe:name; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
+//           [ mc:predicate recipe:unit; algo:mergeWith algo:LWW_Register; mc:isIdentifying true ],
+//           [ mc:predicate recipe:amount; algo:mergeWith algo:LWW_Register ]
 ```
 
 This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
@@ -932,7 +934,7 @@ sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/rec
 
 ### 5.3. Layer 3: The Indexing Layer
 
-This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only Hybrid Logical Clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed.
+This layer is **vital for change detection and synchronization efficiency**. It defines a convention for how data can be indexed for fast access and change monitoring. While the amount of header information stored in indices is optional (some may contain only Hybrid Logical Clock hashes), the indexing layer itself is required for the framework to efficiently detect when resources have changed. For detailed sharding algorithms and performance optimization strategies, see [SHARDING.md](SHARDING.md) and [PERFORMANCE.md](PERFORMANCE.md).
 
 #### 5.3.1. Index Architecture Overview
 
@@ -1487,7 +1489,7 @@ Having established the architectural layers, we now examine the complete lifecyc
 
 ### 6.1. Pod Setup and Initial Configuration
 
-When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure:
+When an application first encounters a Pod, it may need to configure the Type Index and other Solid infrastructure. The framework provides standard templates for this initialization process (see [templates/README.md](../templates/README.md) for complete placeholder substitution documentation):
 
 **Comprehensive Setup Process:**
 1. Check WebID Profile Document for solid:publicTypeIndex
