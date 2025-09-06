@@ -1943,82 +1943,40 @@ The framework provides configurable retention policies for tombstoned documents,
 
 ### 6.8. Collaborative Index Lifecycle Management
 
-**CRDT-Based Index Coordination:**
-
 All index lifecycle decisions are made collaboratively through CRDT-managed installation documents and index properties, eliminating single points of failure and coordination bottlenecks.
 
-**Property-Level Reader Tracking:**
+#### 6.8.1. Reader Management and Cleanup
+
+**Reader Tracking:**
 ```turtle
 <> a idx:FullIndex;
    sync:isGovernedBy mappings:index-v1;
    idx:indexedProperty [
-     a idx:IndexedProperty;
      idx:trackedProperty schema:name;
      idx:readBy <installation-1>, <installation-2>  # OR-Set of active readers
-   ],
-   [
-     a idx:IndexedProperty;
-     idx:trackedProperty schema:keywords;
-     idx:readBy <installation-1>  # Only one reader remaining
    ];
    idx:readBy <installation-1>, <installation-2>, <installation-3> .  # Index-level readers
 ```
 
-**Index Reader Management:**
+**Collaborative Cleanup Process:**
+1. **Installation tombstoning**: Remove tombstoned installations from all `idx:readBy` OR-Sets
+2. **Property cleanup**: Remove properties with empty `idx:readBy` lists from `idx:indexedProperty`
+3. **Index tombstoning**: Tombstone indices when `idx:readBy` becomes empty
+4. **Garbage collection**: Tombstoned indices enter GC index for cleanup after retention period
 
-**Property Cleanup Process:**
-1. **Reader removal:** When installation is tombstoned, remove from all `idx:readBy` lists
-2. **Property removal:** When property has no active readers, remove from `idx:indexedProperty`
-3. **Index tombstoning:** When index has no active readers, tombstone using framework deletion (`crdt:deletedAt`)
-4. **Garbage collection:** Tombstoned indices are registered in GC index for cleanup after retention period
+#### 6.8.2. Index States and Reactivation
 
-**Index States and Transitions:**
+**Index States:**
+- **Active**: `idx:populationState "active"`, non-empty `idx:readBy` list, receives updates
+- **Tombstoned**: When `idx:readBy` becomes empty, index is tombstoned by setting `crdt:deletedAt`, then registered in GC index for cleanup
 
-*Active State:*
-- **Properties:** `idx:populationState "active"`, non-empty `idx:readBy` list
-- **Behavior:** Receives write updates, participates in sync operations
-- **Reader management:** Installations can join/leave through `idx:readBy` OR-Set
+**Reactivation Process:**
+When discovering compatible tombstoned indices:
+1. **Undelete**: Add new `crdt:createdAt` timestamp, tombstone existing `crdt:deletedAt` entries
+2. **Fresh initialization**: Recreate index structure from scratch as if it never existed before
+3. **Join as reader**: Add installation to `idx:readBy` OR-Set
+4. **Fresh population**: Set `idx:populationState "populating"` and perform complete index population like a new index
 
-*Tombstoned State:*
-- **Trigger:** Last active installation removed from `idx:readBy` (OR-Set becomes empty)
-- **Properties:** `max(crdt:deletedAt) > max(crdt:createdAt)`, `idx:readBy` empty
-- **Behavior:** Marked for garbage collection, stops receiving updates
-- **Cleanup:** Framework GC index tracks for automated cleanup after retention period
-
-**Index Reactivation Policy:**
-
-*Tombstoned Index Reactivation:*
-- **Discovery:** New installation discovers tombstoned index through Type Index  
-- **Validation:** Check structural compatibility with current requirements
-- **Reactivation:** Undelete index by adding new `crdt:createdAt` timestamp, tombstoning existing `crdt:deletedAt` entries and joining `idx:readBy`
-- **Re-population required:** Index is stale, must re-enter populating state for update
-  - Set `idx:populationState "populating"`
-  - Create populating shards to scan for new/changed resources since tombstoning like for a new index, possibly undeleting existing shards 
-  - Detect and handle tombstoned entries that may have been missed during tombstoned period
-- **Stale data handling:** Tombstoned period may have missed resource deletions and updates
-- **Tombstone detection algorithm:**
-  1. **Hybrid Logical Clock comparison:** Compare index entry clocks with actual resource clocks
-  2. **Resource availability check:** Verify that indexed resources still exist and are accessible
-  3. **Tombstone processing:** Apply any missed RDF reification tombstones from tombstoned period
-  4. **Entry cleanup:** Remove stale entries for deleted or moved resources
-
-**Configurable CRDT Tie-Breaking Framework:**
-
-*Algorithm-Specific Behaviors:*
-- **`crdt:LWW_Register`:** Standard timestamp comparison with lexicographic installation ID tie-breaking
-- **`crdt:Immutable`:** No updates allowed after creation - sync fails on conflicting values
-- **`crdt:FWW_Register`:** First write wins - subsequent conflicting writes are ignored gracefully
-
-*Framework Benefits:*
-- **Explicit semantics:** Each property declares its intended collaboration model
-- **Configurable per-property:** Different tie-breaking rules for different use cases
-- **Backward compatibility:** Existing `crdt:LWW_Register` maps to `crdt:TimestampLWW`
-- **Self-describing:** Merge behavior discoverable through vocabulary definitions
-
-*Installation Document Specific Rules:*
-- Installations control their own identity and activity metrics via `SelfOnlyLWW` and `SelfWinsLWW`
-- Collaborative dormancy detection enabled through `TimestampLWW` for dormancy properties
-- Framework prevents ownership conflicts while enabling collaborative lifecycle management
 
 ### 6.9. Error Handling and Recovery
 
