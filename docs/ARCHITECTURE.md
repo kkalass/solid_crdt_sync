@@ -666,7 +666,7 @@ The framework uses two distinct tombstone mechanisms for different deletion scop
 ```
 
 **Document-Level Deletion Semantics (Universal Emptying):**
-When the document has `max(crdt:deletedAt) > max(crdt:createdAt)`, the framework immediately empties the document of all semantic content while preserving essential framework metadata. This "radical emptying" approach provides:
+When applying document tombstones, implementations must perform universal emptying: remove all semantic content while preserving essential framework metadata. This applies when setting `crdt:deletedAt` such that `max(crdt:deletedAt) > max(crdt:createdAt)`. This "radical emptying" approach provides:
 
 - **Consistent storage usage:** All tombstoned documents have predictable, minimal size
 - **Conflict avoidance:** No stale content to conflict with during reactivation scenarios  
@@ -2067,20 +2067,44 @@ syncLibrary.onUpdate((mergedResource) => {
 
 Beyond regular data synchronization, the framework requires periodic **management operations** to maintain system health and clean up stale metadata. These operations are separate from normal sync workflows and run on a different schedule.
 
-#### 7.2.1. Management Phase Scope and Frequency
+#### 7.2.1. Lazy Evaluation Principle
+
+**Core Design Principle:** Management operations are performance-critical and must be implemented with high efficiency:
+
+**Cheap Operations (Always Acceptable):**
+- Cached index lookups (reading installation states from locally cached Framework Installation Index)
+- Processing cached Framework Garbage Collection Index entries
+
+**Critical Implementation Notes:** 
+- **Caching Required:** "Cheap" operations rely on **local caching with ETag validation**. The framework maintains local copies of frequently-accessed indices (Installation Index, GC Index) and uses HTTP `If-None-Match` headers to get efficient `304 Not Modified` responses when data hasn't changed. Fresh HTTP requests for every management operation would violate the efficiency principle.
+- **Frequency Management:** Management operations should **not run on every sync**. Recommended approach: run management operations only on the first sync of each day, or after extended periods of inactivity. This prevents unnecessary overhead during normal application usage.
+
+**Lazy Operations (Only During Normal Access):**
+- Reader list cleanup happens **only** when already syncing an index for other purposes
+- Index deprecation happens **only** when accessing indices that are already being synchronized
+- No dedicated scanning or fetching of resources solely for cleanup purposes
+
+**Operations to Avoid:**
+- Scanning Pod containers to discover resources for cleanup
+- Fetching documents solely to check their cleanup eligibility  
+- Any operations requiring O(total resources) or O(total indices) traversal
+- Proactive "find and fix" patterns that traverse data structures
+
+This principle ensures management operations remain efficient regardless of Pod data volume.
+
+#### 7.2.2. Management Phase Scope and Frequency
 
 **When Management Phase Runs:**
 - **Scheduled**: Daily or weekly (configurable, default: daily)
-- **Triggered**: When encountering obviously invalid installations during normal operations
-- **Per-Installation**: Each active installation independently performs management work
+- **No Coordination Required**: Each installation runs management operations independently without coordinating with other installations - CRDT merge semantics handle any concurrent operations safely
 
 **Management Operations:**
-1. **Reader List Cleanup**: Remove tombstoned installations from `idx:readBy` lists across indices
-2. **Installation Dormancy Detection**: Check installation activity and tombstone inactive ones
-3. **Index Deprecation**: Mark indices with no active readers as deprecated
-4. **Garbage Collection**: Process framework GC index for cleanup-ready resources
+1. **Installation Dormancy Detection**: Check installation activity and tombstone inactive ones (cheap: uses Framework Installation Index)
+2. **Opportunistic Reader List Cleanup**: Remove tombstoned installations from `idx:readBy` lists during normal index sync operations (lazy: only for indices being synchronized)
+3. **Opportunistic Index Deprecation**: Mark indices with no active readers as deprecated during normal access (lazy: only for indices being synchronized)
+4. **Garbage Collection**: Process framework GC index for cleanup-ready resources (cheap: uses GC index, processes bounded batch sizes)
 
-#### 7.2.2. Installation Index for Efficient Management
+#### 7.2.3. Installation Index for Efficient Management
 
 **Framework Installation Index:**
 To avoid expensive Type Index container scanning, the framework maintains a dedicated installation index at `/indices/framework/installations-index-${hash}/index`.
@@ -2109,32 +2133,37 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
 - **No container scanning**: Avoid expensive Pod filesystem operations
 - **Framework consistency**: Use same index patterns as user data
 
-#### 7.2.3. Management Phase Algorithm
+#### 7.2.4. Management Phase Algorithm
 
-**Phase 1: Sync Installation Index**
+**Phase 1: Sync Installation Index (Cheap)**
 1. Sync framework installation index (same as any other index)
 2. Identify potentially dormant installations from `crdt:lastActiveAt` headers
 3. Build priority list for validation (oldest first)
 
-**Phase 2: Validate Dormant Installations**
-1. For each potentially dormant installation:
+**Phase 2: Validate Dormant Installations (Cheap - Bounded by Installation Count)**
+1. **Initial screening**: Use cached Installation Index to identify installations that appear dormant based on `crdt:lastActiveAt` headers
+2. **Document validation**: For each potentially dormant installation:
    - GET installation document from Pod
-   - Check `crdt:lastActiveAt` against `crdt:maxInactivityPeriod` 
-   - Apply collaborative tombstoning if beyond threshold
-2. Update installation index with validation results
+   - Re-check dormancy using actual `crdt:lastActiveAt` vs `crdt:maxInactivityPeriod` from document
+3. **Tombstone dormant installations**: If still dormant based on actual document data:
+   - Apply document tombstone by adding `crdt:deletedAt` timestamp and performing universal emptying (remove all semantic content, keeping only framework metadata)
+   - PUT updated installation document
+4. **Automatic index registration**: Framework automatically registers tombstoned installation documents in Garbage Collection Index for eventual cleanup
 
-**Phase 3: Clean Reader Lists**
-1. For each index this installation reads (`idx:readBy` contains self):
-   - Remove tombstoned installations from reader lists
-   - Mark indices with empty reader lists as deprecated
-   - Update indices using standard CRDT merge
-
-**Phase 4: Framework Garbage Collection**
-1. Process framework GC index for cleanup-ready resources
-2. Remove resources beyond retention periods
+**Phase 3: Framework Garbage Collection (Cheap - Uses GC Index)**
+1. Process framework GC index for cleanup-ready documents
+2. Remove documents beyond retention periods (bounded batch sizes)
 3. Update GC index to reflect completed cleanups
 
-#### 7.2.4. Coordination and Conflict Resolution
+**Phase 4: Opportunistic Cleanup (Lazy - Only During Normal Operations)**
+1. **During subsequent normal sync operations**, not as part of management phase:
+   - When syncing any index, opportunistically remove tombstoned installations from `idx:readBy` lists
+   - When syncing any index with empty reader lists, mark as deprecated
+   - When syncing deprecated indices, apply tombstoning if appropriate
+
+**Key Implementation Note:** Phase 4 operations are **not performed during management phase** - they happen lazily as part of normal data synchronization workflows.
+
+#### 7.2.5. Coordination and Conflict Resolution
 
 **Collaborative Execution**: Multiple installations may run management phases simultaneously. CRDT merge semantics ensure safe coordination:
 
