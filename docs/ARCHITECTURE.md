@@ -1980,73 +1980,35 @@ When discovering compatible tombstoned indices:
 
 ### 6.9. Error Handling and Recovery
 
-The framework provides robust error handling for lifecycle management failures, ensuring system integrity and recovery from various failure scenarios.
+The framework provides robust error handling for lifecycle management failures, ensuring system integrity and recovery from various failure scenarios. For comprehensive error handling patterns and implementation guidance, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
-**Pod Setup Failure Recovery:**
+#### 6.9.1. Recovery Principles
 
-**Incomplete Setup Detection:**
-- **Missing Type Index entries:** Framework detects incomplete registrations during startup and re-presents setup dialog
-- **Corrupted configuration:** Validate all Type Index entries against expected schema, repair automatically where possible
-- **Permission failures:** If Pod modification fails during setup, offer alternative approaches (read-only mode, manual configuration)
-- **Network interruptions:** Resume setup process from last successfully completed step, avoid duplicate operations
+**Fundamental Approaches:**
+- **Fail-safe defaults**: When in doubt, choose options that preserve data integrity
+- **Incremental recovery**: Break operations into small, resumable steps to handle interruptions
+- **Fresh start preference**: For complex failures, rebuild from scratch rather than attempting partial repairs
+- **CRDT-based coordination**: Use existing CRDT merge rules to resolve conflicts during recovery
 
-**Setup State Tracking:**
-```turtle
-# Framework tracks setup progress to enable resumption
-<> a sync:ManagedDocument;
-   foaf:primaryTopic <#installation>;
-   sync:isGovernedBy mappings:client-installation-v1 .
+#### 6.9.2. Key Recovery Scenarios
 
-<#installation> a crdt:ClientInstallation;
-    crdt:setupProgress [
-        crdt:typeIndexUpdated true;
-        crdt:dataContainersCreated true;
-        crdt:indicesInitialized false;  # Failed here, needs retry
-        crdt:lastSetupAttempt "2024-08-15T10:30:00Z"^^xsd:dateTime
-    ] .
-```
-
-**Garbage Collection Failure Recovery:**
-
-**Corrupted GC Index State:**
-- **Index corruption:** Rebuild GC index from scratch by scanning all data containers for tombstoned documents
-- **Inconsistent tombstone tracking:** Cross-validate GC index entries against actual document tombstone states
-- **Missing cleanup operations:** Detect documents that should have been cleaned but weren't, reschedule cleanup operations
-- **Partially deleted documents:** Handle cases where document files were deleted but GC index entries remain
-
-**Cleanup Process Interruption:**
-- **Batch failure recovery:** If cleanup batch fails, mark individual documents for retry rather than entire batch
-- **Document lock conflicts:** If multiple installations attempt cleanup simultaneously, use CRDT merge rules to coordinate
-- **Network failures during cleanup:** Queue failed cleanup operations for retry with exponential backoff
-- **Storage errors:** Handle filesystem-level errors gracefully, log issues for manual intervention
-
-**RDF Reification Tombstone Recovery:**
-
-**Tombstone Format Migration Issues:**
-- **Version compatibility:** Framework recognizes and processes both old and new tombstone formats during migration periods
-- **Malformed tombstones:** Detect and repair tombstones with invalid RDF structure or missing required properties
-- **Orphaned tombstones:** Clean up tombstones that reference non-existent properties
-- **Duplicate tombstone conflicts:** Resolve cases where multiple tombstones exist for the same triple using CRDT merge rules
-
-**Tombstone Processing Failures:**
-- **Incomplete tombstone application:** Track which tombstones have been successfully applied during sync operations
-- **Merge conflict resolution:** When tombstone conflicts with document updates, apply deterministic CRDT resolution
-- **Clock synchronization issues:** Handle cases where tombstone timestamps are inconsistent with document clocks
+**Pod Setup Recovery:**
+- **Incomplete setup**: Re-present setup dialog for missing Type Index entries
+- **Permission failures**: Offer alternative approaches (read-only mode, manual configuration)
+- **Network interruptions**: Resume from last completed step, avoid duplicate operations
 
 **Index Lifecycle Recovery:**
+- **Reactivation failures**: Restart with clean tombstoned state and perform fresh population
+- **Population interruptions**: Resume index population from last successfully processed resource
+- **Concurrent conflicts**: Use CRDT merge rules when multiple installations perform recovery simultaneously
 
-**Tombstoned Index Recovery:**
-- **Reactivation failure:** If index reactivation fails partway through, restart with clean tombstoned state
-- **Stale data corruption:** If tombstoned index contains corrupted entries, mark for full re-population rather than incremental update
-- **Population process interruption:** Resume index population from last successfully processed resource
-- **Concurrent reactivation conflicts:** Use CRDT merge rules when multiple installations attempt reactivation simultaneously
+**Garbage Collection Recovery:**
+- **Cleanup interruptions**: Queue failed operations for retry with exponential backoff
+- **GC index corruption**: Accept orphaned tombstoned documents as manageable trade-off (universal emptying keeps them minimal)
+- **Cross-validation**: Validate GC index entries against document states only during normal processing, avoid expensive container scans
 
-**Recovery Process Principles:**
-- **Fail-safe defaults:** When in doubt, choose the safer option that preserves data integrity
-- **Incremental recovery:** Break recovery operations into small, resumable steps to handle interruptions
-- **State validation:** Always validate system state after recovery operations complete
-- **Manual override capability:** Provide escape hatches for situations requiring human intervention
-- **Comprehensive logging:** Log all recovery operations to enable debugging and prevent repeated failures
+**Property Tombstone Recovery:**
+- **Malformed tombstones**: Detect and repair tombstones with invalid RDF structure
 
 ## 7. Synchronization Workflow
 
