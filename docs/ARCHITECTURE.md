@@ -1,5 +1,33 @@
 # A Framework for Local-First, Interoperable Apps on Solid
 
+**Version:** 0.9.0-draft  
+**Last Updated:** September 2025  
+**Status:** Draft Specification  
+**Authors:** Klas Kalaß  
+**Target Audience:** Library implementers, application developers, Solid ecosystem contributors  
+
+## Document Status
+
+This is a **draft specification** under active development. The architecture and APIs described here are subject to change based on implementation experience and community feedback. 
+
+**Feedback Welcome:** Please report issues, suggestions, or questions at [GitHub Issues](https://github.com/anthropics/claude-code/issues) or contribute via pull requests.
+
+## Document Changelog
+
+### Version 0.9.0-draft (September 2025)
+- Initial comprehensive draft specification
+- Complete 4-layer architecture: Data Resource, Merge Contract, Indexing, Sync Strategy layers
+- CRDT foundations with Hybrid Logical Clocks and state-based merging
+- Three sync strategies: FullSync, GroupedSync, OnDemandSync with performance analysis
+- Lifecycle management including Pod setup, index population, and maintenance phases
+- Management operations with lazy evaluation principles for efficiency
+- Comprehensive error handling and graceful degradation patterns
+- Security considerations covering threat model, data integrity, and privacy
+- Professional glossary of technical terms
+- References to complementary documents: [PERFORMANCE.md](PERFORMANCE.md), [ERROR-HANDLING.md](ERROR-HANDLING.md), [FUTURE-TOPICS.md](FUTURE-TOPICS.md)
+
+---
+
 ## 1. Executive Summary
 
 ### 1.1. Framework Overview
@@ -2231,23 +2259,99 @@ The system provides two operational modes based on sync availability:
 
 For comprehensive implementation guidance including specific error scenarios, recovery procedures, and user interface recommendations, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
-## 9. Benefits of this Architecture
+## 9. Security Considerations
+
+### 9.1. Threat Model
+
+This framework operates within the **Solid security model** where:
+- **Pod access control** (WAC/ACP) provides primary security boundaries
+- **WebID-based authentication** establishes user identity
+- **Pods are trusted storage** - no protection against malicious Pod providers
+- **Network communication** relies on HTTPS for transport security
+
+### 9.2. Data Integrity and Authenticity
+
+**Tamper Resistance:**
+- **Hybrid Logical Clocks** provide tamper-resistant causality tracking through logical time counters
+- **Cryptographic hash verification** of index shard states detects data corruption
+- **CRDT merge semantics** ensure convergent outcomes regardless of operation order
+
+**Limitations:**
+- No cryptographic signatures on data - integrity depends on Pod provider trustworthiness
+- Malicious Pod providers could manipulate stored data
+- Hybrid Logical Clock physical timestamps are user-controlled (trusted for tie-breaking only)
+
+### 9.3. Privacy and Access Control
+
+**Access Patterns:**
+- Framework **respects Pod access control** but does not enforce additional restrictions
+- **Index structures may leak metadata** about data organization and access patterns
+- **Installation documents** contain user device/application metadata visible to collaborators
+
+**Privacy Considerations:**
+- **Collaborative visibility**: All installations in a Pod can see framework metadata and index structures
+- **Temporal information**: Hybrid Logical Clocks reveal rough timing and causality of changes
+- **No end-to-end encryption** - data protection relies entirely on Pod provider security
+
+### 9.4. Authentication and Authorization
+
+**Current Scope:**
+- Framework **assumes valid WebID authentication** handled by external mechanisms
+- **Permission failures** trigger graceful degradation to local-only operation
+- **No proactive permission checking** - operations may fail due to access control changes
+
+**Future Enhancements:**
+For proactive access control integration and advanced security features, see [FUTURE-TOPICS.md](FUTURE-TOPICS.md) sections 13-15.
+
+## 10. Benefits of this Architecture
 
 * **CRDT Interoperability:** CRDT-enabled applications achieve safe collaboration by discovering CRDT-managed resources through `sync:ManagedDocument` registrations and following published merge contracts, while remaining protected from interference by incompatible applications.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Controlled Discoverability:** The system is discoverable by CRDT-enabled applications while protecting CRDT-managed data from accidental modification by incompatible applications.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 10. Alignment with Standardization Efforts
+## 11. Alignment with Standardization Efforts
 
-### 10.1. Community Alignment
+### 11.1. Community Alignment
 
 This architecture aligns with the goals of the **W3C CRDT for RDF Community Group**.
 
 * **Link:** <https://www.w3.org/community/crdt4rdf/>
 
-### 10.2. Architectural Differentiators
+### 11.2. Architectural Differentiators
 
 * **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
+
+## 12. Glossary
+
+**CRDT (Conflict-free Replicated Data Type)**: Data structure that can be safely replicated and merged without coordination, guaranteeing convergent outcomes.
+
+**FullIndex**: Monolithic index covering an entire dataset, suitable for small collections (< 1000 resources).
+
+**GroupIndexTemplate**: Template defining how data is grouped into separate indices, enabling scalable organization of large datasets.
+
+**Hybrid Logical Clock (HLC)**: Causality tracking mechanism combining logical time (tamper-resistant) with physical timestamps (intuitive tie-breaking).
+
+**Installation**: Single instance of an application on a specific device, identified by a unique IRI and serving as the CRDT "actor" or "node ID".
+
+**LWW-Register (Last-Writer-Wins Register)**: CRDT type where the most recent value (based on Hybrid Logical Clock) wins during conflicts.
+
+**Merge Contract**: Public RDF document defining how to merge conflicting changes for specific data properties, referenced via `sync:isGovernedBy`.
+
+**OR-Set (Observed-Remove Set)**: CRDT set type supporting additions and explicit removals, commonly used for multi-value properties.
+
+**Pod**: Solid personal data storage space providing web-based access control and RDF data storage.
+
+**sync:ManagedDocument**: Framework wrapper around RDF resources that enables CRDT synchronization and conflict resolution.
+
+**Sync Strategy**: High-level performance pattern (FullSync, GroupedSync, OnDemandSync) determining when and how data is synchronized.
+
+**Tombstone**: Deletion marker in CRDT systems, either at document level (`crdt:deletedAt`) or property level (RDF reification).
+
+**Type Index**: Solid discovery mechanism registering data types and their storage locations within a Pod.
+
+**Universal Emptying**: Process of removing all semantic content from tombstoned documents while preserving framework metadata.
+
+**WebID**: Unique identifier for users in the Solid ecosystem, serving as both identity and profile location.
