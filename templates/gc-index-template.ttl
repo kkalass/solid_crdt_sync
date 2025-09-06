@@ -19,6 +19,27 @@
      crdt:physicalTime 0
    ] ;
    idx:indexesClass sync:ManagedDocument, idx:FullIndex, idx:GroupIndex, idx:GroupIndexTemplate, idx:Shard ;  # Document types that can be deleted
+   idx:indexedProperty [
+     a idx:IndexedProperty ;
+     idx:trackedProperty crdt:deletedAt ;
+     idx:readBy <{INSTALLATION_URI}>
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty crdt:createdAt ;    # Needed for temporal lifecycle evaluation
+     idx:readBy <{INSTALLATION_URI}>
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty rdf:type ;
+     idx:readBy <{INSTALLATION_URI}>
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty sync:managedResourceType ;  # For ManagedDocument retention policies
+     idx:readBy <{INSTALLATION_URI}>
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty idx:indexesClass ;  # For index retention policies
+     idx:readBy <{INSTALLATION_URI}>
+   ] ;
    idx:groupedBy [
      a idx:GroupingRule;
      idx:property [
@@ -26,7 +47,7 @@
        idx:sourceProperty crdt:deletedAt;
        idx:name "deletionYear";
        idx:format "YYYY"
-       # No idx:missingValue = resources without deletedAt create no groups
+       # No idx:missingValue = documents without deletedAt create no groups
      ];
      idx:groupTemplate "gc/{deletionYear}/index"
    ];

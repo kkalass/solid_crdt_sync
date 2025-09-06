@@ -52,7 +52,7 @@ This phase performs maintenance operations and validates index consistency befor
       * **Batch optimization:** Group installation fetches to minimize HTTP requests
       * **Scalability:** Performance independent of total installation count
    3. **Collaborative cleanup:** Apply lifecycle-based reader list updates to all indices
-   4. **Index lifecycle:** Check for indices with no active readers and set `idx:deprecatedAt`
+   4. **Index lifecycle:** Check for indices with no active readers and tombstone them using framework deletion (`crdt:deletedAt`)
 
 2. **Index Consistency Validation:**
    1. **Reader list verification:** Ensure all `idx:readBy` installations are still active

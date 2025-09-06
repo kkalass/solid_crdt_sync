@@ -349,58 +349,151 @@ class Ingredient {
 
 This constraint fundamentally shapes merge contract design, mapping validation, and the scope of supported CRDT operations.
 
-### 4.3. Resource/Document Abstraction Layers
+### 4.3. Resource/Document Abstraction
 
-The framework operates on two distinct but coordinated abstraction layers that resolve the fundamental tension between developer-friendly resource-oriented thinking and protocol-efficient document-oriented synchronization.
+Developers want to work with individual recipe properties like `schema:name` and `schema:ingredients`, but efficient sync requires handling entire documents as atomic units. This section explains how the framework solves both needs through coordinated abstraction levels.
 
-#### 4.3.1. The Fundamental Principle
+#### 4.3.1. The Problem: Two Different Mental Models
 
-**Core Rule:** *If the resource uses a fragment identifier, then sync/merge control operates on the entire document. The resource content/indexing operates on the specific resource, regardless of whether that resource is the document's primary topic, the document itself, or any other resource within that document.*
+**What Developers Want to Work With:**
+```turtle
+# Individual recipe properties - feels natural for app development
+<https://alice.podprovider.org/data/recipes/tomato-soup#it> 
+    schema:name "Tomato Soup" ;
+    schema:ingredients "tomatoes, basil" ;
+    schema:prepTime "PT30M" .
+```
 
-This principle creates a clean separation between:
+**What Efficient Sync Requires:**
 
-- **Logical Layer (Developer-Facing):** Resource-oriented operations, properties, and indexing
-- **Physical Layer (Sync Protocol):** Document-oriented change detection, conflict resolution, and atomic synchronization
+*Document: `/data/recipes/tomato-soup`*
+```turtle
+# Complete document with sync metadata - efficient for protocol operations
+<https://alice.podprovider.org/data/recipes/tomato-soup> 
+    a sync:ManagedDocument ;
+    sync:managedResourceType schema:Recipe ;  # Enables resource-type-specific retention policies
+    crdt:hasClockEntry [
+        crdt:installationId <https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz> ;
+        crdt:logicalTime "15"^^xsd:long ;
+        crdt:physicalTime "1693824600000"^^xsd:long
+    ] ;
+    sync:isGovernedBy <https://alice.podprovider.org/mappings/recipes-v1> ;
+    crdt:clockHash "abc123def456" .
 
-#### 4.3.2. Abstraction Layer Details
+<https://alice.podprovider.org/data/recipes/tomato-soup#it> 
+    schema:name "Tomato Soup" ;
+    schema:ingredients "tomatoes, basil" ;
+    schema:prepTime "PT30M" .
+```
 
-**Developer/Application Layer:**
-- **Think in resources:** `recipe#it`, `shoppingList#item1`, properties like `schema:name`
-- **Index entries contain resource properties** for intuitive querying and discovery  
-- **Type registrations use semantic resource types** (`schema:Recipe`, `meal:ShoppingListEntry`)
-- **APIs work with resource identities** and individual property values
-- **Resource type registration:** Implementations provide mechanisms for developers to associate resource types with their governing mapping documents, establishing the connection between application classes and CRDT merge contracts
+The framework needs to support both perspectives simultaneously.
 
-**Framework/Sync Layer:**  
-- **Operate on documents as atomic units** for conflict-free synchronization
-- **HLC hashes track document-level changes** for efficient change detection
-- **Merge conflicts resolved at property level** using each property's declared CRDT algorithm
-- **Deletion is document-level** with all-or-nothing cleanup semantics
+#### 4.3.2. The Solution: Dual Abstraction Levels
 
-#### 4.3.3. Indexing Implications
+**Core Rule:** *When a resource uses a fragment identifier (like `#it`), sync/merge control operates on the entire document, while resource content and indexing operate on the specific resource.*
 
-**Resource-Oriented Index Content:**
-- Indexes contain resource-level properties for meaningful application queries
-- Applications query by semantic properties (`schema:name`, `meal:quantity`, resource types)
-- All indexing operations work with resource identities (fragment identifiers)
+This creates two coordinated abstraction levels:
 
-**Document-Level Change Detection:**
-- Change detection operates on complete documents via HLC hashes
-- Framework tracks which documents have changed, not individual resources
-- Sync efficiency comes from document-granularity change detection
+**Developer/Application Perspective (Resource-Oriented):**
+- Work with resource identities: `https://alice.podprovider.org/data/recipes/tomato-soup#it`
+- Receive resource properties for local storage and application logic
+- Update individual properties: change just the `schema:prepTime`
+- APIs handle resource-level operations and individual property values
 
-**Garbage Collection:**
-- Tracks **document tombstones** (not resource tombstones)
-- Type registrations specify **semantic resource types** for policy configuration
-- Cleanup operates on **complete documents** when retention periods expire
+**Framework/Sync Perspective (Document-Oriented):**
+- Track changes at document level using Hybrid Logical Clock hashes
+- Merge conflicts by comparing entire document states, then resolving property-by-property
+- Synchronize complete documents as atomic units for consistency
+- Handle deletion as all-or-nothing document cleanup
 
-#### 4.3.4. Protocol Consistency
+#### 4.3.3. Document-Level Sync with Resource-Level Access
 
-This dual-layer approach ensures:
-- **Atomic consistency:** All changes to resources within a document are synchronized together
-- **Developer intuition:** APIs and indices work with familiar resource-oriented concepts
-- **Efficient sync:** Protocol transfers and conflicts operate on document granularity
-- **Clean semantics:** Fragment resources automatically inherit document-level sync behavior
+The framework maintains the dual abstraction by tracking changes at the document level while providing access to individual resources:
+
+*Document: `/data/recipes/tomato-soup`*
+```turtle
+# Document-level change tracking enables efficient sync
+<https://alice.podprovider.org/data/recipes/tomato-soup> 
+    a sync:ManagedDocument ;
+    sync:managedResourceType schema:Recipe ;
+    crdt:clockHash "abc123def456" ;  # Single hash covers entire document
+    crdt:hasClockEntry [...] ;
+    sync:isGovernedBy <mappings> .
+
+# Resource-level content for application use
+<https://alice.podprovider.org/data/recipes/tomato-soup#it> 
+    schema:name "Tomato Soup" ;
+    schema:ingredients "tomatoes, basil" ;
+    schema:prepTime "PT30M" .
+```
+
+**Conflict Resolution:**
+When Alice and Bob edit the same recipe simultaneously, the framework merges at the document level while preserving individual resource properties:
+
+*Merged Document: `/data/recipes/tomato-soup`*
+```turtle
+# Result: Both changes preserved through property-level conflict resolution
+<https://alice.podprovider.org/data/recipes/tomato-soup> 
+    a sync:ManagedDocument ;
+    sync:managedResourceType schema:Recipe ;
+    crdt:clockHash "def789ghi012" ;      # Updated hash reflects merged state
+    crdt:hasClockEntry [
+        crdt:installationId <https://alice.podprovider.org/installations/mobile-recipe-app-2024-08-19-xyz> ;
+        crdt:logicalTime "16"^^xsd:long
+    ], [
+        crdt:installationId <https://bob.podprovider.org/installations/desktop-recipe-app-2024-08-15-abc> ;
+        crdt:logicalTime "15"^^xsd:long
+    ] ;
+    sync:isGovernedBy <https://alice.podprovider.org/mappings/recipes-v1> .
+
+<https://alice.podprovider.org/data/recipes/tomato-soup#it> 
+    schema:name "Spicy Tomato Soup" ;    # Alice's change (higher logical time)
+    schema:ingredients "tomatoes, basil" ; # Unchanged property preserved
+    schema:prepTime "PT45M" .            # Bob's change (preserved)
+```
+
+#### 4.3.4. Benefits of This Approach
+
+**For Developers:**
+- Work with standard resource-oriented RDF concepts
+- Receive individual resource data for local storage and application logic
+- Type registrations use familiar semantic types (`schema:Recipe`)
+
+**For Sync Efficiency:**
+- Document-level change detection minimizes network overhead
+- Atomic document synchronization prevents partial update inconsistencies
+- Single document merge resolves all property conflicts together
+
+**For System Consistency:**
+- All changes to resources within a document are synchronized together
+- Deletion operates cleanly on complete documents with retention policies
+- Fragment resources automatically inherit document-level sync behavior
+
+#### 4.3.5. Implementation Requirements
+
+**Mandatory Document Properties:**
+Framework libraries **MUST** include the following properties when creating `sync:ManagedDocument` instances:
+
+- **`foaf:primaryTopic`**: MUST identify the primary resource within the document (typically `<#it>`)
+- **`crdt:createdAt`**: MUST be set to document creation timestamp to enable zombie deletion protection
+- **`sync:managedResourceType`**: MUST be set to the `rdf:type` of the `foaf:primaryTopic` resource
+  - **Purpose**: Enables efficient garbage collection, retention policy lookup, and prevents zombie deletion problems during document recreation
+  - **Requirement**: The `sync:managedResourceType` value MUST equal the primary resource type (e.g., `schema:Recipe` for recipe documents)
+
+```turtle
+# REQUIRED: All mandatory properties must be present
+<https://alice.podprovider.org/data/recipes/tomato-soup> 
+    a sync:ManagedDocument ;
+    sync:managedResourceType schema:Recipe ;  # MUST match #it rdf:type
+    crdt:createdAt "2024-08-15T10:30:00Z"^^xsd:dateTime ;  # MUST be present
+    foaf:primaryTopic <#it> .
+
+<https://alice.podprovider.org/data/recipes/tomato-soup#it>
+    a schema:Recipe ;  # Must match sync:managedResourceType above
+    schema:name "Tomato Soup" .
+```
+
+This requirement ensures consistent resource type tracking across Type Index registrations, document metadata, and garbage collection operations.
 
 ### 4.4. Solid Discovery Integration
 
@@ -467,16 +560,17 @@ This creates clean separation: compatible applications collaborate safely on man
 <> solid:hasRegistration [
       a solid:TypeRegistration;
       solid:forClass idx:FullIndex;
-      solid:instanceContainer <../indices/recipes/>;
       idx:indexesClass schema:Recipe
+      solid:instanceContainer <../indices/recipes/>;
    ], [
       a solid:TypeRegistration;
       solid:forClass idx:GroupIndexTemplate;
-      solid:instanceContainer <../indices/shopping-entries/>;
       idx:indexesClass meal:ShoppingListEntry
+      solid:instanceContainer <../indices/shopping-entries/>;
    ], [
       a solid:TypeRegistration;
-      solid:forClass crdt:ClientInstallation;
+      solid:forClass sync:ManagedDocument;
+      sync:managedResourceType crdt:ClientInstallation;
       solid:instanceContainer <../installations/>
    ] .
 ```
@@ -541,23 +635,24 @@ Distributed systems require explicit deletion handling to ensure consistent data
 
 #### 4.6.1. Tombstone Types and Scope
 
-The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate with unified OR-Set semantics.
+The framework uses two distinct tombstone mechanisms for different deletion scopes, both utilizing the same `crdt:deletedAt` predicate but with different merge semantics appropriate to their scope.
 
 **Two Types of Tombstones:**
 
 **1. Document Tombstones** (Entire Document Deletion):
 - **Purpose:** Mark complete documents as deleted, affecting all resources contained within
-- **Property:** `crdt:deletedAt` with OR-Set semantics applied to the primary resource IRI
-- **Scope:** Applied to the primary resource identifier `<doc#it>`, marking the entire document for cleanup
+- **Property:** `crdt:deletedAt` with OR-Set semantics applied to the document
+- **Scope:** Applied to the document identifier `<doc>`, marking the entire document for cleanup
 - **Use Case:** Application-controlled cleanup of documents (recipes, shopping lists, etc.)
 
 ```turtle
-# Document tombstone example - applied to primary resource, affects entire document
-<shopping-entry-123#it> crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
+# Document tombstone example - applied at document level
+<https://alice.podprovider.org/data/shopping-entries/entry-123> 
+    crdt:deletedAt "2024-09-02T14:30:00Z"^^xsd:dateTime .
 ```
 
 **Document-Level Deletion Semantics:**
-When the primary resource (`<doc#it>`) is marked with `crdt:deletedAt`, the framework treats this as a signal to delete the entire document during garbage collection. All resources within the document (any fragment identifiers) are considered deleted together. This approach:
+When the document has `max(crdt:deletedAt) > max(crdt:createdAt)`, the framework treats this as a signal to delete the entire document during garbage collection if retention settings mandate it. All resources within the document (any fragment identifiers) are considered deleted together. This approach:
 
 - **Simplifies cleanup logic:** One deletion marker controls entire document lifecycle
 - **Preserves application control:** Applications decide what and when to delete
@@ -580,35 +675,60 @@ The `crdt:deletedAt` predicate is defined globally in the framework's predicate 
 ```
 
 **Key Properties:**
-- **Multi-Value Set:** `crdt:deletedAt` is a set of deletion timestamps (OR-Set semantics)
-- **State Determination:** A resource/value is considered deleted if `crdt:deletedAt` set is non-empty, undeleted if set is empty
-- **Merge Behavior:** OR-Set union across all replicas - timestamps can be added (delete) or removed (undelete)
-- **Undeletion Support:** Remove timestamps from the set by tombstoning the deletion timestamps themselves
+
+**Document-Level Deletion:**
+- **Temporal Lifecycle:** Both `crdt:createdAt` and `crdt:deletedAt` are sets of timestamps (OR-Set semantics)
+- **State Determination:** A document is considered deleted if `max(crdt:deletedAt) > max(crdt:createdAt)`
+- **Merge Behavior:** OR-Set union across all replicas for both creation and deletion timestamps
+- **Undeletion Support:** Add new `crdt:createdAt` timestamp and tombstone old `crdt:deletedAt` timestamps that are being "undone"
+
+**Property-Level Deletion (RDF Reification):**
+- **Simple Tombstone:** Property values are deleted if a corresponding RDF reification tombstone with `crdt:deletedAt` exists
+- **No Creation Tracking:** Property tombstones only have `crdt:deletedAt` (no `crdt:createdAt` at value level)
+- **Standard RDF Semantics:** Uses RDF reification to mark specific triples as deleted without asserting them
+
+**Undeletion Example:**
+```turtle
+# Before undeletion - document is deleted (max deletion > max creation)
+<doc> crdt:createdAt ["2024-01-01T10:00:00Z"] ;
+      crdt:deletedAt ["2024-06-01T15:30:00Z"] .  # Document deleted
+
+# After undeletion - add new creation, tombstone old deletion
+<doc> crdt:createdAt ["2024-01-01T10:00:00Z", "2024-08-15T09:00:00Z"] ;
+      crdt:deletedAt [] .  # Deletion timestamp tombstoned
+
+# The deletion tombstone (as RDF reification):
+[rdf:subject <doc> ; 
+ rdf:predicate crdt:deletedAt ; 
+ rdf:object "2024-06-01T15:30:00Z"^^xsd:dateTime] 
+    crdt:deletedAt "2024-08-15T09:01:00Z"^^xsd:dateTime .
+```
 
 **Deletion API Design Philosophy:**
 
-Deletion in this framework is conceptually straightforward: adding `crdt:deletedAt` triples to resources. Framework deletion methods serve as syntactic sugar for this fundamental operation:
+Framework deletion operates at the document level, providing a clean separation between application-controlled soft deletion and system-level cleanup:
 
 ```dart
-// Conceptually equivalent operations for document deletion:
+// Document-level deletion - marks entire document for cleanup
 syncLibrary.deleteDocument(documentUri);
-// ↑ Convenience method - marks primary resource, triggers document cleanup
+// ↑ Framework handles document-level tombstone, affects all resources within
 
-syncLibrary.addTriple('${documentUri}#it', 'crdt:deletedAt', timestamp);  
-// ↑ Explicit triple addition - same semantic effect
+// Note: Direct manipulation of document metadata is NOT supported:
+// syncLibrary.addTriple(documentUri, 'crdt:deletedAt', timestamp); // ILLEGAL
+// ↑ Document metadata belongs to framework, not application control
 ```
 
 **Key Principles:**
-- **Developer Control:** Applications control deletion through either explicit triple manipulation or convenience APIs
-- **Consistent Semantics:** Framework handles distributed coordination identically regardless of how `crdt:deletedAt` triples are added
-- **Data-Centric Design:** Deletion becomes "just another state change" rather than a special operation outside the data model
+- **Document-Level Scope:** Deletion affects entire documents, not individual resources
+- **Developer Choice:** Use framework deletion only when business-level soft deletion isn't sufficient
+- **Explicit Cleanup:** Framework deletion provides eventual cleanup with retention policies
 
 **Application vs System Deletion:**
 
 The framework distinguishes between application-level "deletion" semantics and system-level cleanup operations:
 
 - **Application Layer:** Developers typically implement domain-specific soft deletion (`status: "archived"`, `visibility: "hidden"`) using their own vocabulary and business logic
-- **System Layer:** Framework deletion (`crdt:deletedAt`) is for true cleanup - storage optimization, retention compliance, and resource lifecycle management
+- **System Layer:** Framework deletion (`crdt:deletedAt`) is for true cleanup - storage optimization, retention compliance, and document lifecycle management
 - **Layered Approach:** Applications may use both - soft deletion for user-facing features, framework deletion for backend cleanup policies
 
 This separation allows developers to maintain full control over user-visible deletion semantics while leveraging the framework's sophisticated distributed cleanup infrastructure when genuine resource removal is required.
@@ -706,7 +826,7 @@ This layer defines the "how" of data integrity. It is a public, application-agno
 
 * **The Rules (`sync:` vocabulary):** A separate, published RDF file defines the merge behavior for a class of data by linking its properties to specific CRDT algorithms.
 
-* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Hybrid Logical Clocks** for versioning and **Resource Tombstones** for managing deletions.
+* **The Mechanics (`crdt:` vocabulary):** To execute the rules, low-level metadata is embedded within the data resource itself. This includes **Hybrid Logical Clocks** for versioning and **Document Tombstones** for managing deletions.
 
 #### 5.2.1. Merge Contract Fundamentals
 
@@ -965,11 +1085,15 @@ The framework provides two fundamental indexing approaches to handle different d
 | **FullIndex** | Bounded datasets you browse/search globally | Recipes (≤1000s), Contacts, Documents | Limited by total size |
 | **GroupIndexTemplate** | Unbounded datasets with natural groupings | Shopping by month, Transactions by year | Unlimited (groups stay small) |
 
+**Index Convention:** Indices are separate CRDT resources that **minimally contain a lightweight hash of each document's Hybrid Logical Clock** for change detection. They may optionally contain additional "header" information extracted from **resource properties** (like `schema:name`, `schema:dateCreated`) to support on-demand synchronization scenarios.
+
+**Important Distinction:** While the Hybrid Logical Clock hash tracks document-level changes, the header properties come from specific resources within those documents. For example, a recipe's `schema:name` property belongs to the `recipe#it` resource, not the document itself, but gets included in index headers for efficient discovery.
+
+**Bidirectional Index Maintenance:** All index operations require updating both the index shard entries and the corresponding `idx:belongsToIndexShard` references in the indexed documents. Removing a document from an index means removing both its shard entry and updating the document to remove its `idx:belongsToIndexShard` reference to that shard. This principle applies to all indexing operations: population, cleanup, document updates, and maintenance tasks.
+
 #### 5.3.2. Framework Vocabulary
 
 The `idx:` vocabulary provides the building blocks for both indexing approaches:
-
-**Index Convention:** Indices are separate CRDT resources that **minimally contain a lightweight hash of each document's Hybrid Logical Clock** for change detection. They may optionally contain additional "header" information (like titles, dates) to support on-demand synchronization scenarios.
 
 **Core Index Classes:**
 * **`idx:Index`:** The abstract base class for any sharded index that directly contains data entries.
@@ -987,6 +1111,8 @@ The `idx:` vocabulary provides the building blocks for both indexing approaches:
 * **`idx:isShardOf`:** Links shard back to its parent index
 * **`idx:containsEntry`:** Contains an index entry with resource IRI and metadata
 * **`idx:resource`:** Points to the actual data resource from an index entry
+
+**Indexing Flexibility:** While most indices focus on primary resources (like `recipe#it`), the framework supports indexing any resource within a document. For example, a recipe document could have both a recipe index (indexing `recipe#it` for name, prep time) and a nutrition index (indexing `recipe#nutrition` for calories, protein). Both resources sync together via the same document-level Hybrid Logical Clock but serve different discovery purposes.
 * **`idx:groupedBy`:** Links GroupIndexTemplate to its GroupingRule
 * **`idx:property`:** Multi-value property linking to GroupingRuleProperty instances (in GroupingRule)
 * **`idx:groupTemplate`:** Template for group index paths using named substitution (in GroupingRule)
@@ -1054,7 +1180,7 @@ idx:property [
   # No missingValue = no group if property absent
 ];
 idx:groupTemplate "gc/{year}/index"
-# Only resources WITH crdt:deletedAt get indexed
+# Only documents WITH crdt:deletedAt get indexed
 ```
 
 *Multi-Value Permutations with Deduplication:*
@@ -1172,7 +1298,7 @@ When installations attempt to create indices with conflicting immutable properti
 **Performance Impact Management:**
 - **Write overhead awareness:** Every additional index increases write operation overhead for all installations
 - **Property-level optimization:** Framework automatically removes unused `idx:indexedProperty` entries when last reader is tombstoned (see Section 5.8 for index lifecycle management)
-- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index deprecation when no active readers remain (see Section 5.8)
+- **Reader list maintenance:** Framework automatically removes tombstoned installations from `idx:readBy` lists, enabling index tombstoning when no active readers remain (see Section 5.8)
 
 #### 5.3.6. Index Population Mechanics
 
@@ -1528,7 +1654,7 @@ After successful Pod setup, the framework automatically creates an Installation 
 The Installation Document serves as the foundation for all collaborative operations - index management, dormancy detection, and CRDT conflict resolution. It is registered in the system Installation Index and remains active until the installation is tombstoned.
 
 **Tombstoned Installation Recovery:**
-If an installation discovers its own document has been tombstoned (marked with `crdt:deletedAt`) **or cannot find its installation document remotely** (indicating it was tombstoned and later garbage collected), it must **not** attempt undeletion or continue using the stored installation ID. Instead, it creates a fresh installation identity and resets all internal state.
+If an installation discovers its own document has been tombstoned (`max(crdt:deletedAt) > max(crdt:createdAt)`) **or cannot find its installation document remotely** (indicating it was tombstoned and later garbage collected), it must **not** attempt undeletion or continue using the stored installation ID. Instead, it creates a fresh installation identity and resets all internal state.
 
 **Recovery Process:**
 1. **Detection during startup:** Framework checks if its locally stored installation ID exists in the remote Installation Index
@@ -1551,7 +1677,7 @@ Before application-specific functionality can begin, the framework establishes e
 
 **Required System Indices:**
 - **Installation Index:** For tracking all client installations (Section 4.2.2)
-- **Framework Garbage Collection Index:** For tracking tombstoned resources (Section 5.6)
+- **Framework Garbage Collection Index:** For tracking tombstoned documents (Section 6.6)
 
 **Lifecycle Role:**
 These indices follow standard creation and discovery rules (Chapter 4) but are established automatically during framework initialization. The Installation Index receives the installation document created in Section 5.2, enabling collaborative operations for subsequent application indices.
@@ -1642,18 +1768,21 @@ Resource creation must be resumable after interruptions (network failures, app t
 
 ### 6.6. Framework Garbage Collection Index
 
-System-level index for tracking tombstoned documents that require proactive cleanup. This includes temporary framework resources (populating shards) and complete user data documents marked for deletion, but **not property tombstones** which are handled during sync-time processing.
+System-level index for tracking tombstoned documents that require proactive cleanup. This includes temporary framework documents (populating shards) and complete user data documents marked for deletion, but **not property tombstones** which are handled during sync-time processing.
 
 #### 6.6.1. Design Overview
 
 **Centralized Cleanup Strategy:**
-Rather than requiring cleanup processes to scan entire data containers looking for tombstoned documents, primary resources marked with `crdt:deletedAt` are automatically registered in this index, enabling efficient discovery and batch cleanup operations. When cleanup occurs, the entire document (including all fragment resources) is removed from Pod storage.
+Rather than requiring cleanup processes to scan entire data containers looking for tombstoned documents, framework-managed documents where `max(crdt:deletedAt) > max(crdt:createdAt)` are automatically registered in this index, enabling efficient discovery and batch cleanup operations. When cleanup occurs, the entire document (including all fragment resources) is removed from Pod storage.
 
 **GroupIndexTemplate Implementation:**
-The GC index leverages the enhanced GroupingRule system to achieve conditional registration - only resources with `crdt:deletedAt` timestamps get indexed, organized by deletion year for efficient cleanup operations.
+The GC index leverages the enhanced GroupingRule system to achieve conditional registration - only framework-managed documents where `max(crdt:deletedAt) > max(crdt:createdAt)` get indexed, organized by deletion year for efficient cleanup operations.
 
-**Multi-Type Support:**
-Uses `rdfs:Resource` as `idx:indexesClass` to handle any resource type. The framework consistently extracts the primary topic resource from `sync:ManagedDocument` wrappers for indexing.
+**Precise Type Targeting:**
+Uses specific document/framework types as `idx:indexesClass` to avoid indexing application resources that happen to use `crdt:deletedAt` for soft deletion. Only indexes documents and framework resources that can actually be deleted at the system level.
+
+**Resource Type Tracking:**
+Framework-managed documents (`sync:ManagedDocument`) include `sync:managedResourceType` property to enable resource-type-specific retention policies without expensive document content fetching. This allows different retention periods for recipes vs shopping lists while maintaining efficient garbage collection operations.
 
 #### 6.6.2. Index Structure
 
@@ -1661,7 +1790,29 @@ Uses `rdfs:Resource` as `idx:indexesClass` to handle any resource type. The fram
 ```turtle
 <gc-index-template> a idx:GroupIndexTemplate;
    sync:isGovernedBy mappings:index-v1;
-   idx:indexesClass rdfs:Resource;  # Indexes any resource type
+   idx:indexesClass sync:ManagedDocument, idx:FullIndex, idx:GroupIndex, 
+                    idx:GroupIndexTemplate, idx:Shard;  # Document/framework types only
+   idx:indexedProperty [
+     a idx:IndexedProperty ;
+     idx:trackedProperty crdt:deletedAt ;
+     idx:readBy <installation-uri>  # Installations reading deletion timestamps
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty crdt:createdAt ;
+     idx:readBy <installation-uri>  # Needed for temporal lifecycle evaluation
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty rdf:type ;
+     idx:readBy <installation-uri>  # Installations reading document types
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty sync:managedResourceType ;  # For ManagedDocument retention policies
+     idx:readBy <installation-uri>  # Installations reading resource types
+   ], [
+     a idx:IndexedProperty ;
+     idx:trackedProperty idx:indexesClass ;  # For index retention policies
+     idx:readBy <installation-uri>  # Installations reading index classes
+   ] ;
    idx:groupedBy [
      a idx:GroupingRule;
      idx:property [
@@ -1669,99 +1820,97 @@ Uses `rdfs:Resource` as `idx:indexesClass` to handle any resource type. The fram
        idx:sourceProperty crdt:deletedAt;
        idx:name "deletionYear";
        idx:format "YYYY"
-       # No idx:missingValue = resources without deletedAt create no groups
+       # No idx:missingValue = documents without deletedAt create no groups
      ];
      idx:groupTemplate "gc/{deletionYear}/index"
    ];
-   # Standard sharding and merge contracts...
-```
-
-**Registration Behavior:**
-- **Active resources** (no `crdt:deletedAt`): Not indexed (no groups created)  
-- **Tombstoned resources** (with `crdt:deletedAt`): Automatically registered in appropriate yearly group
-- **Yearly organization:** `gc/2024/index`, `gc/2025/index`, etc. for efficient retention policy application
-
-#### 6.6.3. Lifecycle Management
-
-**Index Discovery:**
-- **Type Index registration:** Framework registers as `idx:GroupIndexTemplate` for tombstoned resource cleanup
-- **Structure-derived naming:** Follows standard GroupIndexTemplate creation rules (Section 4.3)
-- **System index creation:** Created during System Index Setup (Section 5.3) as part of essential framework infrastructure
-
-**Detailed Configuration:**
-```turtle
-<gc-index-a1b2c3d4> a idx:FullIndex;
-   sync:isGovernedBy mappings:index-v1;
-   # Index covers all tombstoned resource types
-   idx:indexedProperty [
-     a idx:IndexedProperty;
-     idx:trackedProperty crdt:deletedAt;          # Deletion timestamps for all resources
-     idx:readBy <installation-1>, <installation-2>, <installation-3>
-   ], [
-     a idx:IndexedProperty;
-     idx:trackedProperty rdf:type;                # Resource type for cleanup process routing  
-     idx:readBy <installation-1>, <installation-2>, <installation-3>
-   ] ;
+   # Standard sharding for GC index
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
      idx:hashAlgorithm "xxhash64";
      idx:numberOfShards 1
-   ] ;
-   idx:readBy <installation-1>, <installation-2>, <installation-3> .
+   ];
+   idx:populationState "active";
+   idx:readBy <installation-uri> .  # Installations that read GC index for cleanup
 ```
+
+**Registration Behavior:**
+- **Active framework documents** (no `crdt:deletedAt`): Not indexed (no groups created)  
+- **Tombstoned framework documents** (`max(crdt:deletedAt) > max(crdt:createdAt)`): Automatically registered in appropriate yearly group
+- **Undeleted documents**: Can be efficiently removed from GC index using both `crdt:createdAt` and `crdt:deletedAt` data
+- **Application resources with soft deletion**: Ignored (not in indexed types list)
+- **Yearly organization:** `gc/2024/index`, `gc/2025/index`, etc. for efficient retention policy application
+
+**Temporal Lifecycle Support:**
+Including both `crdt:createdAt` and `crdt:deletedAt` as indexed properties enables the cleanup process to evaluate deletion state without fetching full documents, and automatically handle undeletion scenarios where documents should be removed from the GC index.
+
+#### 6.6.3. Operational Lifecycle
+
+**Group Creation:**
+- **Automatic:** New yearly groups (e.g., `gc/2025/index`) are created automatically when the first tombstoned document from that deletion year is encountered
+- **Template-driven:** Group structure follows the `idx:groupTemplate` pattern defined in the GC index template
+- **Population state:** New groups start as "populating" and transition to "active" once initial sync completes
+
+**Retention Policy Application:**
+- **Periodic scans:** Background processes periodically scan GC index groups older than configured retention periods
+- **Type-specific policies:** Use (`rdf:type`, `sync:managedResourceType`) or (`rdf:type`, `idx:indexesClass`) tuples to determine retention periods for each document
+- **Batch cleanup:** Documents meeting retention criteria are deleted in batches to optimize Pod operations
+
+**Group Cleanup:**
+- **Empty group detection:** Groups with no remaining entries (all documents cleaned up) are marked for deletion
+- **Template preservation:** The GC index template itself is never deleted, only the yearly group instances
+- **Tombstone management:** Empty groups are tombstoned rather than immediately deleted to maintain CRDT consistency across installations
 
 #### 6.6.4. Cleanup Operations
 
 **Document Garbage Collection Process:**
-1. **Automatic Registration:** When documents receive `crdt:deletedAt` timestamp, automatically add entry to GC index
-2. **Periodic Cleanup:** Background processes scan GC index for tombstoned documents older than configured retention periods
-3. **Type-Specific Cleanup:** Route different document types to appropriate cleanup logic based on document `rdf:type`
-4. **Safe Deletion:** Remove entire document files from Pod after verifying retention period has passed (includes all fragment resources)
-5. **GC Index Maintenance:** Remove entries for successfully deleted documents from GC index
+1. **Automatic Registration:** When documents become tombstoned (`max(crdt:deletedAt) > max(crdt:createdAt)`), automatically add entry to GC index
+2. **Periodic Cleanup:** Background processes scan GC index for documents older than configured retention periods
+3. **Temporal Validation:** For each candidate, verify `max(crdt:deletedAt) > max(crdt:createdAt)` using indexed data - if false, remove from GC index and remove the document's `idx:belongsToIndexShard` reference to the GC index (document was undeleted)
+4. **Retention Policy Lookup:** Apply type-specific retention periods using tuples: (`rdf:type`, `sync:managedResourceType`) for ManagedDocuments or (`rdf:type`, `idx:indexesClass`) for index documents
+5. **Type-Specific Cleanup:** Route different document types to appropriate cleanup logic based on document `rdf:type`
+6. **Index Entry Cleanup:** Remove corresponding index entries from all shards referenced in the document's `idx:belongsToIndexShard` properties, and remove those `idx:belongsToIndexShard` references from the document itself
+7. **Document Deletion:** Remove entire document files from Pod after verifying retention period has passed (includes all fragment resources)
+8. **GC Index Maintenance:** Remove entries for successfully deleted documents from GC index
 
 **Property Tombstone Exclusion:** Property tombstones (RDF Reification statements) are **not** registered in the GC index. They are cleaned during document sync operations when the containing document is processed, providing more efficient and local-first aligned cleanup.
 
-#### 6.6.5. Performance and Thresholds
-
-**GC Index Size Monitoring:**
-- **Warning threshold:** 1000+ tombstoned entries in GC index suggests retention periods may be too long
-- **Performance threshold:** 5000+ entries may impact index sync performance, consider more aggressive cleanup
-- **Critical threshold:** 10000+ entries indicates cleanup process failure, requires manual intervention
+#### 6.6.5. Cleanup Implementation
 
 **Cleanup Process Batching:**
-- **Batch size:** Process 50-100 tombstoned resources per cleanup cycle to respect mobile device constraints
+- **Batch size:** Process 50-100 tombstoned documents per cleanup cycle to respect mobile device constraints
 - **Frequency:** Run cleanup cycles every 24-48 hours during low-activity periods
 - **Resource limits:** Limit cleanup operations to 2-5 minutes total execution time per cycle
 - **Concurrent safety:** Multiple installations may run cleanup simultaneously - use CRDT merge rules for coordination
 
-**Retention Period Balancing:**
-- **Minimum safe period:** 30 days for property tombstones, 6 months for resource tombstones
-- **Performance optimization:** Shorter periods reduce GC index size but increase risk of zombie deletions
-- **Storage optimization:** Longer periods ensure deletion propagation but may accumulate storage overhead
+**Retention Period Guidelines:**
+- **Minimum safe period:** 30 days for property tombstones, 6 months for document tombstones
+- **Trade-offs:** Shorter periods reduce storage but increase risk of zombie deletions; longer periods ensure deletion propagation but may accumulate storage overhead
+- **App-specific tuning:** Flutter apps can adjust retention based on device storage constraints
 
 **Cleanup Efficiency Benefits:**
 - **No Container Scanning:** Cleanup processes never need to scan entire data containers
-- **Batch Operations:** Process multiple tombstoned resources in single operation
-- **Type-Aware Routing:** Different cleanup logic for user data vs framework resources
+- **Batch Operations:** Process multiple tombstoned documents in single operation
+- **Type-Aware Routing:** Different cleanup logic for user data vs framework documents
 - **Retention Policy Enforcement:** Centralized tracking of deletion timestamps enables proper retention policy compliance
 
 ### 6.7. Retention Policies and Cleanup Configuration
 
-The framework provides configurable retention policies for tombstoned resources, recognizing their different cleanup strategies and risk profiles.
+The framework provides configurable retention policies for tombstoned documents, recognizing their different cleanup strategies and risk profiles.
 
 **Cleanup Configuration Properties:**
 
-**Resource Tombstone Configuration:**
-- **`crdt:resourceTombstoneRetentionPeriod`:** Duration to retain deleted resources (recommended: P2Y)
-- **`crdt:enableResourceTombstoneCleanup`:** Whether to automatically clean up resource tombstones
-- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 5.6)
-- **Risk:** Zombie deletions can affect recreated resources with same IRI
+**Document Tombstone Configuration:**
+- **`crdt:documentTombstoneRetentionPeriod`:** Duration to retain deleted documents (recommended: P2Y)
+- **`crdt:enableDocumentTombstoneCleanup`:** Whether to automatically clean up document tombstones
+- **Cleanup Strategy:** Proactive cleanup via Framework Garbage Collection Index (see Section 6.6)
+- **Risk:** Zombie deletions can affect recreated documents with same IRI
 
 **Property Tombstone Configuration:**
 - **`crdt:propertyTombstoneRetentionPeriod`:** Duration to retain deleted property values (recommended: P6M to P1Y)
 - **`crdt:enablePropertyTombstoneCleanup`:** Whether to automatically clean up property tombstones
 - **Cleanup Strategy:** Sync-time cleanup during document processing (not tracked in GC index)
-- **Risk:** Deleted property values may reappear, but resource remains intact
+- **Risk:** Deleted property values may reappear, but document remains intact
 
 **Configuration Hierarchy:**
 
@@ -1775,8 +1924,8 @@ The framework provides configurable retention policies for tombstoned resources,
 # Type Index with framework-wide defaults
 <> a solid:TypeIndex;
    # Framework adds these defaults if missing
-   crdt:resourceTombstoneRetentionPeriod "P2Y"^^xsd:duration;
-   crdt:enableResourceTombstoneCleanup true;
+   crdt:documentTombstoneRetentionPeriod "P2Y"^^xsd:duration;
+   crdt:enableDocumentTombstoneCleanup true;
    crdt:propertyTombstoneRetentionPeriod "P6M"^^xsd:duration;
    crdt:enablePropertyTombstoneCleanup true;
    solid:hasRegistration [
@@ -1784,25 +1933,25 @@ The framework provides configurable retention policies for tombstoned resources,
       solid:forClass sync:ManagedDocument;
       sync:managedResourceType schema:Recipe;
       solid:instanceContainer <../data/recipes/>;
-      # Override: Keep recipe resource tombstones longer
-      crdt:resourceTombstoneRetentionPeriod "P3Y"^^xsd:duration;
+      # Override: Keep recipe document tombstones longer
+      crdt:documentTombstoneRetentionPeriod "P3Y"^^xsd:duration;
       crdt:propertyTombstoneRetentionPeriod "P3M"^^xsd:duration
    ] .
 ```
 
 **Cleanup Strategies:**
 
-**Resource Tombstone Cleanup (Proactive):**
-1. **Registration:** Complete tombstoned resources automatically registered in Framework Garbage Collection Index
-2. **Discovery:** Cleanup processes scan GC index for resources older than retention period
-3. **Processing:** Remove entire resource files from Pod after verifying retention requirements
-4. **Efficiency:** No need to scan data containers for tombstoned resources
+**Document Tombstone Cleanup (Proactive):**
+1. **Registration:** Complete tombstoned documents automatically registered in Framework Garbage Collection Index
+2. **Discovery:** Cleanup processes scan GC index for documents older than retention period
+3. **Processing:** Remove entire document files from Pod after verifying retention requirements
+4. **Efficiency:** No need to scan data containers for tombstoned documents
 
 **Property Tombstone Cleanup (Sync-Time):**
 1. **Integration:** Property tombstone cleanup happens during normal document synchronization
 2. **Detection:** When syncing a document, check all property tombstones against retention configuration
 3. **Local Processing:** Clean expired property tombstones as part of document merge process
-4. **Benefits:** Resources not actively synced retain their tombstones (may be beneficial for long-term auditability)
+4. **Benefits:** Documents not actively synced retain their tombstones (may be beneficial for long-term auditability)
 5. **Trade-offs:** Only synchronized documents are cleaned, unused documents accumulate stale tombstones
 
 ### 6.8. Collaborative Index Lifecycle Management
@@ -1833,8 +1982,8 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 **Property Cleanup Process:**
 1. **Reader removal:** When installation is tombstoned, remove from all `idx:readBy` lists
 2. **Property removal:** When property has no active readers, remove from `idx:indexedProperty`
-3. **Index deprecation:** When index has no active readers, set `idx:deprecatedAt`
-4. **Garbage collection:** Deprecated indices stop receiving updates from write operations
+3. **Index tombstoning:** When index has no active readers, tombstone using framework deletion (`crdt:deletedAt`)
+4. **Garbage collection:** Tombstoned indices are registered in GC index for cleanup after retention period
 
 **Index States and Transitions:**
 
@@ -1843,33 +1992,27 @@ All index lifecycle decisions are made collaboratively through CRDT-managed inst
 - **Behavior:** Receives write updates, participates in sync operations
 - **Reader management:** Installations can join/leave through `idx:readBy` OR-Set
 
-*Deprecated State:*
+*Tombstoned State:*
 - **Trigger:** Last active installation removed from `idx:readBy` (OR-Set becomes empty)
-- **Properties:** `idx:deprecatedAt` timestamp set, `idx:readBy` empty
-- **Behavior:** Stops receiving write updates, no active readers accessing it
-- **Persistence:** Index documents and shards remain in Pod but become stale over time
-
-*Tombstoned State (Proposed):*
-- **Trigger:** Deprecated for extended period (e.g., 1 year) with no reactivation
-- **Properties:** `crdt:deletedAt` timestamp set
-- **Behavior:** Marked for garbage collection, should not be reactivated
-- **Cleanup:** Framework GC index tracks for automated cleanup
+- **Properties:** `max(crdt:deletedAt) > max(crdt:createdAt)`, `idx:readBy` empty
+- **Behavior:** Marked for garbage collection, stops receiving updates
+- **Cleanup:** Framework GC index tracks for automated cleanup after retention period
 
 **Index Reactivation Policy:**
 
-*Deprecated Index Reactivation (Recommended):*
-- **Discovery:** New installation discovers deprecated index through Type Index
+*Tombstoned Index Reactivation (Not Recommended):*
+- **Discovery:** New installation discovers tombstoned index through Type Index  
 - **Validation:** Check structural compatibility with current requirements
-- **Reactivation:** Add self to `idx:readBy`, remove `idx:deprecatedAt` timestamp
+- **Reactivation:** Undelete index by adding new `crdt:createdAt` timestamp and joining `idx:readBy`
 - **Re-population required:** Index is stale, must re-enter populating state for update
   - Set `idx:populationState "populating"`
-  - Create populating shards to scan for new/changed resources since deprecation
-  - Detect and handle tombstoned entries that may have been missed during deprecated period
-- **Stale data handling:** Deprecated period may have missed resource deletions and updates
+  - Create populating shards to scan for new/changed resources since tombstoning
+  - Detect and handle tombstoned entries that may have been missed during tombstoned period
+- **Stale data handling:** Tombstoned period may have missed resource deletions and updates
 - **Tombstone detection algorithm:**
   1. **Hybrid Logical Clock comparison:** Compare index entry clocks with actual resource clocks
   2. **Resource availability check:** Verify that indexed resources still exist and are accessible
-  3. **Tombstone processing:** Apply any missed RDF reification tombstones from deprecation period
+  3. **Tombstone processing:** Apply any missed RDF reification tombstones from tombstoned period
   4. **Entry cleanup:** Remove stale entries for deleted or moved resources
 
 *Tombstoned Index Handling (Strict):*
@@ -1926,14 +2069,14 @@ The framework provides robust error handling for lifecycle management failures, 
 **Garbage Collection Failure Recovery:**
 
 **Corrupted GC Index State:**
-- **Index corruption:** Rebuild GC index from scratch by scanning all data containers for tombstoned resources
-- **Inconsistent tombstone tracking:** Cross-validate GC index entries against actual resource tombstone states
-- **Missing cleanup operations:** Detect resources that should have been cleaned but weren't, reschedule cleanup operations
-- **Partially deleted resources:** Handle cases where resource files were deleted but GC index entries remain
+- **Index corruption:** Rebuild GC index from scratch by scanning all data containers for tombstoned documents
+- **Inconsistent tombstone tracking:** Cross-validate GC index entries against actual document tombstone states
+- **Missing cleanup operations:** Detect documents that should have been cleaned but weren't, reschedule cleanup operations
+- **Partially deleted documents:** Handle cases where document files were deleted but GC index entries remain
 
 **Cleanup Process Interruption:**
-- **Batch failure recovery:** If cleanup batch fails, mark individual resources for retry rather than entire batch
-- **Resource lock conflicts:** If multiple installations attempt cleanup simultaneously, use CRDT merge rules to coordinate
+- **Batch failure recovery:** If cleanup batch fails, mark individual documents for retry rather than entire batch
+- **Document lock conflicts:** If multiple installations attempt cleanup simultaneously, use CRDT merge rules to coordinate
 - **Network failures during cleanup:** Queue failed cleanup operations for retry with exponential backoff
 - **Storage errors:** Handle filesystem-level errors gracefully, log issues for manual intervention
 
@@ -1942,13 +2085,13 @@ The framework provides robust error handling for lifecycle management failures, 
 **Tombstone Format Migration Issues:**
 - **Version compatibility:** Framework recognizes and processes both old and new tombstone formats during migration periods
 - **Malformed tombstones:** Detect and repair tombstones with invalid RDF structure or missing required properties
-- **Orphaned tombstones:** Clean up tombstones that reference non-existent resources or properties
+- **Orphaned tombstones:** Clean up tombstones that reference non-existent properties
 - **Duplicate tombstone conflicts:** Resolve cases where multiple tombstones exist for the same triple using CRDT merge rules
 
 **Tombstone Processing Failures:**
 - **Incomplete tombstone application:** Track which tombstones have been successfully applied during sync operations
-- **Merge conflict resolution:** When tombstone conflicts with resource updates, apply deterministic CRDT resolution
-- **Clock synchronization issues:** Handle cases where tombstone timestamps are inconsistent with resource clocks
+- **Merge conflict resolution:** When tombstone conflicts with document updates, apply deterministic CRDT resolution
+- **Clock synchronization issues:** Handle cases where tombstone timestamps are inconsistent with document clocks
 
 **Index Lifecycle Recovery:**
 
@@ -2022,7 +2165,7 @@ syncLibrary.onUpdate((mergedResource) => {
 
 Beyond regular data synchronization, the framework requires periodic **management operations** to maintain system health and clean up stale metadata. These operations are separate from normal sync workflows and run on a different schedule.
 
-#### 6.2.1. Management Phase Scope and Frequency
+#### 7.2.1. Management Phase Scope and Frequency
 
 **When Management Phase Runs:**
 - **Scheduled**: Daily or weekly (configurable, default: daily)
@@ -2035,7 +2178,7 @@ Beyond regular data synchronization, the framework requires periodic **managemen
 3. **Index Deprecation**: Mark indices with no active readers as deprecated
 4. **Garbage Collection**: Process framework GC index for cleanup-ready resources
 
-#### 6.2.2. Installation Index for Efficient Management
+#### 7.2.2. Installation Index for Efficient Management
 
 **Framework Installation Index:**
 To avoid expensive Type Index container scanning, the framework maintains a dedicated installation index at `/indices/framework/installations-index-${hash}/index`.
@@ -2064,7 +2207,7 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
 - **No container scanning**: Avoid expensive Pod filesystem operations
 - **Framework consistency**: Use same index patterns as user data
 
-#### 6.2.3. Management Phase Algorithm
+#### 7.2.3. Management Phase Algorithm
 
 **Phase 1: Sync Installation Index**
 1. Sync framework installation index (same as any other index)
@@ -2089,13 +2232,13 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
 2. Remove resources beyond retention periods
 3. Update GC index to reflect completed cleanups
 
-#### 6.2.4. Coordination and Conflict Resolution
+#### 7.2.4. Coordination and Conflict Resolution
 
 **Collaborative Execution**: Multiple installations may run management phases simultaneously. CRDT merge semantics ensure safe coordination:
 
 - **Installation tombstoning**: OR-Set semantics on `crdt:deletedAt` allow multiple installations to safely mark dormant installations
 - **Reader list updates**: OR-Set removal operations are commutative and convergent  
-- **Index state changes**: LWW-Register semantics on `idx:deprecatedAt` ensure deterministic state transitions
+- **Index tombstoning**: OR-Set semantics on `crdt:deletedAt` ensure deterministic deletion state transitions
 
 **Efficiency Optimization**: Management phase skips work already completed by other installations by checking index states before performing updates.
 

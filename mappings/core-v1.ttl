@@ -14,7 +14,7 @@
    # Define class mappings for framework components
    mc:classMapping ( <#managed-document> <#statement> ) ;
    # Define predicate mappings for framework components (ordered list)
-   mc:predicateMapping ( <#clock-mappings> <#deletion-mappings> ) .
+   mc:predicateMapping ( <#clock-mappings> <#lifecycle-mappings> ) .
 
 # ManagedDocument is the wrapper for all CRDT-managed resources
 <#managed-document> a mc:ClassMapping;
@@ -41,11 +41,11 @@
      [ mc:predicate crdt:logicalTime; algo:mergeWith algo:LWW_Register ],
      [ mc:predicate crdt:physicalTime; algo:mergeWith algo:LWW_Register ] .
 
-# Standard mapping for deletion semantics across all CRDT contexts
-<#deletion-mappings> a mc:PredicateMapping;
+# Standard mapping for lifecycle semantics across all CRDT contexts
+<#lifecycle-mappings> a mc:PredicateMapping;
    mc:rule
-     # Global deletion semantics - applies to all contexts where crdt:deletedAt is used
-     # Supports both document tombstones (document-level deletion) and property tombstones with unified OR-Set semantics
-     # Document-level: crdt:deletedAt triggers all-or-nothing cleanup of entire document and all contained resources
-     # Property-level: crdt:deletedAt on RDF reification statements for individual value removal
-     [ mc:predicate crdt:deletedAt; algo:mergeWith algo:OR_Set ] .
+     # Global lifecycle semantics - applies to all contexts where lifecycle properties are used
+     # Uses temporal ordering: document/value is deleted if max(crdt:deletedAt) > max(crdt:createdAt)
+     # Solves zombie deletion problems during document recreation scenarios
+     [ mc:predicate crdt:createdAt; algo:mergeWith algo:OR_Set ],  # Creation/recreation timestamps
+     [ mc:predicate crdt:deletedAt; algo:mergeWith algo:OR_Set ] . # Deletion timestamps

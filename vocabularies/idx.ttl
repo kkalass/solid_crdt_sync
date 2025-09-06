@@ -181,11 +181,6 @@ idx:readBy a rdf:Property;
     rdfs:domain [ a owl:Class; owl:unionOf (idx:Index idx:IndexedProperty) ];
     rdfs:range rdfs:Resource .
 
-idx:deprecatedAt a rdf:Property;
-    rdfs:label "deprecated at";
-    rdfs:comment "Timestamp when this index was marked as deprecated. Presence of this property indicates deprecation status.";
-    rdfs:domain idx:Index;
-    rdfs:range xsd:dateTime .
 
 idx:populationState a rdf:Property;
     rdfs:label "population state";

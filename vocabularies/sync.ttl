@@ -26,6 +26,6 @@ sync:isGovernedBy a rdf:Property;
 
 sync:managedResourceType a rdf:Property;
     rdfs:label "managed resource type";
-    rdfs:comment "Links a Type Index registration for sync:ManagedDocument to the semantic RDF class of the resources being managed (e.g., schema:Recipe). This property is used within solid:TypeRegistration entries where solid:forClass is sync:ManagedDocument. Framework-aware applications can filter by sync:managedResourceType to discover containers holding specific semantic types (like recipes or tasks), while non-framework applications will ignore the CRDT-managed resources since they only see the sync:ManagedDocument wrapper type.";
-    rdfs:domain <http://www.w3.org/ns/solid/terms#TypeRegistration>;
+    rdfs:comment "Identifies the semantic RDF class of the resources being managed (e.g., schema:Recipe). Used in two contexts: (1) Within solid:TypeRegistration entries where solid:forClass is sync:ManagedDocument, enabling framework-aware applications to discover containers holding specific semantic types. (2) Directly on sync:ManagedDocument instances to enable efficient garbage collection and retention policies without requiring document content fetching.";
+    rdfs:domain [ a owl:Class; owl:unionOf ( <http://www.w3.org/ns/solid/terms#TypeRegistration> sync:ManagedDocument ) ];
     rdfs:range rdfs:Class .

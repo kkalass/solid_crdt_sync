@@ -22,8 +22,7 @@
      [ mc:predicate idx:indexedProperty; algo:mergeWith algo:OR_Set ],
      [ mc:predicate idx:hasShard; algo:mergeWith algo:OR_Set ],
      [ mc:predicate idx:shardingAlgorithm; algo:mergeWith algo:Immutable ],
-     [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ],
-     [ mc:predicate idx:deprecatedAt; algo:mergeWith algo:LWW_Register ] .
+     [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ] .
 
 # GroupIndexTemplate documents
 <#group-index-template> a mc:ClassMapping;
@@ -34,7 +33,6 @@
      [ mc:predicate idx:shardingAlgorithm; algo:mergeWith algo:Immutable ],
      [ mc:predicate idx:groupedBy; algo:mergeWith algo:Immutable ],
      [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ],
-     [ mc:predicate idx:deprecatedAt; algo:mergeWith algo:LWW_Register ],
      [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ],
      [ mc:predicate idx:hasPopulatingShard; algo:mergeWith algo:OR_Set ] .
 
@@ -44,8 +42,7 @@
    mc:rule
      [ mc:predicate idx:basedOn; algo:mergeWith algo:Immutable ],
      [ mc:predicate idx:readBy; algo:mergeWith algo:OR_Set ],
-     [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ],
-     [ mc:predicate idx:deprecatedAt; algo:mergeWith algo:LWW_Register ] .
+     [ mc:predicate idx:populationState; algo:mergeWith algo:LWW_Register ] .
 
 # IndexedProperty configuration objects within indices
 <#indexed-property> a mc:ClassMapping;
