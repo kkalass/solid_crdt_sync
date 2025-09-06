@@ -2095,9 +2095,9 @@ The framework provides robust error handling for lifecycle management failures, 
 
 **Index Lifecycle Recovery:**
 
-**Deprecated Index Recovery:**
-- **Reactivation failure:** If index reactivation fails partway through, restart with clean deprecated state
-- **Stale data corruption:** If deprecated index contains corrupted entries, mark for full re-population rather than incremental update
+**Tombstoned Index Recovery:**
+- **Reactivation failure:** If index reactivation fails partway through, restart with clean tombstoned state
+- **Stale data corruption:** If tombstoned index contains corrupted entries, mark for full re-population rather than incremental update
 - **Population process interruption:** Resume index population from last successfully processed resource
 - **Concurrent reactivation conflicts:** Use CRDT merge rules when multiple installations attempt reactivation simultaneously
 
