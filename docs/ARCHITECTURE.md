@@ -2251,25 +2251,3 @@ This architecture aligns with the goals of the **W3C CRDT for RDF Community Grou
 * **"Add-on" vs. "Database":** This specification is designed for "add-on" libraries. The developer retains control over their local storage and querying logic.
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
-
-## 11. Outlook: Future Enhancements
-
-The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
-
-* **Extended CRDT Algorithm Support:** While the v1 framework focuses on fundamental property-level CRDTs, production readiness will require additional algorithms including:
-  - Counter algorithms (G-Counter, PN-Counter) for numeric aggregation and collaborative counting
-  - Sequence algorithms (RGA, Fractional Indexing) for ordered collections and collaborative text editing
-  - Advanced set and map variants (LWW-Map, OR-Map) for specialized dictionary use cases
-  - The current architecture should accommodate most extensions, though sequence algorithms may require positional metadata extensions to the identification system
-
-* **Legacy Data Import (Optional Extension):** A user-controlled import process to bring existing Solid data into framework management. This would be implemented as an optional library feature requiring explicit user consent and would include:
-  - Discovery of existing data through traditional Type Index registrations (e.g., `solid:forClass schema:Recipe`)
-  - One-time import creation of `sync:ManagedDocument` wrappers with `dct:source` links to preserve originals
-  - Import timestamp tracking in index entries to enable incremental re-imports
-  - User selection interface for choosing which legacy resources to import
-  - Clear separation between imported framework-managed data and original legacy files
-
-* **Proactive Access Control (WAC/ACP):** A mature version of this library should proactively check Solid's access control rules.
-* **Data Validation (SHACL):** By integrating SHACL, the library can validate the merged RDF graph against a predefined "shape" before uploading it.
-* **Richer Provenance (PROV-O):** By incorporating PROV-O, the library can create a rich, auditable history of changes.
-* Usage of physical timestamps in Hybrid Logical Clocks for better tie-breaking (already implemented).

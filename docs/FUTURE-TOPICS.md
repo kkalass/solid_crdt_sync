@@ -345,6 +345,103 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ---
 
+## 12. Legacy Data Import (Optional Extension)
+
+**Status**: Future Enhancement  
+**Current Limitation**: Framework requires new data to be CRDT-managed from creation, but many users have existing Solid data.
+
+**Proposed Solution**: User-controlled import process to bring existing Solid data into framework management. This would be implemented as an optional library feature requiring explicit user consent.
+
+**Implementation Details**:
+- Discovery of existing data through traditional Type Index registrations (e.g., `solid:forClass schema:Recipe`)
+- One-time import creation of `sync:ManagedDocument` wrappers with `dct:source` links to preserve originals
+- Import timestamp tracking in index entries to enable incremental re-imports
+- User selection interface for choosing which legacy resources to import
+- Clear separation between imported framework-managed data and original legacy files
+
+**Design Considerations**:
+- Should preserve original data integrity and provide rollback mechanisms
+- Must handle schema mapping from traditional RDF to CRDT-managed format
+- Requires careful handling of relationships between imported and new resources
+
+**Related**: Integration with Type Index discovery patterns in ARCHITECTURE.md sections 4.4 and 6.1.
+
+---
+
+## 13. Proactive Access Control Integration
+
+**Status**: Future Enhancement  
+**Current Limitation**: Framework assumes access control is handled externally, but production systems need proactive permission checking.
+
+**Enhancement Scope**:
+- **WAC (Web Access Control)**: Integration with Solid's standard access control mechanism
+- **ACP (Access Control Policy)**: Support for next-generation Solid access control
+
+**Implementation Requirements**:
+- Pre-sync permission validation to avoid failed operations
+- Access control-aware sync strategies (skip inaccessible resources vs. fail entire sync)
+- Dynamic permission discovery and caching for performance
+- Integration with authentication flows and credential management
+
+**Trade-offs**:
+- Performance vs. security (permission checks add overhead)
+- Complexity vs. robustness (fine-grained checks vs. simple patterns)
+- User experience vs. access control accuracy
+
+**Related**: Error handling patterns in ERROR-HANDLING.md and sync workflow in ARCHITECTURE.md Chapter 7.
+
+---
+
+## 14. Data Validation Integration
+
+**Status**: Future Enhancement  
+**Current Limitation**: Framework performs CRDT merge operations without semantic validation.
+
+**SHACL Integration**: 
+- Validate merged RDF graphs against predefined "shapes" before uploading
+- Support for both pre-merge and post-merge validation workflows
+- Error handling for validation failures during sync operations
+
+**Validation Patterns**:
+- **Strict Mode**: Block invalid data from entering the system
+- **Permissive Mode**: Allow invalid data but flag for attention
+- **Progressive Mode**: Validate incrementally as resources are accessed
+
+**Implementation Considerations**:
+- Performance impact of validation during sync operations
+- Handling validation conflicts across different installations
+- Integration with merge contract evolution and schema changes
+
+**Related**: Merge contract fundamentals in ARCHITECTURE.md Section 5.2 and error handling in ERROR-HANDLING.md.
+
+---
+
+## 15. Provenance and Audit Trail Support
+
+**Status**: Future Enhancement  
+**Current Limitation**: Framework tracks basic causality through Hybrid Logical Clocks but doesn't provide rich provenance.
+
+**PROV-O Integration**:
+- Rich, auditable history of changes using W3C PROV-O vocabulary
+- Track not just when changes occurred, but who made them, why, and how
+- Support for business process provenance beyond technical sync operations
+
+**Provenance Levels**:
+- **Installation Provenance**: Which installation made each change
+- **User Provenance**: Which user (WebID) authorized each change  
+- **Process Provenance**: Which business process or workflow triggered changes
+- **Derivation Provenance**: How data was derived, transformed, or calculated
+
+**Implementation Challenges**:
+- Storage overhead of detailed provenance information
+- Privacy implications of detailed audit trails
+- Performance impact of provenance tracking during normal operations
+- Integration with existing Hybrid Logical Clock causality tracking
+
+**Related**: Hybrid Logical Clock mechanics in ARCHITECTURE.md Section 5.2.3 and CRDT-SPECIFICATION.md.
+
+---
+
 ## Contributing to Future Topics
 
 When identifying new topics:
