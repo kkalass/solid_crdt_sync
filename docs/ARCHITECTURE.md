@@ -8,6 +8,8 @@ This document outlines an architecture for building **local-first, collaborative
 
 The proposed solution addresses both challenges through a declarative, developer-centric framework. Unlike operation-based approaches (such as SU-Set) that synchronize individual change events, our architecture uses a **state-based CRDT model**. This means the entire state of a resource is synchronized, a choice that works seamlessly with passive storage backends like Solid Pods. To ensure data integrity, developers declaratively **link data properties to CRDT merge strategies**. To manage performance, they define a high-level **Sync Strategy** per type (full, groups, or on-demand). This approach allows the library to act as a flexible "add-on" to an existing application, rather than a monolithic database, while ensuring all data at rest on the Solid Pod is clean, standard RDF.
 
+For comprehensive performance analysis, benchmarks, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
+
 ### 1.2. Implementation Model
 
 The technical complexity described in this document is intended to be encapsulated within a reusable synchronization library (such as `solid-crdt-sync`). Application developers interact with a simple, declarative API while the library handles all CRDT algorithms, index management, conflict resolution, and Pod communication. The detailed specifications in this document serve as implementation guidance for library authors and reference for understanding the underlying system behavior.
@@ -1657,6 +1659,8 @@ The named sync strategies combine the two decisions above:
 *   **GroupedSync:** Shopping entries, activity logs → GroupIndexTemplate + immediate data for subscribed groups  
 *   **OnDemandSync:** Recipe collections, document libraries → Any index + headers-only until requested
 
+For detailed performance analysis, benchmarks, and optimization guidance for each sync strategy, see [PERFORMANCE.md](PERFORMANCE.md).
+
 ## 6. Lifecycle Management
 
 Having established the architectural layers, we now examine the complete lifecycle of resources, indices, and installations - from initial Pod setup through daily operations to long-term maintenance and cleanup.
@@ -1994,7 +1998,7 @@ The framework provides robust error handling for lifecycle management failures, 
 
 **Pod Setup Recovery:**
 - **Incomplete setup**: Re-present setup dialog for missing Type Index entries
-- **Permission failures**: Offer alternative approaches (read-only mode, manual configuration)
+- **Permission failures**: Offer alternative approaches (local-only operation, manual configuration)
 - **Network interruptions**: Resume from last completed step, avoid duplicate operations
 
 **Index Lifecycle Recovery:**
@@ -2220,61 +2224,21 @@ While the synchronization workflow provides the ideal path for data consistency,
 
 ### 8.3. Graceful Degradation
 
-The system provides multiple operational modes based on error conditions:
+The system provides two operational modes based on sync availability:
 
 1. **Full Functionality:** Complete discovery, sync, and merge operations
-2. **Limited Discovery:** Manual resource specification, reduced auto-discovery  
-3. **Read-Only Mode:** Display data but cannot sync changes
-4. **Offline Mode:** Local cache only, queue changes for later sync
+2. **Sync Disabled:** Full local functionality with sync operations disabled until connectivity/permissions restored
 
 For comprehensive implementation guidance including specific error scenarios, recovery procedures, and user interface recommendations, see [ERROR-HANDLING.md](ERROR-HANDLING.md).
 
-## 9. Performance Characteristics
-
-### 9.1. Sync Strategy Performance Trade-offs
-
-The choice of sync strategy fundamentally determines application performance characteristics:
-
-**FullSync:**
-- **Scaling:** Linear with total dataset size
-- **Best for:** Small, frequently-accessed datasets (< 100 resources)
-- **Limitation:** Becomes impractical beyond ~1000 resources
-
-**GroupedSync:**
-- **Scaling:** Linear with subscribed group sizes only (independent of total collection size)
-- **Best for:** Time-based or logically-grouped data where users work with specific subsets
-- **Key insight:** Performance depends only on groups you subscribe to, not total dataset
-
-**OnDemandSync:**
-- **Scaling:** Constant-time sync regardless of dataset size
-- **Best for:** Large collections with unpredictable access patterns
-- **Trade-off:** Individual resource fetches add latency to data access
-
-### 9.2. Index-Based Change Detection
-
-The architecture's index-based approach provides efficient incremental synchronization:
-
-- **Cold Start:** Must download all relevant index shards (O(s) where s = number of shards)
-- **Incremental Sync:** Download only changed shards through Hybrid Logical Clock hash comparison (O(k) where k = changed shards)
-- **Bandwidth Efficiency:** Index headers provide metadata without downloading full resources
-
-### 9.3. Architecture Performance Benefits
-
-- **Parallel Fetching:** Sharded indices enable concurrent synchronization
-- **Partial Failure Resilience:** Failed shards don't block others
-- **Conflict-Free Merging:** State-based CRDT approach eliminates merge conflicts
-- **Offline Capability:** Applications remain functional without network connectivity
-
-For detailed performance analysis, benchmarks, optimization strategies, and mobile considerations, see [PERFORMANCE.md](PERFORMANCE.md).
-
-## 10. Benefits of this Architecture
+## 9. Benefits of this Architecture
 
 * **CRDT Interoperability:** CRDT-enabled applications achieve safe collaboration by discovering CRDT-managed resources through `sync:ManagedDocument` registrations and following published merge contracts, while remaining protected from interference by incompatible applications.
 * **Developer-Centric Flexibility:** The Sync Strategy model empowers the developer to choose the right performance trade-offs for their specific data.
 * **Controlled Discoverability:** The system is discoverable by CRDT-enabled applications while protecting CRDT-managed data from accidental modification by incompatible applications.
 * **High Performance & Consistency:** The RDF-based sharded index and state-based sync with HTTP caching ensure that synchronization is fast and bandwidth-efficient.
 
-## 11. Alignment with Standardization Efforts
+## 10. Alignment with Standardization Efforts
 
 ### 10.1. Community Alignment
 
@@ -2288,7 +2252,7 @@ This architecture aligns with the goals of the **W3C CRDT for RDF Community Grou
 * **CRDT Interoperability over Convenience:** The primary rule is that CRDT-managed data must be clean, standard RDF within `sync:ManagedDocument` containers, enabling safe collaboration among CRDT-enabled applications while remaining protected from incompatible applications.
 * **Transparent Logic:** The merge logic is not a "black box." By using the `sync:isGovernedBy` link, the rules for conflict resolution become a public, inspectable part of the data model itself.
 
-## 12. Outlook: Future Enhancements
+## 11. Outlook: Future Enhancements
 
 The core architecture provides a robust foundation for synchronization. The following complementary layers can be built on top of it without altering the core merge logic.
 
