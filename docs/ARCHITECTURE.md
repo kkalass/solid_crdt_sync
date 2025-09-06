@@ -1866,7 +1866,7 @@ Rather than scanning entire data containers, framework-managed documents with AN
 1. **Periodic scans**: Background processes scan GC index groups older than retention periods
 2. **Temporal validation**: Verify `max(crdt:deletedAt) > max(crdt:createdAt)` using indexed data
 3. **Retention verification**: Apply type-specific retention periods using (`rdf:type`, `sync:managedResourceType`) or (`rdf:type`, `idx:indexesClass`) tuples
-4. **Document deletion**: Remove entire document files from Pod (includes all fragment resources)
+4. **Document deletion**: Remove document files from Pod (fragment resources already removed during tombstoning)
 5. **Index maintenance**: Remove entries for successfully deleted documents from GC index
 
 **Implementation Guidelines:**
