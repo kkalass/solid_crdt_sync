@@ -2190,6 +2190,7 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
 **Phase 4: Opportunistic Cleanup (Lazy - Only During Normal Operations)**
 1. **During subsequent normal sync operations**, not as part of management phase:
    - When syncing any index, opportunistically remove tombstoned installations from `idx:readBy` lists
+   - When syncing any data document, opportunistically remove tombstoned installations from Hybrid Logical Clock entries
    - When syncing any index with empty reader lists, mark as deprecated
    - When syncing deprecated indices, apply tombstoning if appropriate
 

@@ -769,7 +769,7 @@ A robust implementation of this specification requires a comprehensive test suit
 2. **Schema Evolution**: How to handle changes in merge contracts over time?
 3. **Performance Boundaries**: At what resource size/complexity should we recommend different approaches?
 4. **Security Implications**: How to prevent malicious Hybrid Logical Clock manipulation?
-5. **Blank Nodes** Do the algorithms break for Blank Nodes? rdf:List? rdf:Seq? etc.
+5. **Complex RDF Structures** How to handle rdf:List, rdf:Seq, rdf:Bag, rdf:Alt and other RDF containers with CRDT semantics?
 
 ---
 

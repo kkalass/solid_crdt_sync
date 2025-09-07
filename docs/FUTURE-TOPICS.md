@@ -1,273 +1,63 @@
 # Future Topics and Open Questions
 
-This document tracks substantial topics identified for future discussion and potential implementation. These represent areas where the current specification could be enhanced or optimized, but require deeper analysis and design work.
+This document tracks substantial topics identified for future discussion and potential implementation. Topics are organized by implementation timeline to provide clear guidance for development planning.
 
-## 1. Extended CRDT Algorithm Support (v1 Requirement)
+---
 
-**Status**: v1 Completion Requirement  
-**Current Gap**: Framework focuses on basic property-level CRDTs but requires additional algorithms for production readiness.
+# Version 1 (v1) - Critical Requirements
 
-**Critical v1 Algorithms Needed**:
+These topics must be completed for v1 release. They represent essential functionality gaps that prevent production readiness.
+
+## 1. Extended CRDT Algorithm and RDF Structure Support
+
+**Priority**: Critical for v1 Release  
+**Current Gap**: Framework focuses on basic property-level CRDTs but requires additional algorithms and RDF structure support for production readiness.
+
+**CRDT Algorithms to Evaluate for v1**:
 - **Counter algorithms (G-Counter, PN-Counter)**: For numeric aggregation and collaborative counting use cases
-- **Sequence algorithms (RGA, Fractional Indexing)**: For ordered collections and collaborative text editing
+- **Sequence algorithms (RGA, Fractional Indexing)**: For ordered collections and collaborative text editing  
 - **Advanced set and map variants (LWW-Map, OR-Map)**: For specialized dictionary use cases
+- **Multi-Value Registers (MV-Register)**: For preserving concurrent writes
+- **Trees**: Hierarchical data structures (taxonomies, organizational charts)
 
-**Architecture Assessment**: The current infrastructure (Hybrid Logical Clocks, blank node identification, merge contracts) should accommodate most extensions, though sequence algorithms may require positional metadata extensions to the identification system.
-
-**Implementation Strategy**: These algorithms should be implementable within the existing framework without fundamental architectural changes, making them suitable for v1 completion.
-
-## 2. Restore Consistency
-
-The architecture has been growing a lot, and many good things were added or updated, but I think we have started losing consistency and started to contradict ourselves.
-I think that the most important upcoming topic is, to get back on track and try to get everything consistent and correct that we have defined so far, without
-really adding anything new to the spec.
-
-## 3. Custom Tombstone Format vs RDF Reification
-
-**Status**: Open Question  
-**Current Approach**: Uses RDF Reification for semantic correctness but with significant overhead.
-
-**Alternative Approaches**:
-- **Custom Compact Format**: Define framework-specific tombstone representation
-
-**Trade-offs to Analyze**:
-- Semantic correctness vs storage efficiency
-- Interoperability vs performance
-- Standard RDF tooling compatibility vs custom processing requirements
-
-**Related**: Current RDF Reification approach in CRDT-SPECIFICATION.md sections 3.2, 3.3
-
----
-
-## 4. Hybrid Logical Clock Optimization for Tombstones
-
-**Status**: Open Question  
-**Current Limitation**: Document-level Hybrid Logical Clocks prevent tombstone compaction.
-
-**Optimization Strategies**:
-- **Referenced Hybrid Logical Clocks**: Multiple tombstones share clock references instead of full copies
-- **Clock Base + Diffs**: Represent clocks as base + incremental changes rather than full state
-- **Hybrid Per-Tombstone Clocks**: Enable compaction while minimizing storage overhead
-- **Clock Compression**: Develop algorithms for safely pruning old clock entries
-
-**Implementation Ideas**:
-- Clock reference pool within document
-- Diff-based clock representation with reconstruction algorithms
-- Selective per-tombstone clocks based on property churn analysis
-
-**Related**: CRDT-SPECIFICATION.md section 3.3.1 compaction limitations
-
----
-
-## 5. Hybrid Approach Specification
-
-**Status**: Open Question  
-**Current Issue**: "Hybrid Approach" mentioned in compaction section but not fully specified.
-
-**Definition Needed**:
-- Which properties/scenarios warrant per-tombstone clocks?
-- How do applications declare hybrid clock strategies?
-- Merge algorithm modifications for mixed clock approaches
-- Performance analysis and recommendation guidelines
-
-**Specification Requirements**:
-- Formal algorithm for hybrid clock selection
-- Migration path from document-level to hybrid approach
-- Compatibility matrix for mixed-clock scenarios
-- Implementation guidance for library developers
-
-**Related**: CRDT-SPECIFICATION.md line 189 "Hybrid Approach" mention
-
----
-
-## 6. RDF Collections and Extended CRDT Algorithms
-
-**Status**: Open Question  
-**Current Gap**: Framework focuses on basic CRDT types but doesn't address complex RDF structures or additional CRDT algorithms.
-
-**RDF Structure Analysis Needed**:
-- **rdf:List**: How do ordered lists merge? Position-based vs content-based conflict resolution?
+**RDF Structures to Address Before v1**:
+- **rdf:List**: Position-based vs content-based conflict resolution for ordered lists
 - **rdf:Seq/rdf:Bag/rdf:Alt**: Merge semantics for RDF container types
-- **Blank Node Graphs**: Complex structures with interdependent blank nodes
+- **Complex Blank Node Graphs**: Interdependent blank nodes (building on solved context-based identification)
 - **Property Paths**: Multi-hop relationships and their CRDT implications
 - **Reification Chains**: Nested reified statements and metadata
 
-**Additional CRDT Algorithms to Specify**:
-- **Counters**: G-Counter, PN-Counter for numeric aggregation use cases
-- **Sequences**: CRDT algorithms for ordered data (recipes steps, procedure lists)
-- **Maps/Dictionaries**: Key-value structures with CRDT merge semantics  
-- **Trees**: Hierarchical data structures (taxonomies, organizational charts)
-- **Multi-Value Registers**: MV-Register for preserving concurrent writes
+**Architecture Assessment**: Current infrastructure (Hybrid Logical Clocks, blank node identification via context, merge contracts) should accommodate most extensions. Sequence algorithms may require positional metadata extensions.
 
-**Design Questions**:
-- Should complex RDF structures be decomposed into simpler CRDT-manageable parts?
-- How do we handle CRDT operations on interdependent RDF subgraphs?
-- Can we define compositional rules for building complex CRDT behaviors from simpler ones?
-- What's the interaction between RDF semantics and CRDT operational semantics?
-
-**Related**: Current CRDT-SPECIFICATION.md sections 3.1-3.3 cover only basic types, section 8 mentions "Blank Nodes" as open question
-
---- 
-## 7. Automated Metadata Partitioning for Scalability
-
-**Status:** Future Topic (Advanced Research)
-
-**Current Limitation:** In long-running systems with many participants, a single resource's Hybrid Logical Clock and tombstone set can grow indefinitely. This impacts storage and sync performance, as all installations must download and process the entire metadata set on every sync.
-
-#### Proposed Solution: Hot/Cold Metadata Partitioning
-This proposal introduces a library-level, transparent mechanism to partition CRDT metadata into "hot" (active) and "cold" (inactive/stable) sets, keeping the primary data resource lean and sync operations fast.
-
-* **Primary Document ("Hot"):** The main data resource would only contain metadata for recently active installations and tombstones for recent deletions.
-
-* **Metadata Documents ("Cold"):** Linked, separate documents would archive Hybrid Logical Clock entries for inactive installations and "stable" tombstones (those acknowledged by all active installations). The primary document would only store a link and a hash for these cold documents.
-
-This would allow the vast majority of sync operations to only involve the small, "hot" document.
-
-#### High-Level Workflow
-1. **Standard Sync:** Active installations sync only the "hot" document, verifying the hashes of the linked "cold" documents. As long as the hashes are unchanged, the cold documents are not fetched.
-
-2. **Hot-to-Cold Transition (Demotion):** The library would follow a deterministic, specified rule to decide when metadata becomes "cold." For example, after an installation has been inactive for a certain number of sync cycles, any installation can perform the housekeeping task of moving its clock entry to the "cold" document and updating the hashes. This is a special, non-CRDT "compaction" operation.
-
-3. **Cold-to-Hot Transition (Promotion):** When an inactive installation comes back online, it will perform an initial sync of both the hot and cold documents. Discovering its installationId in the cold document, it will initiate a CRDT-based transaction to:
-
-    - Remove its entry from the cold document.
-
-    - Re-calculate the hash of the cold document.
-
-    - Add its entry to the hot document.
-
-    - Update the hash pointer in the hot document.
-
-#### Open Questions and Design Challenges
-* **Deterministic Demotion Rule:** Defining a robust, deterministic, and coordination-free rule for moving metadata from hot to cold is the primary challenge. This cannot be a standard CRDT merge and requires careful specification.
-
-* **Initial Sync Cost:** While avoiding continuous overhead, the one-time cost for a returning installation to download and process the cold metadata still exists. For extremely large archives, this could be a bottleneck.
-
-* **Concurrency on Metadata Archives:** While standard CRDT merging should handle concurrent "promotion" events, the interaction between CRDT operations and the special "demotion" rule needs to be formally proven to be safe under all conditions.
-
-#### Ideas for improvements
-* If the "cold state" of an installation is global and recorded in its instance identification document, we could probably get around the need to sync the cold data initially. Only if an installation learns that it is cold will it have to do this extra work - and only this installation has to do it. All others never need to touch the cold document unless they want to move someone from hot to cold. 
-* For the question who does the demotion when: We could state that an installation that adds itself to a clock needs to check if it can demote another installation.
-* And for really extreme cases, we could even think about sharding of the cold metadata
-* Instead of real tombstones, when moving a tombstone to cold, we could maybe att its fragment identifier to some list and record a Hybrid Logical Clock in cold, so that we can reduce this list after some time? 
-* Could we also do a similar approach of highly optimized pseudo tombstones in the main document for Hybrid Logical Clock entries to signal during merge that an item was "tombstoned" (e.g. moved to cold) and should be removed safely? 
-* But ok, how do we get this list reduced later? Maybe by treating it as a LMW_Register? But that could cause data loss. Or putting this list into its own fragment identifier resource and then "forking" the list, using LMW_Register to determine who wins? OK, this still needs a lot of thoughts.
+**Implementation Strategy**: These should integrate within existing framework without fundamental architectural changes.
 
 ---
 
-## 8. Private Type Index Support
+## 2. Framework Version Compatibility Strategy
 
-**Status**: Future Enhancement  
-**Current Limitation**: Framework currently uses only the Public Type Index, making all CRDT-managed resources discoverable by other applications.
+**Priority**: Critical for v1 Release  
+**Core Issue**: What happens when different versions of the framework try to collaborate in the same Pod?
 
-**Privacy Use Cases**:
-- Personal data that shouldn't be discoverable (journals, private notes)
-- Application-specific resources not intended for collaboration  
-- Sensitive business data requiring access control
-- Development/testing resources separate from production data
+**Key Decisions Needed**:
+- **Installation Version Declaration**: How installations declare their framework version for compatibility checking
+- **Version Mismatch Handling**: Graceful fallbacks when incompatible versions encounter each other  
+- **Migration Path**: Basic strategy for evolving formats (RDF reification, index structures, merge contracts) without breaking existing collaborations
 
-**Design Challenges**:
-- **Discovery mechanism**: How do applications find private CRDT resources without Type Index?
-- **Collaboration boundaries**: When private resources need selective sharing
-- **Mixed visibility**: Supporting both public collaborative and private isolated resources
-- **Migration paths**: Moving resources between public and private scopes
+**v1 Scope**: Define minimum viable compatibility strategy - not full migration automation, but clear policies for version conflicts and a path forward for format evolution.
 
-**Potential Approaches**:
-- **Dual Type Index**: Use both public and private Type Index with clear scope boundaries
-- **Configurable visibility**: Per-container or per-resource visibility settings
-- **Application-specific discovery**: Direct path configuration for private resources
-
-**Related**: Current Public Type Index usage in ARCHITECTURE.md section 4.2
+**Implementation Strategy**: Build on existing installation document infrastructure to add version metadata and basic compatibility checks.
 
 ---
 
-## 9. Incorporate Gemini Pro's Feedback:
+# Version 2+ (Future Research and Enhancements)
 
-> ---
-> Points for Discussion and Consideration
->
-> While the overall concept is very strong, here are a few points that I would raise for discussion as a senior developer:
->
-> * **Blank Node Identity:** The ARCHITECTURE.md document correctly identifies the challenge of blank node identity in a distributed system. The proposed solution of using sync:identifyingPredicate for context-based identification is clever. However, this relies on careful data modeling and mapping design. It would be beneficial to provide clear guidelines and examples for developers on how to design their data to be "CRDT-friendly," especially when dealing with complex, nested structures.
->
-Idea: Should we incorporate a mapping analyzis phase or such? probably not viable, but we should at least provide helpful error and logging messages. But: Once the core functionality works I was planning to generate the mapping document out of annotations on dart classes and then we should be able to let the generator fail and give helpful advice. 
-
-> * **Tombstone Compaction:** The CRDT-SPECIFICATION.md explicitly states that with the current document-level Hybrid Logical Clock approach, tombstone compaction is not possible. While the document justifies this as a trade-off for implementation simplicity, for very long-lived, highly dynamic data, the accumulation of tombstones could become a storage and performance issue. This is a valid architectural trade-off, but it's worth keeping in mind for future versions.
-
-Agreed - we should find some efficient way to attach Hybrid Logical Clocks. Or we need to make it optional. 
-**!!! IMPORTANT: Maybe put Hybrid Logical Clocks on tombstones after all, trusting on future solutions like the cold metadata**!!! - that would be more future safe, since this way we do not lose information. And also some more efficient Hybrid Logical Clock handling could likely be based on this.
-
-> * **Initialization of Existing Pods:** The documentation mentions the "cold start" problem for new indices but doesn't go into extensive detail about the process of integrating with a Pod that already contains a large amount of legacy data. A clear strategy for a "retro-fitting" or migration process would be a valuable addition.
->
-> * **Error Handling and User Feedback:** The ERROR-HANDLING.md document provides a good breakdown of failure modes. In practice, surfacing these complex distributed system errors to the end-user in a way that is understandable and actionable is very challenging. It would be good to see some discussion on best practices for UI/UX patterns that can handle these states gracefully.
->
-> ---
-
-
-
-## 10. Framework Version Compatibility and Migration
-
-**Status**: Open Question - Major Architectural Challenge  
-**Current Limitation**: Framework lacks comprehensive version compatibility and migration strategy for collaborative environments.
-
-**Core Architectural Issues**:
-
-**Specification Version in Installation Documents**:
-- Installation documents must include spec version for compatibility checking
-- Installation Index must index spec versions for discovery and coordination
-- Version compatibility matrix needed to determine which installations can collaborate
-
-**Multi-Format Support During Transitions**:
-- During version transitions, frameworks must write BOTH old and new formats (e.g., tombstone formats)
-- Support period length determination: Who decides how long to maintain backward compatibility?
-- Storage and performance overhead of maintaining multiple formats simultaneously
-
-**Collaborative Deprecation Coordination**:
-- New spec versions can only fully deprecate old features when NO installations use the old spec
-- Requires distributed consensus mechanism across all installations in a Pod
-- Challenge: How to coordinate deprecation decisions across independently operated installations?
-
-**Version Mismatch Scenarios**:
-- **Application too old**: Needs "graceful degradation" or "way out" when joining Pod with newer spec versions
-- **Application too new**: Must maintain compatibility with older installations already in the Pod
-- **Mixed versions**: How do installations with different spec versions collaborate on shared indices?
-
-**Migration Complexity**:
-- **Resource format changes**: How to migrate existing resources to new formats without breaking references
-- **Index structure evolution**: Coordinate index format changes across multiple installations
-- **Tombstone format migration**: RDF reification to potential future formats while maintaining consistency
-- **Merge contract evolution**: Updates to CRDT algorithms and their compatibility across versions
-
-**Discovery and Negotiation**:
-- How do installations discover version compatibility before attempting collaboration?
-- Negotiation protocol for determining common supported feature set
-- Fallback mechanisms when version incompatibility is detected
-
-**Design Questions**:
-- Should framework support "version islands" where incompatible versions coexist separately?
-- How to handle emergency deprecation (security issues) vs gradual deprecation?
-- What's the minimum viable compatibility window for different types of changes?
-- How to communicate version requirements and migration paths to users?
-
-**Implementation Challenges**:
-- Multi-version code maintenance burden for implementers
-- Testing matrix explosion with multiple supported versions
-- User experience during long migration periods
-- Data consistency during partial migration states
-
-**Potential Approaches**:
-- **Versioned Installation Documents**: Explicit spec version declarations with compatibility matrices
-- **Feature Negotiation**: Dynamic capability negotiation rather than monolithic version numbers
-- **Migration Phases**: Defined phases (Preparation → Transition → Consolidation) with clear rules
-- **Version-aware Type Index**: Separate registration paths for different framework versions
-
-**Related**: This fundamentally affects all collaborative operations described in ARCHITECTURE.md Chapter 5 and CRDT merge behaviors in CRDT-SPECIFICATION.md.
+These topics represent interesting research directions and framework improvements to explore after v1 is completed. Priority and timeline will be determined based on practical needs and research outcomes.
 
 ---
 
-## 11. Multi-Pod Application Integration
+## 3. Multi-Pod Application Integration
 
-**Status**: Future Enhancement (v2/v3 Candidate)  
+**Status**: Future Research  
 **Current Limitation**: Framework focuses on single-Pod CRDT synchronization but doesn't address applications that need to integrate data from multiple Pods, including Pods not owned by the user.
 
 **Use Case Scenario:**
@@ -343,102 +133,165 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 **Related**: Builds on all current framework concepts but extends them into distributed, multi-authority scenarios that go beyond the current single-Pod collaborative model.
 
+## 4. Custom Tombstone Format Optimization
+
+**Status**: Future Research  
+**Current Approach**: Uses RDF Reification for semantic correctness but with significant overhead.
+
+**Alternative Approaches**:
+- **Custom Compact Format**: Define framework-specific tombstone representation
+
+**Trade-offs to Analyze**:
+- Semantic correctness vs storage efficiency
+- Interoperability vs performance
+- Standard RDF tooling compatibility vs custom processing requirements
+
+**Related**: Current RDF Reification approach in CRDT-SPECIFICATION.md sections 3.2, 3.3
+
 ---
 
-## 12. Legacy Data Import (Optional Extension)
+## 5. Provenance and Audit Trail Support
 
-**Status**: Future Enhancement  
-**Current Limitation**: Framework requires new data to be CRDT-managed from creation, but many users have existing Solid data.
+**Status**: Future Research  
+**Problem**: Framework tracks basic causality through Hybrid Logical Clocks but doesn't provide rich provenance information for auditing and compliance needs.
 
-**Proposed Solution**: User-controlled import process to bring existing Solid data into framework management. This would be implemented as an optional library feature requiring explicit user consent.
+**Core Questions**:
+- **Provenance granularity**: Should tracking focus on installations, users, processes, or individual operations?
+- **Storage trade-offs**: How much provenance overhead is acceptable for different use cases?
+- **Privacy considerations**: How to balance audit requirements with user privacy?
+- **Integration approach**: Should provenance extend existing causality tracking or operate separately?
 
-**Implementation Details**:
-- Discovery of existing data through traditional Type Index registrations (e.g., `solid:forClass schema:Recipe`)
-- One-time import creation of `sync:ManagedDocument` wrappers with `dct:source` links to preserve originals
-- Import timestamp tracking in index entries to enable incremental re-imports
-- User selection interface for choosing which legacy resources to import
-- Clear separation between imported framework-managed data and original legacy files
+**Use Cases to Consider**:
+- Compliance auditing requiring detailed change history
+- Debugging collaborative workflows and conflict resolution
+- Business process analysis and optimization
+- Trust and transparency in multi-party collaboration
 
 **Design Considerations**:
-- Should preserve original data integrity and provide rollback mechanisms
-- Must handle schema mapping from traditional RDF to CRDT-managed format
-- Requires careful handling of relationships between imported and new resources
+- Different provenance standards (PROV-O, custom vocabularies) have different capabilities
+- Provenance information may need different retention policies than data
+- Cross-installation provenance requires coordination and trust mechanisms
+- Integration with existing Hybrid Logical Clock system for consistency
+
+**Related**: Hybrid Logical Clock mechanics in ARCHITECTURE.md Section 5.2.3 and CRDT-SPECIFICATION.md.
+
+---
+
+## 6. Legacy Data Import (Optional Extension)
+
+**Status**: Future Research  
+**Problem**: Framework requires new data to be CRDT-managed from creation, but many users have existing Solid data.
+
+**Core Challenge**: How to bring existing traditional Solid data into framework management without breaking existing workflows or data integrity?
+
+**Key Design Questions**:
+- **Discovery approach**: How to identify existing resources suitable for import?
+- **Data preservation**: Should imports create copies, wrappers, or migrate in-place?
+- **Relationship handling**: How to maintain references between imported and existing resources?
+- **User control**: What level of granular selection and rollback should be provided?
+- **Schema compatibility**: How to handle traditional RDF that doesn't map cleanly to CRDT semantics?
+
+**Potential Approaches**:
+- **Wrapper strategy**: Create managed documents that reference originals
+- **Migration strategy**: Convert traditional resources to CRDT format
+- **Hybrid strategy**: Copy frequently-edited data, reference read-only data
 
 **Related**: Integration with Type Index discovery patterns in ARCHITECTURE.md sections 4.4 and 6.1.
 
 ---
 
-## 13. Proactive Access Control Integration
+## 7. Proactive Access Control Integration
 
-**Status**: Future Enhancement  
-**Current Limitation**: Framework assumes access control is handled externally, but production systems need proactive permission checking.
+**Status**: Future Research  
+**Problem**: Framework assumes access control is handled externally, but production systems may need proactive permission checking to improve user experience.
 
-**Enhancement Scope**:
-- **WAC (Web Access Control)**: Integration with Solid's standard access control mechanism
-- **ACP (Access Control Policy)**: Support for next-generation Solid access control
+**Core Questions**:
+- **Integration depth**: Should the framework check permissions before attempting operations, or handle failures gracefully?
+- **Permission discovery**: How can applications efficiently determine what resources are accessible?
+- **Sync behavior**: When encountering access restrictions, should sync skip resources, fail entirely, or provide partial results?
+- **Performance trade-offs**: What's the cost of permission checking vs. handling failed operations?
 
-**Implementation Requirements**:
-- Pre-sync permission validation to avoid failed operations
-- Access control-aware sync strategies (skip inaccessible resources vs. fail entire sync)
-- Dynamic permission discovery and caching for performance
-- Integration with authentication flows and credential management
-
-**Trade-offs**:
-- Performance vs. security (permission checks add overhead)
-- Complexity vs. robustness (fine-grained checks vs. simple patterns)
-- User experience vs. access control accuracy
+**Design Considerations**:
+- Multiple access control systems (WAC, ACP, custom) may need support
+- Caching strategies for permission information to minimize overhead
+- Graceful degradation when permissions change during sync operations
+- Integration with existing error handling and retry mechanisms
 
 **Related**: Error handling patterns in ERROR-HANDLING.md and sync workflow in ARCHITECTURE.md Chapter 7.
 
 ---
 
-## 14. Data Validation Integration
+## 8. Data Validation Integration
 
-**Status**: Future Enhancement  
-**Current Limitation**: Framework performs CRDT merge operations without semantic validation.
+**Status**: Future Research  
+**Problem**: Framework performs CRDT merge operations without semantic validation, potentially allowing invalid data states.
 
-**SHACL Integration**: 
-- Validate merged RDF graphs against predefined "shapes" before uploading
-- Support for both pre-merge and post-merge validation workflows
-- Error handling for validation failures during sync operations
+**Core Questions**:
+- **Validation timing**: Should validation happen before merge, after merge, or both?
+- **Failure handling**: When validation fails, should operations be blocked, flagged, or logged?
+- **Validation scope**: Should validation apply to individual properties, complete resources, or cross-resource relationships?
+- **Performance impact**: How to balance data quality with sync performance?
 
-**Validation Patterns**:
-- **Strict Mode**: Block invalid data from entering the system
-- **Permissive Mode**: Allow invalid data but flag for attention
-- **Progressive Mode**: Validate incrementally as resources are accessed
+**Design Considerations**:
+- Different validation technologies (SHACL, custom rules, application logic) have different trade-offs
+- Validation conflicts between installations may require consensus mechanisms
+- Schema evolution must account for validation rule changes over time
+- Integration with merge contract system for consistent validation policies
 
-**Implementation Considerations**:
-- Performance impact of validation during sync operations
-- Handling validation conflicts across different installations
-- Integration with merge contract evolution and schema changes
+**Open Approaches**:
+- Pre-merge validation to prevent invalid merges
+- Post-merge validation with rollback capabilities
+- Progressive validation during resource access
+- Hybrid approaches with different strictness levels
 
 **Related**: Merge contract fundamentals in ARCHITECTURE.md Section 5.2 and error handling in ERROR-HANDLING.md.
 
 ---
 
-## 15. Provenance and Audit Trail Support
+## 9. Private Type Index Support
 
-**Status**: Future Enhancement  
-**Current Limitation**: Framework tracks basic causality through Hybrid Logical Clocks but doesn't provide rich provenance.
+**Status**: Future Research (Low Priority)  
+**Current Approach**: Framework uses only the Public Type Index, making all CRDT-managed resources discoverable by other applications.
 
-**PROV-O Integration**:
-- Rich, auditable history of changes using W3C PROV-O vocabulary
-- Track not just when changes occurred, but who made them, why, and how
-- Support for business process provenance beyond technical sync operations
+**Core Questions**:
+- **Policy decisions**: Should applications default to public or private Type Index registration for CRDT resources?
+- **User control**: How should users control which resource types are registered privately vs. publicly?
+- **Setup UX**: Should apps suggest privacy settings during setup, or should this be a user-driven decision?
+- **Discovery implications**: How do applications handle mixed public/private resource scenarios?
 
-**Provenance Levels**:
-- **Installation Provenance**: Which installation made each change
-- **User Provenance**: Which user (WebID) authorized each change  
-- **Process Provenance**: Which business process or workflow triggered changes
-- **Derivation Provenance**: How data was derived, transformed, or calculated
+**Use Cases**:
+- Personal data not intended for collaboration (private journals, notes)
+- Development/testing resources separate from production data
+- Business data requiring access control but still needing CRDT capabilities
 
-**Implementation Challenges**:
-- Storage overhead of detailed provenance information
-- Privacy implications of detailed audit trails
-- Performance impact of provenance tracking during normal operations
-- Integration with existing Hybrid Logical Clock causality tracking
+**Design Considerations**:
+- Solid provides both Public and Private Type Index documents with different access controls
+- Registration in Private Type Index requires the application to have privileged access
+- Migration between public/private registration may be needed as resource usage evolves
+- Mixed visibility scenarios require clear policies for collaboration boundaries
 
-**Related**: Hybrid Logical Clock mechanics in ARCHITECTURE.md Section 5.2.3 and CRDT-SPECIFICATION.md.
+**Related**: Current Public Type Index usage in ARCHITECTURE.md section 4.2
+
+
+---
+
+# Summary and Planning
+
+## Implementation Priority Overview
+
+**v1 Critical Requirements (2 topics)**:
+1. Extended CRDT Algorithm and RDF Structure Support
+2. Framework Version Compatibility Strategy
+
+**v2+ Future Research (7 topics)**:
+
+3. Multi-Pod Application Integration
+4. Custom Tombstone Format Optimization
+5. Provenance and Audit Trail Support
+6. Legacy Data Import
+7. Proactive Access Control Integration
+8. Data Validation Integration
+9. Private Type Index Support
 
 ---
 
@@ -446,13 +299,14 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 When identifying new topics:
 1. **Clearly describe the current limitation or opportunity**
-2. **Outline potential approaches or solutions**
+2. **Outline potential approaches or solutions** 
 3. **Identify trade-offs and risks that need discussion**
 4. **Reference related sections in existing specifications**
-5. **Add to this document with "Status: Open Question"**
+5. **Assign appropriate version target (v1/v2/v3+)**
 
 Topics graduate to active development when:
 - Problem scope is well-defined
 - Solution approaches are compared
 - Implementation plan is developed
 - Backwards compatibility is addressed
+- Version timeline is confirmed
