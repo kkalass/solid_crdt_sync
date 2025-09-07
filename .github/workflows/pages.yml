@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'doc/**'
+      - 'spec/vocabularies/**'
+      - 'spec/mappings/**'
       - '.github/workflows/pages.yml'
       - 'pubspec.yaml'
       - 'README.md'
@@ -27,10 +29,20 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Copy doc/ to docs/
+      - name: Setup deployment structure
         run: |
           rm -rf docs
           cp -r doc docs
+          
+          # Create vocab and mappings directories
+          mkdir -p docs/vocab
+          mkdir -p docs/mappings
+          
+          # Copy vocabularies to /vocab path
+          cp spec/vocabularies/* docs/vocab/
+          
+          # Copy mappings to /mappings path
+          cp spec/mappings/* docs/mappings/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
