@@ -29,7 +29,7 @@ final recipes = await syncStrategy.getAll();
 ```
 
 ### For Specification Writers
-The complete architecture is documented in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+The complete architecture is documented in **[spec/docs/ARCHITECTURE.md](spec/docs/ARCHITECTURE.md)**.
 
 ### For Framework Implementers  
 This specification is designed to be **language-agnostic**. The Dart implementation serves as a reference, but the architecture supports implementations in JavaScript, Python, Java, etc.
@@ -45,10 +45,10 @@ This repository serves dual purposes:
 
 | Document | Purpose | Audience |
 |----------|---------|----------|
-| **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Complete specification | Implementers, standards bodies |
-| **[PERFORMANCE.md](docs/PERFORMANCE.md)** | Performance analysis & optimization | Developers, system architects |
-| **[ERROR-HANDLING.md](docs/ERROR-HANDLING.md)** | Error scenarios & recovery | Implementation teams |
-| **[FUTURE-TOPICS.md](docs/FUTURE-TOPICS.md)** | Roadmap & open questions | Contributors, researchers |
+| **[ARCHITECTURE.md](spec/docs/ARCHITECTURE.md)** | Complete specification | Implementers, standards bodies |
+| **[PERFORMANCE.md](spec/docs/PERFORMANCE.md)** | Performance analysis & optimization | Developers, system architects |
+| **[ERROR-HANDLING.md](spec/docs/ERROR-HANDLING.md)** | Error scenarios & recovery | Implementation teams |
+| **[FUTURE-TOPICS.md](spec/docs/FUTURE-TOPICS.md)** | Roadmap & open questions | Contributors, researchers |
 
 ## Architecture Overview
 

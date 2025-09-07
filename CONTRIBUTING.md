@@ -19,7 +19,14 @@ Thank you for your interest in contributing to `solid_crdt_sync`! We welcome con
 - Be respectful and constructive in all interactions.
 - See the [AI Policy](README.md#ai-policy) for how we leverage generative AI.
 
-## License
+## Intellectual Property
+
+### Original Work
+- Ensure contributions are your own work or properly attributed
+- Be aware of potential patent issues, especially with CRDT algorithms
+- When referencing academic papers or existing implementations, provide proper citations
+
+### License Compatibility
 By contributing, you agree that your contributions will be licensed under the MIT License.
 
 ---
