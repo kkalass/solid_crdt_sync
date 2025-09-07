@@ -36,19 +36,41 @@ This specification is designed to be **language-agnostic**. The Dart implementat
 
 ## Project Scope
 
-This repository serves dual purposes:
+This repository serves **dual purposes**:
 
-1. **📋 Specification**: Complete architectural documentation for building CRDT-enabled Solid applications
-2. **🛠️ Reference Implementation**: Dart library demonstrating the specification in practice
+### 📋 1. Specification
+Complete architectural documentation for building CRDT-enabled Solid applications across any programming language. The specification lives in the **[`spec/`](spec/)** directory and includes:
 
-## Documentation
+- **Complete CRDT-RDF architecture** with formal vocabulary definitions
+- **Language-agnostic design patterns** for implementers
+- **Performance analysis** and optimization strategies  
+- **Interoperability contracts** for cross-application compatibility
 
+### 🛠️ 2. Dart Implementation (In Development)
+A Dart library that aims to become production-ready for real-world applications. The implementation will provide:
+
+- **Full-featured library** for building collaborative Solid applications
+- **Complete API coverage** of the specification's capabilities  
+- **Performance-optimized** implementation suitable for mobile and web applications
+- **Reference example** for implementers in other languages
+
+*Note: Implementation is currently in early development - the specification came first to ensure a solid foundation.*
+
+## Documentation Structure
+
+### 📋 Specification Documents (`spec/`)
 | Document | Purpose | Audience |
 |----------|---------|----------|
 | **[ARCHITECTURE.md](spec/docs/ARCHITECTURE.md)** | Complete specification | Implementers, standards bodies |
 | **[PERFORMANCE.md](spec/docs/PERFORMANCE.md)** | Performance analysis & optimization | Developers, system architects |
 | **[ERROR-HANDLING.md](spec/docs/ERROR-HANDLING.md)** | Error scenarios & recovery | Implementation teams |
 | **[FUTURE-TOPICS.md](spec/docs/FUTURE-TOPICS.md)** | Roadmap & open questions | Contributors, researchers |
+
+### 🛠️ Implementation Documents (Root Level)
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| **[CLAUDE.md](CLAUDE.md)** | Development guidelines | Contributors to Dart implementation |
+| **[examples/](examples/)** | Usage patterns & API examples | Dart developers |
 
 ## Architecture Overview
 
@@ -95,9 +117,10 @@ This work aligns with and wants to eventually contribute to:
 - **Pull Requests**: Documentation improvements and clarifications welcome
 
 ### Implementation Contributions
-- **Dart Library**: Core implementation in `lib/` directory
+- **Dart Library**: Core implementation in `lib/` directory  
 - **Tests**: Specification compliance tests in `test/`
 - **Examples**: Real-world usage patterns in `examples/`
+
 
 ### Other Languages
 Interested in implementing this specification in other languages? We'd love to collaborate! The architecture is designed to be language-agnostic.

@@ -110,6 +110,19 @@ The Dart reference implementation is available in the root directory of this rep
 
 This specification is released under the MIT License, allowing for both open-source and commercial implementations.
 
+## AI Assistance Acknowledgment
+
+This specification was developed with assistance from large language models (Claude, Gemini) for:
+
+- **Research assistance**: Exploring CRDT literature, Solid ecosystem standards, and related work
+- **Technical writing and editing**: Improving clarity, consistency, and professional formatting  
+- **Architecture review**: Identifying gaps, inconsistencies, and improvement opportunities
+- **Documentation structure**: Organizing complex technical concepts for multiple audiences
+
+**Human oversight**: All architectural decisions, technical approaches, and conceptual frameworks remain under full human authorship and responsibility. AI tools served as sophisticated writing and analysis assistants, not as sources of technical authority.
+
+**Quality assurance**: The specification's technical validity comes from careful review, implementation experience, and community feedback - not from AI generation.
+
 ---
 
 *This specification enables a new generation of truly collaborative, interoperable applications that respect user data ownership while providing seamless synchronization across devices and applications.*
