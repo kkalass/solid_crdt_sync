@@ -66,6 +66,11 @@ A Dart library that aims to become production-ready for real-world applications.
 | **[ERROR-HANDLING.md](spec/docs/ERROR-HANDLING.md)** | Error scenarios & recovery | Implementation teams |
 | **[FUTURE-TOPICS.md](spec/docs/FUTURE-TOPICS.md)** | Roadmap & open questions | Contributors, researchers |
 
+### 🌐 Web Resources
+| Resource | Purpose | Audience |
+|----------|---------|----------|
+| **[📋 RDF Vocabularies & Mappings](https://kkalass.github.io/solid_crdt_sync/)** | Web access to RDF vocabularies and semantic mappings | Developers, semantic web tools |
+
 ### 🛠️ Implementation Documents (Root Level)
 | Document | Purpose | Audience |
 |----------|---------|----------|
