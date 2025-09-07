@@ -89,6 +89,24 @@ This work aligns with and wants to eventually contribute to:
 - **[Solid Protocol](https://solidproject.org/)** ecosystem
 - **[RDF](https://www.w3.org/RDF/)** and **[Linked Data](https://www.w3.org/standards/semanticweb/data)** principles
 
+## Related Work and Acknowledgments
+
+This work builds upon and was inspired by several important projects in the local-first and semantic web ecosystems:
+
+### Local-First RDF Systems
+- **[m-ld](https://m-ld.org/)** - A pioneering approach to collaborative, live information using JSON-LD and CRDTs
+- **[NextGraph](https://nextgraph.org/)** - A decentralized, secure, and local-first web platform with RDF foundations
+
+Both m-ld and NextGraph demonstrate the viability of combining RDF with CRDT approaches, though they target different storage backends than Solid Pods.
+
+### Solid + CRDT Ecosystem
+- **[Noel De Martin](https://noeldemartin.com/)** and **[aerogel](https://github.com/NoelDeMartin/aerogel)** - Operation-based CRDT framework for Solid applications
+
+Noel's work with aerogel provided valuable insights into the challenges of building collaborative Solid applications. This specification takes a different architectural approach with state-based CRDTs and emphasizes cooperative indexing strategies, but benefits from Noel de Martin's generous sharing of insights from building aerogel.
+
+### Gratitude
+Special thanks to the broader Solid community, W3C CRDT for RDF Community Group members, and local-first software researchers whose work and discussions helped shape this specification's design decisions.
+
 ## Version History
 
 - **v0.9.0-draft** (2025) - Initial specification release
