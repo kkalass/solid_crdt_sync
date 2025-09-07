@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solid CRDT Sync - RDF Vocabularies and Mappings</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 2rem auto; 
+            max-width: 800px;
+            line-height: 1.6; 
+            color: #333;
+        }
+        h1, h2 { color: #2c3e50; }
+        h1 { border-bottom: 3px solid #3498db; padding-bottom: 0.5rem; }
+        .intro { 
+            background: #f8f9fa; 
+            padding: 1.5rem; 
+            border-radius: 8px; 
+            margin: 2rem 0;
+            border-left: 4px solid #3498db;
+        }
+        .section { 
+            margin: 2rem 0; 
+            background: white;
+            padding: 1.5rem;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+        }
+        ul { list-style-type: none; padding: 0; }
+        li { 
+            margin: 0.75rem 0; 
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        a { color: #3498db; text-decoration: none; font-weight: 500; }
+        a:hover { text-decoration: underline; color: #2980b9; }
+        .file-description { 
+            font-size: 0.9em; 
+            color: #666; 
+            margin-top: 0.25rem;
+        }
+        .usage-note {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
+        .back-link {
+            text-align: center;
+            margin: 2rem 0;
+            padding: 1rem;
+            background: #f1f3f4;
+            border-radius: 6px;
+        }
+        .spec-link {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            margin: 2rem 0;
+        }
+        .spec-link a {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔗 Solid CRDT Sync - RDF Resources</h1>
+    
+    <div class="intro">
+        <p><strong>Solid CRDT Sync</strong> is a Dart library enabling synchronization of RDF data to Solid Pods using Conflict-free Replicated Data Types (CRDTs). This page provides access to the RDF vocabularies and semantic mapping files that define the library's merge contracts and synchronization behavior.</p>
+        
+        <p>These resources are designed for <strong>local-first, interoperable applications</strong> following semantic web standards.</p>
+    </div>
+
+    <div class="spec-link">
+        <a href="https://github.com/klaskalass/solid_crdt_sync/blob/main/spec/SPECIFICATION.md">📋 Read the Full Specification</a>
+        <p style="margin-top: 0.5rem; font-size: 0.9em; color: #666;">Complete technical specification with implementation details, algorithms, and examples</p>
+    </div>
+
+    <div class="section">
+        <h2>📚 RDF Vocabularies</h2>
+        <p>Custom RDF vocabularies defining CRDT algorithms, framework mechanics, indexing strategies, and synchronization protocols.</p>
+        
+        <ul>
+            <li>
+                <a href="vocab/crdt-algorithms.ttl">crdt-algorithms.ttl</a>
+                <div class="file-description">Defines CRDT merge algorithms (LWW-Register, FWW-Register, OR-Set, Immutable) in the <code>algo:</code> namespace.</div>
+            </li>
+            <li>
+                <a href="vocab/crdt-mechanics.ttl">crdt-mechanics.ttl</a>
+                <div class="file-description">Framework infrastructure vocabulary (<code>crdt:</code> namespace) for clocks, installations, deletions, and versioning metadata.</div>
+            </li>
+            <li>
+                <a href="vocab/idx.ttl">idx.ttl</a>
+                <div class="file-description">Indexing vocabulary (<code>idx:</code> namespace) for performance optimization with sharded indices and root/partitioned index strategies.</div>
+            </li>
+            <li>
+                <a href="vocab/sync.ttl">sync.ttl</a>
+                <div class="file-description">Synchronization vocabulary (<code>sync:</code> namespace) defining sync strategies, data exchange protocols, and merge contracts.</div>
+            </li>
+            <li>
+                <a href="vocab/merge-contract.ttl">merge-contract.ttl</a>
+                <div class="file-description">Merge contract definitions establishing public rules for CRDT behavior and property-level merge strategies.</div>
+            </li>
+        </ul>
+        
+        <div class="usage-note">
+            <strong>Usage:</strong> Reference these vocabularies by their HTTP URIs in your RDF data. For example, use <code>algo:LWWRegister</code> to specify Last-Writer-Wins merge behavior for a property.
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🎯 Semantic Mappings</h2>
+        <p>Mapping files defining CRDT merge contracts for specific application domains. These establish the semantic rules for how different types of data should merge during synchronization.</p>
+        
+        <ul>
+            <li>
+                <a href="mappings/core-v1.ttl">core-v1.ttl</a>
+                <div class="file-description">Essential CRDT mappings imported by all other mapping files. Defines fundamental merge behaviors for common RDF properties.</div>
+            </li>
+            <li>
+                <a href="mappings/client-installation-v1.ttl">client-installation-v1.ttl</a>
+                <div class="file-description">Mappings for client installation and device management data structures.</div>
+            </li>
+            <li>
+                <a href="mappings/index-v1.ttl">index-v1.ttl</a>
+                <div class="file-description">Mappings specific to indexing data structures and performance optimization metadata.</div>
+            </li>
+            <li>
+                <a href="mappings/shard-v1.ttl">shard-v1.ttl</a>
+                <div class="file-description">Mappings for data sharding strategies and distributed index management.</div>
+            </li>
+        </ul>
+        
+        <div class="usage-note">
+            <strong>Integration:</strong> Applications import relevant mapping files to establish merge contracts. Start with <code>core-v1.ttl</code> and add domain-specific mappings as needed.
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🏗️ Architecture Overview</h2>
+        <p>The library follows a <strong>4-layer architecture</strong>:</p>
+        <ol>
+            <li><strong>Data Resource Layer:</strong> Clean, standard RDF vocabularies</li>
+            <li><strong>Merge Contract Layer:</strong> Public CRDT rules via vocabularies</li>
+            <li><strong>Indexing Layer:</strong> Performance optimization with sharded indices</li>
+            <li><strong>Sync Strategy Layer:</strong> Client-side synchronization behaviors</li>
+        </ol>
+        <p>This service acts as a synchronization "add-on" while developers retain full control over local storage and querying.</p>
+    </div>
+
+    <div class="back-link">
+        <a href="https://github.com/klaskalass/solid_crdt_sync">🔙 Back to GitHub Repository</a>
+    </div>
+</body>
+</html>
