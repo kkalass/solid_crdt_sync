@@ -1,0 +1,36 @@
+name: solid_crdt_sync_drift
+description: Drift (SQLite) storage implementation for solid_crdt_sync_core
+version: 0.9.15-dev
+homepage: https://kkalass.github.io/solid_crdt_sync/
+repository: https://github.com/kkalass/solid_crdt_sync
+issue_tracker: https://github.com/kkalass/solid_crdt_sync/issues
+publish_to: none
+
+topics:
+  - solid
+  - crdt
+  - storage
+  - drift
+  - sqlite
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  solid_crdt_sync_core:
+    path: ../solid_crdt_sync_core
+  drift: ^2.20.0
+  drift_flutter: ^0.2.0
+  sqlite3_flutter_libs: ^0.5.0
+  path_provider: ^2.1.0
+  path: ^1.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.0
+  lints: ">=5.1.1 <7.0.0"
