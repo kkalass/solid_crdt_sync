@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Dart library (`solid_crdt_sync`) that enables synchronization of RDF data to Solid Pods using CRDT (Conflict-free Replicated Data Types) for local-first, interoperable applications. The library follows a state-based CRDT approach with passive storage backends.
+This is a multipackage Dart library (`solid_crdt_sync`) that enables synchronization of RDF data to Solid Pods using CRDT (Conflict-free Replicated Data Types) for local-first, interoperable applications. The library follows a state-based CRDT approach with passive storage backends.
+
+The project is organized as a monorepo with the following packages:
+- `solid_crdt_sync_core` - Platform-agnostic sync logic and CRDT implementations
+- `solid_crdt_sync_auth` - Solid authentication integration using solid-auth library
+- `solid_crdt_sync_ui` - Flutter UI components including login forms and sync status widgets
 
 ## Key Architecture Concepts
 
@@ -19,23 +24,35 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 
 ## Development Commands
 
+### Melos Workspace Management
+- `dart pub run melos bootstrap` - Bootstrap all packages (run after cloning)
+- `dart pub run melos list` - List all packages in workspace
+- `dart pub run melos clean` - Clean and get dependencies for all packages
+
 ### Testing
-- `dart test` - Run all tests
+- `dart pub run melos test` - Run tests for all packages
 - `dart tool/run_tests.dart` - Run tests with coverage (generates coverage/lcov.info and HTML report)
 
 ### Code Quality  
-- `dart analyze` - Run static analysis
-- `dart format` - Format code (follow this before commits)
+- `dart pub run melos analyze` - Run static analysis for all packages
+- `dart pub run melos format` - Format code for all packages (follow this before commits)
 
-### Maintenance
-- `dart tool/update_version.dart` - Update version numbers
-- `dart tool/release.dart` - Handle release process
+### Version Management & Publishing
+- `dart pub run melos version` - Update versions across all packages with changelog generation
+- `dart pub run melos publish` - Publish all packages to pub.dev
+- `dart pub run melos release` - Preview version + publish process
+- See `tool/version_and_release.md` for detailed workflow
 
 ## Key Files and Structure
 
+### Package Structure
+- `packages/solid_crdt_sync_core/` - Core sync logic, CRDT types, and abstract interfaces
+- `packages/solid_crdt_sync_auth/` - Authentication bridge to solid-auth library
+- `packages/solid_crdt_sync_ui/` - Flutter widgets for login and sync status
+- `melos.yaml` - Workspace configuration for multipackage management
+
 ### Core Documentation
-- `docs/ARCHITECTURE.md` - Detailed 4-layer architecture explanation with RDF examples
-- `docs/Synchronization Algorithm Sketch.md` - Client-side sync algorithm phases
+- `spec/docs/ARCHITECTURE.md` - Detailed 4-layer architecture explanation with RDF examples
 - `examples/interface.dart` - Main API design showing SyncStrategy pattern
 
 ### RDF Vocabularies

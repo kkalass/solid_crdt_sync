@@ -13,17 +13,28 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-      - name: Install dependencies
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          
+      # Install workspace dependencies
+      - name: Install workspace dependencies
         run: dart pub get
-      - name: Publish dry run
-        run: dart pub publish --dry-run
+        
+      # Bootstrap melos workspace  
+      - name: Bootstrap melos workspace
+        run: dart pub run melos bootstrap
+        
+      # Publish dry run for all packages
+      - name: Publish dry run (all packages)
+        run: dart pub run melos publish --dry-run
+        
       - name: Publish (manual)
         if: github.event_name == 'workflow_dispatch'
         run: |
-          echo "To publish, run 'dart pub publish' manually with credentials."
-      # To enable auto-publishing, uncomment below and add PUB_CREDENTIALS secret
-      # - name: Publish
-      #   if: github.event_name == 'release'
-      #   env:
-      #     PUB_CREDENTIALS: ${{ secrets.PUB_CREDENTIALS }}
-      #   run: echo "$PUB_CREDENTIALS" > ~/.pub-cache/credentials.json && dart pub publish -f
+          echo "To publish packages, run 'dart pub run melos publish' manually with credentials."
+          echo "Note: Only solid_crdt_sync_core is currently publishable."
+          echo "UI and auth packages are marked with 'publish_to: none'."
+          
+      # Note: Auto-publishing with melos requires more complex setup
+      # Recommend manual publishing for multipackage repos

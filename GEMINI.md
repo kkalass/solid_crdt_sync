@@ -4,7 +4,15 @@ This document provides context for the Gemini Code Assistant to understand the `
 
 ## Project Overview
 
-`solid_crdt_sync` is a Dart library designed to facilitate local-first, collaborative applications by synchronizing RDF data with Solid Pods. It uses state-based Conflict-free Replicated Data Types (CRDTs) to ensure data consistency and enable offline functionality.
+`solid_crdt_sync` is a multipackage Dart library designed to facilitate local-first, collaborative applications by synchronizing RDF data with Solid Pods. It uses state-based Conflict-free Replicated Data Types (CRDTs) to ensure data consistency and enable offline functionality.
+
+### Package Structure
+
+The project is organized as a monorepo with the following packages:
+
+- **`solid_crdt_sync_core`**: Platform-agnostic sync logic, CRDT implementations, and abstract interfaces
+- **`solid_crdt_sync_auth`**: Authentication bridge to the solid-auth library for Solid Pod login
+- **`solid_crdt_sync_ui`**: Flutter UI components including login screens and sync status widgets
 
 The project's architecture is composed of four layers:
 
@@ -20,17 +28,24 @@ The library is designed to be an "add-on" to an existing application, rather tha
 
 ## Building and Running
 
-### Dependencies
+### Workspace Setup
 
-To install the project dependencies, run:
+This project uses Melos for multipackage management. To set up the workspace:
 
 ```bash
 dart pub get
+dart pub run melos bootstrap
 ```
 
 ### Running Tests
 
-To run the project's tests with coverage, use the following command:
+To run tests across all packages, use Melos:
+
+```bash
+dart pub run melos test
+```
+
+For coverage reporting on the entire workspace, use:
 
 ```bash
 dart tool/run_tests.dart

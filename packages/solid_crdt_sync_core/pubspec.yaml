@@ -1,5 +1,5 @@
-name: solid_crdt_sync_workspace
-description: Workspace for the solid_crdt_sync monorepo
+name: solid_crdt_sync_core
+description: Core CRDT synchronization logic for Solid Pods (platform-agnostic)
 version: 0.9.15-dev
 homepage: https://kkalass.github.io/solid_crdt_sync/
 repository: https://github.com/kkalass/solid_crdt_sync
@@ -7,8 +7,19 @@ issue_tracker: https://github.com/kkalass/solid_crdt_sync/issues
 documentation: https://kkalass.github.io/solid_crdt_sync/
 publish_to: none
 
+topics:
+  - rdf
+  - linked-data
+  - semantic-web
+  - crdt
+  - solid
+
 environment:
   sdk: ^3.6.0
 
+dependencies:
+  logging: ^1.2.0
+
 dev_dependencies:
-  melos: ^6.1.0
+  test: ^1.24.0
+  lints: ">=5.1.1 <7.0.0"

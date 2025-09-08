@@ -14,22 +14,26 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-      - name: Install dependencies
-        run: dart pub get
-      - name: Analyze
-        run: dart analyze
-      - name: Run tests with coverage
-        run: dart test --coverage=coverage
-
-      # Convert coverage to lcov.info (even if only test/ exists)
-      - name: Convert coverage to lcov.info
-        run: |
-          dart pub global activate coverage
-          dart pub global run coverage:format_coverage \
-            --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - uses: subosito/flutter-action@v2
         with:
-          files: coverage/lcov.info
-          fail_ci_if_error: true
+          flutter-version: '3.24.0'
+          
+      # Install workspace dependencies
+      - name: Install workspace dependencies  
+        run: dart pub get
+        
+      # Bootstrap melos workspace
+      - name: Bootstrap melos workspace
+        run: dart pub run melos bootstrap
+        
+      # Run analysis across all packages
+      - name: Analyze all packages
+        run: dart pub run melos analyze
+        
+      # Run tests across all packages
+      - name: Run tests across all packages  
+        run: dart pub run melos test
+        
+      # Note: Coverage aggregation across packages is complex
+      # For now, we run tests without coverage in CI
+      # Individual package coverage can be run locally

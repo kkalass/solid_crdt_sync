@@ -16,20 +16,13 @@ This project addresses the fundamental challenge of creating applications that a
 
 ## Quick Start
 
-### For Application Developers
-```dart
-// Example: Recipe management with automatic conflict resolution
-final syncStrategy = FullSyncStrategy<Recipe>(
-  indexPath: '/indices/recipes/',
-  syncContract: RecipeContract.v1,
-);
-
-await syncStrategy.sync();
-final recipes = await syncStrategy.getAll();
-```
-
 ### For Specification Writers
 The complete architecture is documented in **[spec/docs/ARCHITECTURE.md](spec/docs/ARCHITECTURE.md)**.
+
+### For Application Developers
+The Dart implementation is in early development. The current focus is on establishing the core architecture and interfaces.
+
+📋 **For package structure, current status, and development workflow, see [IMPLEMENTATION.md](IMPLEMENTATION.md)**
 
 ### For Framework Implementers  
 This specification is designed to be **language-agnostic**. The Dart implementation serves as a reference, but the architecture supports implementations in JavaScript, Python, Java, etc.
@@ -47,7 +40,7 @@ Complete architectural documentation for building CRDT-enabled Solid application
 - **Interoperability contracts** for cross-application compatibility
 
 ### 🛠️ 2. Dart Implementation (In Development)
-A Dart library that aims to become production-ready for real-world applications. The implementation will provide:
+A multipackage Dart library that aims to become production-ready for real-world applications. The implementation will provide:
 
 - **Full-featured library** for building collaborative Solid applications
 - **Complete API coverage** of the specification's capabilities  
@@ -55,6 +48,8 @@ A Dart library that aims to become production-ready for real-world applications.
 - **Reference example** for implementers in other languages
 
 *Note: Implementation is currently in early development - the specification came first to ensure a solid foundation.*
+
+📋 **For implementation details, package structure, and development workflow, see [IMPLEMENTATION.md](IMPLEMENTATION.md)**
 
 ## Documentation Structure
 
@@ -74,6 +69,7 @@ A Dart library that aims to become production-ready for real-world applications.
 ### 🛠️ Implementation Documents (Root Level)
 | Document | Purpose | Audience |
 |----------|---------|----------|
+| **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Package structure & development workflow | Dart developers & contributors |
 | **[CLAUDE.md](CLAUDE.md)** | Development guidelines | Contributors to Dart implementation |
 | **[examples/](examples/)** | Usage patterns & API examples | Dart developers |
 
@@ -122,8 +118,8 @@ This work aligns with and wants to eventually contribute to:
 - **Pull Requests**: Documentation improvements and clarifications welcome
 
 ### Implementation Contributions
-- **Dart Library**: Core implementation in `lib/` directory  
-- **Tests**: Specification compliance tests in `test/`
+- **Dart Reference Implementation**: See [IMPLEMENTATION.md](IMPLEMENTATION.md) for package structure and development workflow
+- **Tests**: Specification compliance tests across package directories
 - **Examples**: Real-world usage patterns in `examples/`
 
 

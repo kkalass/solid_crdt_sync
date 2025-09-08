@@ -1,0 +1,30 @@
+name: solid_crdt_sync_ui
+description: Flutter UI components for solid_crdt_sync including login forms and sync widgets
+version: 0.9.15-dev
+homepage: https://kkalass.github.io/solid_crdt_sync/
+repository: https://github.com/kkalass/solid_crdt_sync
+issue_tracker: https://github.com/kkalass/solid_crdt_sync/issues
+publish_to: none
+
+topics:
+  - solid
+  - flutter
+  - ui
+  - crdt
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  solid_crdt_sync_core:
+    path: ../solid_crdt_sync_core
+  solid_crdt_sync_auth:
+    path: ../solid_crdt_sync_auth
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ">=5.1.1 <7.0.0"
