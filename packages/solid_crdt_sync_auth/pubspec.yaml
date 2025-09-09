@@ -20,10 +20,22 @@ dependencies:
     sdk: flutter
   solid_crdt_sync_core:
     path: ../solid_crdt_sync_core
-  # TODO: Add solid-auth dependency once available
-  # solid_auth: ^x.x.x
+  # Solid authentication
+  # TODO: Use published version when available
+  solid_auth:
+    git:
+      url: https://github.com/kkalass/solid_auth.git
+      ref: feat/migrate-to-bdaya-oidc-security-fix
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ">=5.1.1 <7.0.0"
+
+# TODO: Remove when solid_auth and a fixed oidc_core are published
+dependency_overrides:
+  oidc_core:
+    git:
+      url: https://github.com/kkalass/oidc.git
+      ref: fix/oidc-hook-execute-stack-overflow
+      path: packages/oidc_core

@@ -2,7 +2,9 @@
 library;
 
 import 'package:drift/drift.dart';
+
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 part 'database.g.dart';
 
@@ -93,7 +95,8 @@ class IndexEntries extends Table {
 /// Main database class
 @DriftDatabase(tables: [RdfDocuments, RdfTriples, CrdtMetadata, IndexEntries])
 class SolidCrdtDatabase extends _$SolidCrdtDatabase {
-  SolidCrdtDatabase() : super(_openConnection());
+  SolidCrdtDatabase({DriftWebOptions? web, DriftNativeOptions? native})
+      : super(_openConnection(web: web, native: native));
 
   @override
   int get schemaVersion => 1;
@@ -128,6 +131,8 @@ class SolidCrdtDatabase extends _$SolidCrdtDatabase {
 }
 
 /// Create database connection based on platform
-QueryExecutor _openConnection() {
-  return driftDatabase(name: 'solid_crdt_sync');
+QueryExecutor _openConnection(
+    {DriftWebOptions? web, DriftNativeOptions? native}) {
+  // For web, explicitly configure IndexedDB storage
+  return driftDatabase(name: 'solid_crdt_sync', web: web, native: native);
 }
