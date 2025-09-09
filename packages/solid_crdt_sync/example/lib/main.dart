@@ -8,6 +8,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:personal_notes_app/init_rdf_mapper.g.dart';
 import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
@@ -22,10 +23,8 @@ import 'services/notes_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // TODO: Initialize generated RDF mapper
-  // await initRdfMapper();
-  final rdfMapper = RdfMapper(
-      registry: RdfMapperRegistry(), rdfCore: RdfCore.withStandardCodecs());
+  // Initialize with generated mappers
+  final rdfMapper = await initRdfMapper();
 
   // Set up the CRDT sync system - works locally by default
   final syncSystem = await SolidCrdtSync.setup(
