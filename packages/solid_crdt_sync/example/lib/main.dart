@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
+import 'package:drift_flutter/drift_flutter.dart';
 
 import 'mapper_config.dart';
 import 'screens/notes_list_screen.dart';
@@ -29,7 +30,11 @@ void main() async {
 /// - Returns a fully configured sync system
 Future<SolidCrdtSync> initializeSolidCrdtSync() async {
   return await SolidCrdtSync.setup(
-    storage: DriftStorage(),
+    storage: DriftStorage(
+        web: DriftWebOptions(
+      sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+      driftWorker: Uri.parse('drift_worker.js'),
+    )),
     mapperInitializer: createMapperInitializer(),
     crdtMappings: createCrdtMappings(
         baseUrl:

@@ -82,12 +82,46 @@ await notesService.saveNote(myNote);  // Automatically converts to RDF + syncs
 - Dart 3.6.0 or later
 
 ### Installation
+
+**For Desktop/Mobile:**
 ```bash
-cd examples/personal_notes_app
+cd packages/solid_crdt_sync/example
 flutter pub get
 dart run build_runner build  # Generate RDF mappers
-flutter run
+flutter run -d macos  # or -d android, -d ios
 ```
+
+**For Web:**
+```bash
+cd packages/solid_crdt_sync/example
+flutter pub get
+dart run build_runner build  # Generate RDF mappers
+# Setup web dependencies (required for Drift storage)
+./setup_web.sh
+flutter run -d chrome
+```
+
+### Platform-Specific Setup
+
+#### Web (Chrome/Firefox/Safari)
+The example app uses `solid_crdt_sync_drift` for local storage, which requires SQLite WASM files for web deployment.
+
+**Quick setup:**
+```bash
+./setup_web.sh  # Downloads required WASM files
+```
+
+**Manual setup (if needed):**
+```bash
+# Download SQLite3 WASM and Drift worker files
+curl -L -o web/sqlite3.wasm https://github.com/simolus3/sqlite3.dart/releases/latest/download/sqlite3.wasm
+curl -L -o web/drift_worker.js https://github.com/simolus3/drift/releases/latest/download/drift_worker.js
+```
+
+**Important:** This requirement comes from `drift` via the `solid_crdt_sync_drift` storage backend. The core `solid_crdt_sync` library works with any storage implementation and doesn't require WASM files.
+
+#### Desktop/Mobile
+No additional setup required - uses native SQLite directly.
 
 ### First Run
 1. App opens immediately - start creating notes

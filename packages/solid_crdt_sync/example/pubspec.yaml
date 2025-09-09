@@ -11,6 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
     
+  # Drift (SQLite) storage
+  drift_flutter: ^0.2.0
+  
   # Solid CRDT Sync packages
   solid_crdt_sync:
     path: ../
