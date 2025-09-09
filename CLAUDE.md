@@ -36,10 +36,12 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 ### Testing
 - `dart pub run melos test` - Run tests for all packages
 - `dart tool/run_tests.dart` - Run tests with coverage (generates coverage/lcov.info and HTML report)
+- Individual package testing: `cd packages/PACKAGE_NAME && dart test --coverage=coverage`
 
 ### Code Quality  
 - `dart pub run melos analyze` - Run static analysis for all packages
 - `dart pub run melos format` - Format code for all packages (follow this before commits)
+- `dart pub run melos lint` - Combined analyze + format check for all packages
 
 ### Version Management & Publishing
 - `dart pub run melos version` - Update versions across all packages with changelog generation
