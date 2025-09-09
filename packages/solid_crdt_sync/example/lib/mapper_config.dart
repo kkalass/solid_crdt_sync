@@ -32,7 +32,7 @@ MapperInitializerFunction createMapperInitializer() {
     // TODO: This is a placeholder implementation
     // In the real version, this would call the generated initRdfMapper
     // with the context's iri strategy and any user-provided dependencies
-    
+
     return RdfMapper(
       registry: RdfMapperRegistry(),
       rdfCore: RdfCore.withStandardCodecs(),
@@ -49,14 +49,13 @@ CrdtMappingsConfig createCrdtMappings({
 }) {
   // TODO: This is a placeholder implementation
   // In the real version, this would be generated based on annotated models
-  
+
   return CrdtMappingsConfig(
-    baseUrl: baseUrl,
     typeMappings: {
       // Note: CrdtMappingInfo(
       //   dartType: Note,
       //   rdfTypeIri: 'https://schema.org/NoteDigitalDocument',
-      //   filename: 'note-v1.ttl',
+      //   mappingIri: '$baseUrl/note-v1.ttl',
       //   version: 'v1',
       //   description: 'Personal note with LWW and OR-Set merge strategies',
       // ),
@@ -71,4 +70,5 @@ CrdtMappingsConfig createCrdtMappings({
 ///
 /// These functions receive framework services via SolidMappingContext
 /// and return a fully configured RdfMapper.
-typedef MapperInitializerFunction = RdfMapper Function(SolidMappingContext context);
+typedef MapperInitializerFunction = RdfMapper Function(
+    SolidMappingContext context);
