@@ -1,0 +1,14 @@
+# melos_managed_dependency_overrides: solid_crdt_sync,solid_crdt_sync_annotations,solid_crdt_sync_auth,solid_crdt_sync_core,solid_crdt_sync_drift,solid_crdt_sync_ui
+dependency_overrides:
+  solid_crdt_sync:
+    path: ..
+  solid_crdt_sync_annotations:
+    path: ../../solid_crdt_sync_annotations
+  solid_crdt_sync_auth:
+    path: ../../solid_crdt_sync_auth
+  solid_crdt_sync_core:
+    path: ../../solid_crdt_sync_core
+  solid_crdt_sync_drift:
+    path: ../../solid_crdt_sync_drift
+  solid_crdt_sync_ui:
+    path: ../../solid_crdt_sync_ui

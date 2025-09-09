@@ -1,0 +1,48 @@
+name: personal_notes_app
+description: Simple local-first personal notes app demonstrating solid_crdt_sync
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+    
+  # Solid CRDT Sync packages
+  solid_crdt_sync:
+    path: ../
+  solid_crdt_sync_annotations:
+    path: ../../solid_crdt_sync_annotations
+  solid_crdt_sync_core:
+    path: ../../solid_crdt_sync_core
+  solid_crdt_sync_auth:
+    path: ../../solid_crdt_sync_auth
+  solid_crdt_sync_ui:
+    path: ../../solid_crdt_sync_ui
+  solid_crdt_sync_drift:
+    path: ../../solid_crdt_sync_drift
+    
+  # RDF mapping
+  rdf_core: ^0.9.14
+  rdf_mapper: ^0.10.1
+  rdf_vocabularies_schema: ^0.4.4
+  rdf_vocabularies_core: ^0.4.4
+  rdf_mapper_annotations: ^0.10.1
+  
+  # UI
+  flutter_chips_input: ^2.0.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  
+  # Code generation
+  build_runner: ^2.4.0
+  rdf_mapper_generator: ^0.10.1
+
+flutter:
+  uses-material-design: true

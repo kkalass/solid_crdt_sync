@@ -19,6 +19,10 @@ environment:
 
 dependencies:
   logging: ^1.2.0
+  
+  # RDF mapping
+  rdf_core: ^0.9.14
+  rdf_mapper: ^0.10.1
 
 dev_dependencies:
   test: ^1.24.0

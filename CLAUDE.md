@@ -7,9 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a multipackage Dart library (`solid_crdt_sync`) that enables synchronization of RDF data to Solid Pods using CRDT (Conflict-free Replicated Data Types) for local-first, interoperable applications. The library follows a state-based CRDT approach with passive storage backends.
 
 The project is organized as a monorepo with the following packages:
-- `solid_crdt_sync_core` - Platform-agnostic sync logic and CRDT implementations
+- `solid_crdt_sync` - Main entry point package with documentation and examples
+- `solid_crdt_sync_core` - Platform-agnostic sync logic and runtime engine
+- `solid_crdt_sync_annotations` - CRDT merge strategy annotations for code generation
+- `solid_crdt_sync_generator` - Build runner integration for RDF + CRDT code generation
 - `solid_crdt_sync_auth` - Solid authentication integration using solid-auth library
 - `solid_crdt_sync_ui` - Flutter UI components including login forms and sync status widgets
+- `solid_crdt_sync_drift` - Drift (SQLite) storage backend implementation
 
 ## Key Architecture Concepts
 
@@ -45,15 +49,8 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 
 ## Key Files and Structure
 
-### Package Structure
-- `packages/solid_crdt_sync_core/` - Core sync logic, CRDT types, and abstract interfaces
-- `packages/solid_crdt_sync_auth/` - Authentication bridge to solid-auth library
-- `packages/solid_crdt_sync_ui/` - Flutter widgets for login and sync status
-- `melos.yaml` - Workspace configuration for multipackage management
-
 ### Core Documentation
 - `spec/docs/ARCHITECTURE.md` - Detailed 4-layer architecture explanation with RDF examples
-- `examples/interface.dart` - Main API design showing SyncStrategy pattern
 
 ### RDF Vocabularies
 - `vocabularies/` - Custom RDF vocabularies:
@@ -66,6 +63,54 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 
 ### Tools
 - `tool/` - Dart utilities for testing, versioning, and releases
+
+## Package Architecture Guidelines
+
+### Multipackage Structure Requirements
+The project follows these architectural principles established during development:
+
+- **Separate packages with clear dependency chains** - No circular dependencies between packages
+- **No re-exports between packages** - Each package exports only its own functionality  
+- **Clean separation of concerns** - CRDT annotations separate from core runtime logic
+- **Single entry point package** - `solid_crdt_sync` provides documentation and convenient access
+- **RDF mapper ecosystem integration** - CRDT annotations depend on `rdf_mapper_annotations`
+- **Good documentation** - Follow comprehensive documentation standards (see Documentation Guidelines below)
+
+### Dependency Architecture
+```
+solid_crdt_sync (main entry point)
+├── solid_crdt_sync_core (runtime engine)
+├── solid_crdt_sync_annotations (code gen annotations)
+├── solid_crdt_sync_auth (authentication)
+├── solid_crdt_sync_ui (Flutter widgets)  
+└── solid_crdt_sync_drift (storage backend)
+
+solid_crdt_sync_annotations
+└── rdf_mapper_annotations (external dependency)
+```
+
+## Documentation Guidelines
+
+### What "Good Documentation" Means
+
+**Content-wise:**
+1. **Single narrative** - Treats RDF + CRDT as one coherent story, not separate technologies
+2. **Progressive disclosure** - Simple example → full features → advanced concepts  
+3. **Working examples** - Personal notes app as the "hello world" demonstration
+4. **Clear mental models** - "This is distributed data modeling, not just sync"
+5. **Troubleshooting guide** - Common annotation mistakes, build issues, sync conflicts
+
+**Technically:**
+1. **DartDoc + more** - DartDoc for API reference, but need guides/tutorials beyond generated docs
+2. **README hierarchy** - Main package has complete story, sub-packages reference back to main narrative
+3. **Inline examples** - Every annotation shows usage in context with real code
+4. **Generated examples** - Show what the code generator produces, not just input
+
+### Documentation Structure
+- Main `solid_crdt_sync` package README provides the complete story and mental model
+- Individual package READMEs focus on their specific role within the larger narrative
+- Examples demonstrate real-world usage patterns, not toy scenarios
+- API documentation includes both what and why for each component
 
 ## Development Guidelines
 

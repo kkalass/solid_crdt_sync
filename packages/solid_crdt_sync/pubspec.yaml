@@ -1,0 +1,38 @@
+name: solid_crdt_sync
+description: Local-first CRDT synchronization with Solid Pods - Main package with documentation and examples
+version: 0.1.0+1
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  solid_crdt_sync_core:
+    path: ../solid_crdt_sync_core
+  solid_crdt_sync_annotations:
+    path: ../solid_crdt_sync_annotations
+  solid_crdt_sync_drift:
+    path: ../solid_crdt_sync_drift
+  solid_crdt_sync_auth:
+    path: ../solid_crdt_sync_auth
+  solid_crdt_sync_ui:
+    path: ../solid_crdt_sync_ui
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.13
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+topics:
+  - rdf
+  - crdt
+  - solid
+  - local-first
+  - sync
