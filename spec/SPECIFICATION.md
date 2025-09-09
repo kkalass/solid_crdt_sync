@@ -61,7 +61,7 @@ The `templates/` directory provides ready-to-use RDF document templates as imple
 ## Implementation Requirements
 
 ### Language Agnostic Design
-This specification is designed to be implemented in client-side programming languages. The reference implementation in Dart serves as a proof-of-concept, but the architecture supports:
+This specification is designed to be implemented in client-side programming languages. The Dart implementation serves as a working example, but the architecture supports:
 
 - **JavaScript/TypeScript** for web applications and Electron desktop apps
 - **Swift** for iOS and macOS applications
@@ -79,7 +79,7 @@ Any compliant implementation must provide:
 5. **Solid Pod Integration** - Authentication, authorization, and data transfer
 
 ### Compliance Testing
-The specification includes test scenarios in the reference implementation that can be adapted for other languages to ensure compatibility and correctness.
+The specification includes test scenarios in the Dart implementation that can be adapted for other languages to ensure compatibility and correctness.
 
 ## Standards Alignment
 
@@ -120,9 +120,9 @@ Specification contributions are welcome! Please see the main **[CONTRIBUTING.md]
 - Adding new CRDT algorithms
 - Improving documentation and examples
 
-## Reference Implementation
+## Dart Implementation
 
-The Dart reference implementation is available in the root directory of this repository and demonstrates all specification features in a working codebase.
+The Dart implementation is available in the root directory of this repository and demonstrates all specification features in a working codebase.
 
 ## License
 

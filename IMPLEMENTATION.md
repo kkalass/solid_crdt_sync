@@ -1,6 +1,6 @@
-# Implementation Guide - Dart Reference Library
+# Implementation Guide - Dart Library
 
-This document covers the Dart reference implementation of the solid_crdt_sync specification.
+This document covers the Dart implementation of the solid_crdt_sync specification.
 
 ## Multipackage Structure
 

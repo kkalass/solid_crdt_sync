@@ -1,6 +1,6 @@
 # SOLID CRDT Sync: Local-First Collaborative Applications
 
-A comprehensive specification and reference implementation for building **local-first, collaborative, and truly interoperable applications** using Solid Pods as a synchronization backend.
+A comprehensive specification and Dart/Flutter implementation for building **local-first, collaborative, and truly interoperable applications** using Solid Pods as a synchronization backend.
 
 ## Overview
 
@@ -107,7 +107,7 @@ This work aligns with and wants to eventually contribute to:
 | Component | Status | Notes |
 |-----------|--------|-------|
 | **Specification** | ✅ Draft Complete | Ready for community review |
-| **Dart Library** | 🚧 In Development | Reference implementation in progress |
+| **Dart Library** | 🚧 In Development | Dart/Flutter implementation in progress |
 | **JavaScript Library** | 📋 Future | Community implementation welcomed |
 
 ## Contributing
@@ -118,7 +118,7 @@ This work aligns with and wants to eventually contribute to:
 - **Pull Requests**: Documentation improvements and clarifications welcome
 
 ### Implementation Contributions
-- **Dart Reference Implementation**: See [IMPLEMENTATION.md](IMPLEMENTATION.md) for package structure and development workflow
+- **Dart Implementation**: See [IMPLEMENTATION.md](IMPLEMENTATION.md) for package structure and development workflow
 - **Tests**: Specification compliance tests across package directories
 - **Examples**: Real-world usage patterns in `examples/`
 
