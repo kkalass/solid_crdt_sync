@@ -27,3 +27,7 @@ export 'src/crdt/hybrid_logical_clock.dart';
 
 // Sync engine
 export 'src/sync/sync_engine.dart';
+
+// Mapping configuration
+export 'src/mapping/solid_mapping_context.dart';
+export 'src/mapping/crdt_mappings_config.dart';

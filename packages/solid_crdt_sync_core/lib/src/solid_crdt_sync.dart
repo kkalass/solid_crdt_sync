@@ -6,6 +6,8 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
 import 'sync/sync_engine.dart';
+import 'mapping/solid_mapping_context.dart';
+import 'mapping/crdt_mappings_config.dart';
 
 /// Main facade for the solid_crdt_sync system.
 /// 
@@ -36,17 +38,33 @@ class SolidCrdtSync {
   /// configured sync system that works locally by default.
   static Future<SolidCrdtSync> setup({
     required LocalStorage storage,
+    RdfMapper Function(SolidMappingContext)? mapperInitializer,
+    CrdtMappingsConfig? crdtMappings,
     RdfMapper? mapper,
     SolidAuthProvider? authProvider,
   }) async {
     // Initialize storage
     await storage.initialize();
     
-    // Create default mapper if none provided
-    final rdfMapper = mapper ?? RdfMapper(
-      registry: RdfMapperRegistry(),
-      rdfCore: RdfCore.withStandardCodecs(),
-    );
+    // Create RDF mapper using initializer or fallback to provided/default mapper
+    RdfMapper rdfMapper;
+    if (mapperInitializer != null) {
+      // Create framework context for mapper initialization
+      final context = _SolidMappingContextImpl(
+        authProvider: authProvider,
+        storage: storage,
+      );
+      rdfMapper = mapperInitializer(context);
+    } else {
+      // Fallback to provided mapper or create default
+      rdfMapper = mapper ?? RdfMapper(
+        registry: RdfMapperRegistry(),
+        rdfCore: RdfCore.withStandardCodecs(),
+      );
+    }
+    
+    // TODO: Use crdtMappings for configuring sync behavior
+    // This would be used by the sync engine to understand merge strategies
     
     // Create sync engine - auth provider is optional initially
     final syncEngine = authProvider != null 
@@ -154,4 +172,51 @@ class _NoOpAuthProvider implements SolidAuthProvider {
 
   @override
   Stream<bool> get authStateChanges => Stream.value(false);
+}
+
+/// Implementation of SolidMappingContext providing framework services.
+class _SolidMappingContextImpl implements SolidMappingContext {
+  @override
+  final SolidAuthProvider? authProvider;
+  
+  final LocalStorage _storage;
+
+  _SolidMappingContextImpl({
+    required this.authProvider,
+    required LocalStorage storage,
+  }) : _storage = storage;
+
+  @override
+  Object get iriStrategy {
+    // TODO: Create actual SolidPodIriStrategy implementation
+    // For now, return a placeholder object
+    return _PlaceholderIriStrategy();
+  }
+
+  @override
+  RdfMapper get baseMapper {
+    return RdfMapper(
+      registry: RdfMapperRegistry(),
+      rdfCore: RdfCore.withStandardCodecs(),
+    );
+  }
+
+  @override
+  TypeIndexService? get typeIndexService {
+    if (authProvider == null) return null;
+    // TODO: Implement TypeIndexService
+    return null;
+  }
+
+  @override
+  ProfileService? get profileService {
+    if (authProvider == null) return null;
+    // TODO: Implement ProfileService  
+    return null;
+  }
+}
+
+/// Placeholder IRI strategy until we implement the real one.
+class _PlaceholderIriStrategy {
+  // TODO: Implement actual IRI strategy logic
 }
