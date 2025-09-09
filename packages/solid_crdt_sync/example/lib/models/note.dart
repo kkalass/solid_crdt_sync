@@ -10,7 +10,7 @@ import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
 /// Uses CRDT merge strategies:
 /// - LWW-Register for title and content (last writer wins)
 /// - OR-Set for tags (additions and removals merge)
-@RdfGlobalResource(SchemaNoteDigitalDocument.classIri, IriStrategy())
+@SolidPodResource(SchemaNoteDigitalDocument.classIri)
 class Note {
   /// Unique identifier for this note
   @RdfIriPart()

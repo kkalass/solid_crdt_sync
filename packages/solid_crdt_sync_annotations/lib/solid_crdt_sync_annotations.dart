@@ -6,3 +6,4 @@
 library solid_crdt_sync_annotations;
 
 export 'src/crdt_annotations.dart';
+export 'src/solid_pod_resource.dart';

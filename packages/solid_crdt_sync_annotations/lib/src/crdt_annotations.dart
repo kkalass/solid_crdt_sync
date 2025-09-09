@@ -2,7 +2,7 @@
 library;
 
 /// Annotation for Last-Writer-Wins Register merge strategy.
-/// 
+///
 /// Used for single-value properties where conflicts are resolved by
 /// keeping the value with the most recent timestamp.
 class CrdtLwwRegister {
@@ -10,7 +10,7 @@ class CrdtLwwRegister {
 }
 
 /// Annotation for First-Writer-Wins Register merge strategy.
-/// 
+///
 /// Used for single-value properties that should be immutable after
 /// first assignment.
 class CrdtFwwRegister {
@@ -18,7 +18,7 @@ class CrdtFwwRegister {
 }
 
 /// Annotation for Observed-Remove Set merge strategy.
-/// 
+///
 /// Used for multi-value properties where additions and removals
 /// can happen independently and merge together.
 class CrdtOrSet {
@@ -26,15 +26,9 @@ class CrdtOrSet {
 }
 
 /// Annotation for immutable properties that never change.
-/// 
+///
 /// Used for properties like creation timestamps that should
 /// remain constant once set.
 class CrdtImmutable {
   const CrdtImmutable();
 }
-
-// Convenient type aliases for shorter annotation names
-typedef LwwRegister = CrdtLwwRegister;
-typedef FwwRegister = CrdtFwwRegister;
-typedef OrSet = CrdtOrSet;
-typedef Immutable = CrdtImmutable;

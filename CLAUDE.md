@@ -116,6 +116,23 @@ solid_crdt_sync_annotations
 
 ## Development Guidelines
 
+### Collaborative Development Approach
+
+**CRITICAL: Always discuss API design before implementing**
+
+When working on this codebase:
+
+1. **Discussion-first approach**: When implementing new interfaces, classes, or packages, always discuss the API design with the user before writing code
+2. **Ask before implementing**: Explicitly ask "Should I implement this?" or "Would you like me to code this up?" before creating classes or making architectural changes
+3. **Start minimal**: When moving to implementation, start with the smallest possible change that serves the real needs of the example application
+4. **Focus on actual usage**: Design interfaces based on what the example app actually needs, not theoretical requirements
+5. **Avoid over-engineering**: Do not create complex database schemas, elaborate class hierarchies, or interconnected systems without explicit approval
+6. **Iterative refinement**: Build incrementally - get the basic API working first, then add complexity only when needed
+
+**Example of what NOT to do**: Creating comprehensive database schemas, complex interfaces, and multiple interconnected classes when asked to create a storage package, without first discussing what the storage interface should look like.
+
+**Example of what TO do**: Ask "What storage operations does the example app actually need?" and design a minimal interface that serves those specific needs.
+
 ### RDF and Semantic Web Focus
 - All data stored as clean, standard RDF that's human-readable
 - Use fragment identifiers (#it) to distinguish "things" from documents  

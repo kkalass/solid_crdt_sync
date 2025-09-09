@@ -29,12 +29,12 @@ void main() async {
 /// - CRDT mapping files for conflict resolution
 /// - Returns a fully configured sync system
 Future<SolidCrdtSync> initializeSolidCrdtSync() async {
+  final DriftWebOptions webOptions = DriftWebOptions(
+    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+    driftWorker: Uri.parse('drift_worker.js'),
+  );
   return await SolidCrdtSync.setup(
-    storage: DriftStorage(
-        web: DriftWebOptions(
-      sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-      driftWorker: Uri.parse('drift_worker.js'),
-    )),
+    storage: DriftStorage(web: webOptions),
     mapperInitializer: createMapperInitializer(),
     crdtMappings: createCrdtMappings(
         baseUrl:
