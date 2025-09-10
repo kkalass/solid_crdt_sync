@@ -50,25 +50,13 @@ CrdtMappingsConfig createCrdtMappings({
   // TODO: This is a placeholder implementation
   // In the real version, this would be generated based on annotated models
 
-  return CrdtMappingsConfig(
-    typeMappings: {
-      // Note: CrdtMappingInfo(
-      //   dartType: Note,
-      //   rdfTypeIri: 'https://schema.org/NoteDigitalDocument',
-      //   mappingIri: '$baseUrl/note-v1.ttl',
-      //   version: 'v1',
-      //   description: 'Personal note with LWW and OR-Set merge strategies',
-      // ),
-    },
-    iriMappings: {
-      // 'https://schema.org/NoteDigitalDocument': CrdtMappingInfo(...),
-    },
-  );
+  return CrdtMappingsConfig([
+    // CrdtMappingInfo(
+    //   dartType: Note,
+    //   rdfTypeIri: 'https://schema.org/NoteDigitalDocument',
+    //   mappingIri: '$baseUrl/note-v1.ttl',
+    //   version: 'v1',
+    //   description: 'Personal note with LWW and OR-Set merge strategies',
+    // ),
+  ]);
 }
-
-/// Type alias for mapper initializer functions.
-///
-/// These functions receive framework services via SolidMappingContext
-/// and return a fully configured RdfMapper.
-typedef MapperInitializerFunction = RdfMapper Function(
-    SolidMappingContext context);

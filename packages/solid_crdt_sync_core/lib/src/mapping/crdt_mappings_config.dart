@@ -16,10 +16,14 @@ class CrdtMappingsConfig {
   /// Map from RDF type IRI to its CRDT mapping metadata.
   final Map<String, CrdtMappingInfo> iriMappings;
 
-  const CrdtMappingsConfig({
-    required this.typeMappings,
-    required this.iriMappings,
-  });
+  CrdtMappingsConfig(
+    List<CrdtMappingInfo> mappings,
+  )   : typeMappings = {
+          for (var mapping in mappings) mapping.dartType: mapping
+        },
+        iriMappings = {
+          for (var mapping in mappings) mapping.rdfTypeIri: mapping
+        };
 
   /// Get mapping info for a Dart type.
   CrdtMappingInfo? getMappingForType(Type dartType) {
@@ -62,9 +66,3 @@ class CrdtMappingInfo {
     return 'CrdtMappingInfo(type: $dartType, iri: $rdfTypeIri, mapping: $mappingIri)';
   }
 }
-
-/// Factory function type for creating CRDT mappings configuration.
-///
-/// This is what user-provided `createCrdtMappings()` functions should return,
-/// and what generated `createCrdtMappings()` functions will return.
-typedef CrdtMappingsFactory = CrdtMappingsConfig Function();

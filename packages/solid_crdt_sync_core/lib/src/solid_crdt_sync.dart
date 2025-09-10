@@ -1,222 +1,91 @@
 /// Main facade for the CRDT sync system.
 library;
 
-import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
+import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
+import 'package:solid_crdt_sync_core/src/mapping/solid_mapping_context.dart';
 import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
-import 'sync/sync_engine.dart';
-import 'mapping/solid_mapping_context.dart';
-import 'mapping/crdt_mappings_config.dart';
+
+/// Type alias for mapper initializer functions.
+///
+/// These functions receive framework services via SolidMappingContext
+/// and return a fully configured RdfMapper.
+typedef MapperInitializerFunction = RdfMapper Function(
+    SolidMappingContext context);
 
 /// Main facade for the solid_crdt_sync system.
-/// 
+///
 /// Provides a simple, high-level API for local-first applications with
 /// optional Solid Pod synchronization. Handles RDF mapping, storage,
 /// and sync operations transparently.
 class SolidCrdtSync {
-  final LocalStorage _storage;
+  final Storage _storage;
   final RdfMapper _mapper;
-  final SyncEngine _syncEngine;
-  SolidAuthProvider? _authProvider;
-  bool _isConnected = false;
-
+  final Auth? _authProvider;
+  final CrdtMappingsConfig _crdtMappings;
   SolidCrdtSync._({
-    required LocalStorage storage,
+    required Storage storage,
     required RdfMapper mapper,
-    required SyncEngine syncEngine,
-    SolidAuthProvider? authProvider,
-  }) : _storage = storage,
-       _mapper = mapper,
-       _syncEngine = syncEngine,
-       _authProvider = authProvider,
-       _isConnected = authProvider != null;
+    required Auth auth,
+    required CrdtMappingsConfig crdt,
+  })  : _storage = storage,
+        _mapper = mapper,
+        _authProvider = auth,
+        _crdtMappings = crdt;
 
   /// Set up the CRDT sync system with storage and optional components.
-  /// 
+  ///
   /// This is the main entry point for applications. Creates a fully
   /// configured sync system that works locally by default.
   static Future<SolidCrdtSync> setup({
-    required LocalStorage storage,
-    RdfMapper Function(SolidMappingContext)? mapperInitializer,
-    CrdtMappingsConfig? crdtMappings,
-    RdfMapper? mapper,
-    SolidAuthProvider? authProvider,
+    required Auth auth,
+    required Storage storage,
+    required MapperInitializerFunction mapperInitializer,
+    required CrdtMappingsConfig crdt,
   }) async {
     // Initialize storage
     await storage.initialize();
-    
-    // Create RDF mapper using initializer or fallback to provided/default mapper
-    RdfMapper rdfMapper;
-    if (mapperInitializer != null) {
-      // Create framework context for mapper initialization
-      final context = _SolidMappingContextImpl(
-        authProvider: authProvider,
-        storage: storage,
-      );
-      rdfMapper = mapperInitializer(context);
-    } else {
-      // Fallback to provided mapper or create default
-      rdfMapper = mapper ?? RdfMapper(
-        registry: RdfMapperRegistry(),
-        rdfCore: RdfCore.withStandardCodecs(),
-      );
-    }
-    
-    // TODO: Use crdtMappings for configuring sync behavior
-    // This would be used by the sync engine to understand merge strategies
-    
-    // Create sync engine - auth provider is optional initially
-    final syncEngine = authProvider != null 
-        ? SyncEngine(
-            authProvider: authProvider,
-            localStorage: storage,
-          )
-        : SyncEngine(
-            authProvider: _NoOpAuthProvider(),
-            localStorage: storage,
-          );
-    
-    await syncEngine.initialize();
-    
+    throw UnimplementedError('Storage initialization not yet implemented');
+    /*
     return SolidCrdtSync._(
       storage: storage,
-      mapper: rdfMapper,
-      syncEngine: syncEngine,
+      mapper: mapper,
       authProvider: authProvider,
+      crdtMappings: crdtMappings,
     );
+    */
   }
-  
-  /// Connect to a Solid Pod for synchronization.
-  /// 
-  /// This is optional - the app works locally without this call.
-  /// Once connected, data will sync automatically in the background.
-  Future<void> connectToSolid(SolidAuthProvider authProvider) async {
-    _authProvider = authProvider;
-    
-    // TODO: Update sync engine with auth provider
-    // await _syncEngine.setAuthProvider(authProvider);
-    
-    _isConnected = await authProvider.isAuthenticated();
+
+  /// Stream of data updates from sync operations.
+  ///
+  /// Emits objects when they are freshly fetched or updated from the server,
+  /// not existing local data. Use this to react to new data coming through sync.
+  Stream<T> dataUpdatesStream<T>() {
+    // TODO: Implement data updates stream
+    throw UnimplementedError('dataUpdatesStream<T>() not yet implemented');
   }
-  
-  /// Check if connected to a Solid Pod.
-  Future<bool> isConnected() async {
-    if (_authProvider == null) return false;
-    _isConnected = await _authProvider!.isAuthenticated();
-    return _isConnected;
+
+  /// Stream of index entry updates from sync operations.
+  ///
+  /// Emits index entries when they are freshly fetched or updated from the server.
+  /// Index entries contain lightweight copies of selected fields for efficient queries.
+  Stream<T> indexUpdatesStream<T>(String indexName) {
+    // TODO: Implement index updates stream
+    throw UnimplementedError(
+        'indexUpdatesStream<T>(indexName) not yet implemented');
   }
-  
-  /// Manually trigger synchronization (when connected).
-  Future<void> sync() async {
-    if (!_isConnected) {
-      throw StateError('Not connected to Solid Pod - call connectToSolid() first');
-    }
-    await _syncEngine.syncAll();
-  }
-  
-  /// Get all objects of a specific type.
-  Future<List<T>> getAll<T>() async {
-    // TODO: Implement using storage + mapper
-    // 1. Get all stored resources of type T
-    // 2. Convert from RDF to Dart objects using mapper
-    throw UnimplementedError('getAll<T>() not yet implemented');
-  }
-  
-  /// Get a specific object by ID.
-  Future<T?> get<T>(String id) async {
-    // TODO: Implement using storage + mapper
-    // 1. Get resource by IRI
-    // 2. Convert from RDF to Dart object using mapper
-    throw UnimplementedError('get<T>(id) not yet implemented');
-  }
-  
+
   /// Save an object (create or update).
+  ///
+  /// Stores the object locally and triggers sync if connected to Solid Pod.
   Future<void> save<T>(T object) async {
     // TODO: Implement using mapper + storage
-    // 1. Convert Dart object to RDF using mapper
-    // 2. Store RDF in local storage
-    // 3. Trigger sync if connected
     throw UnimplementedError('save<T>(object) not yet implemented');
   }
-  
-  /// Delete an object by ID.
-  Future<void> delete<T>(String id) async {
-    // TODO: Implement using storage
-    // 1. Delete from local storage
-    // 2. Create deletion tombstone for sync
-    // 3. Trigger sync if connected
-    throw UnimplementedError('delete<T>(id) not yet implemented');
-  }
-  
+
   /// Close the sync system and free resources.
   Future<void> close() async {
     await _storage.close();
-    await _syncEngine.dispose();
   }
-}
-
-/// No-op auth provider for local-only operation.
-class _NoOpAuthProvider implements SolidAuthProvider {
-  @override
-  Future<String?> getWebId() async => null;
-
-  @override
-  Future<String?> getAccessToken(String resourceUrl) async => null;
-
-  @override
-  Future<bool> isAuthenticated() async => false;
-
-  @override
-  Future<void> signOut() async {}
-
-  @override
-  Stream<bool> get authStateChanges => Stream.value(false);
-}
-
-/// Implementation of SolidMappingContext providing framework services.
-class _SolidMappingContextImpl implements SolidMappingContext {
-  @override
-  final SolidAuthProvider? authProvider;
-  
-  final LocalStorage _storage;
-
-  _SolidMappingContextImpl({
-    required this.authProvider,
-    required LocalStorage storage,
-  }) : _storage = storage;
-
-  @override
-  Object get iriStrategy {
-    // TODO: Create actual SolidPodIriStrategy implementation
-    // For now, return a placeholder object
-    return _PlaceholderIriStrategy();
-  }
-
-  @override
-  RdfMapper get baseMapper {
-    return RdfMapper(
-      registry: RdfMapperRegistry(),
-      rdfCore: RdfCore.withStandardCodecs(),
-    );
-  }
-
-  @override
-  TypeIndexService? get typeIndexService {
-    if (authProvider == null) return null;
-    // TODO: Implement TypeIndexService
-    return null;
-  }
-
-  @override
-  ProfileService? get profileService {
-    if (authProvider == null) return null;
-    // TODO: Implement ProfileService  
-    return null;
-  }
-}
-
-/// Placeholder IRI strategy until we implement the real one.
-class _PlaceholderIriStrategy {
-  // TODO: Implement actual IRI strategy logic
 }

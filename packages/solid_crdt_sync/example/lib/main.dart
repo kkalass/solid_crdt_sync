@@ -8,6 +8,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
@@ -35,8 +36,9 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
   );
   return await SolidCrdtSync.setup(
     storage: DriftStorage(web: webOptions),
+    auth: SolidAuth(),
     mapperInitializer: createMapperInitializer(),
-    crdtMappings: createCrdtMappings(
+    crdt: createCrdtMappings(
         baseUrl:
             'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings'),
   );

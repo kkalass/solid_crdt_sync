@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 /// A complete login screen for Solid Pod authentication.
-/// 
+///
 /// This widget provides the UI for authenticating with a Solid Pod,
 /// including provider selection and the authentication flow.
 class SolidLoginScreen extends StatefulWidget {
-  final SolidAuthProvider authProvider;
+  final Auth authProvider;
   final VoidCallback? onLoginSuccess;
   final Function(String)? onLoginError;
 
@@ -59,7 +59,7 @@ class _SolidLoginScreenState extends State<SolidLoginScreen> {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _isLoading ? null : _handleLogin,
-              child: _isLoading 
+              child: _isLoading
                   ? const CircularProgressIndicator()
                   : const Text('Sign In'),
             ),
@@ -77,7 +77,7 @@ class _SolidLoginScreenState extends State<SolidLoginScreen> {
     try {
       // TODO: Implement actual login flow once solid-auth is integrated
       await Future.delayed(const Duration(seconds: 2)); // Simulate login
-      
+
       if (mounted) {
         widget.onLoginSuccess?.call();
       }

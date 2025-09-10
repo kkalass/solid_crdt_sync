@@ -11,7 +11,7 @@ import 'database.dart';
 ///
 /// Provides cross-platform SQLite storage for RDF documents, triples,
 /// CRDT metadata, and index entries using the Drift ORM.
-class DriftStorage implements LocalStorage {
+class DriftStorage implements Storage {
   final DriftWebOptions? web;
   late final SolidCrdtDatabase _db;
   bool _initialized = false;

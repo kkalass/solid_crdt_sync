@@ -1,8 +1,8 @@
 /// Abstract storage interface for local data persistence.
-/// 
+///
 /// This interface defines the contract for local storage backends
 /// that will be implemented by specific packages (e.g., Isar, Drift).
-abstract interface class LocalStorage {
+abstract interface class Storage {
   /// Initialize the storage backend.
   Future<void> initialize();
 
