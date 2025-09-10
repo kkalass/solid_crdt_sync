@@ -7,9 +7,16 @@ library;
 
 import 'package:rdf_core/rdf_core.dart';
 
+const defaultIndexLocalName = "default";
+
 abstract interface class CrdtIndexConfig {
   /// The Dart type being indexed (e.g., Contact)
   Type get dartType;
+
+  /// Local name for referencing this index within the app (not used in Pod structure)
+  /// Defaults to [defaultIndexLocalName]. Must be unique per Type within the application.
+  /// Used for referencing in indexUpdatesStream<T>(localName) calls.
+  String get localName;
 
   /// Properties to include in index headers for efficient queries
   List<IriTerm> get indexedProperties;
@@ -26,6 +33,10 @@ class GroupIndex extends CrdtIndexConfig {
   @override
   final Type dartType;
 
+  /// Local name for referencing this index within the app (not used in Pod structure)
+  @override
+  final String localName;
+
   /// Properties used for grouping resources
   final List<GroupingProperty> groupingProperties;
 
@@ -35,9 +46,11 @@ class GroupIndex extends CrdtIndexConfig {
 
   const GroupIndex(
     this.dartType, {
+    this.localName = defaultIndexLocalName,
     required this.groupingProperties,
     this.indexedProperties = const [],
-  });
+  }) : assert(groupingProperties.length > 0,
+            'GroupIndex requires at least one grouping property');
 }
 
 /// Defines a full index configuration that will generate an idx:FullIndex.
@@ -49,12 +62,17 @@ class FullIndex extends CrdtIndexConfig {
   @override
   final Type dartType;
 
+  /// Local name for referencing this index within the app (not used in Pod structure)
+  @override
+  final String localName;
+
   /// Properties to include in index headers for efficient queries
   @override
   final List<IriTerm> indexedProperties;
 
   const FullIndex(
     this.dartType, {
+    this.localName = defaultIndexLocalName,
     required this.indexedProperties,
   });
 }
@@ -73,9 +91,15 @@ class GroupingProperty {
   /// Example: 'yyyy-MM' extracts "2025-08" from date values
   final String format;
 
+  /// Value to use when the source property is missing
+  /// If null, resources missing the property are excluded from the index
+  /// Example: 'unknown' to group all missing values together
+  final String? missingValue;
+
   const GroupingProperty(
     this.predicate, {
     required this.format,
     this.hierarchyLevel = 1,
+    this.missingValue,
   });
 }

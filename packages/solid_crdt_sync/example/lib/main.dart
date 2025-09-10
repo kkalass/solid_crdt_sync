@@ -39,21 +39,22 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
   );
 
   return await SolidCrdtSync.setup(
-      /* control behaviour and system integration */
-      storage: DriftStorage(web: webOptions),
-      auth: SolidAuth(),
+    /* control behaviour and system integration */
+    storage: DriftStorage(web: webOptions),
+    auth: SolidAuth(),
+    indices: [
+      GroupIndex(Note, groupingProperties: [
+        GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+            format: 'yyyy-MM')
+      ])
+    ],
 
-      /* bind to generated code */
-      mapperInitializer: createMapperInitializer(),
-      crdt: createCrdtMappings(
-          baseUrl:
-              'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings'),
-      indices: [
-        GroupIndex(Note, groupingProperties: [
-          GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
-              format: 'yyyy-MM')
-        ])
-      ]);
+    /* bind to generated code */
+    mapperInitializer: createMapperInitializer(),
+    crdt: createCrdtMappings(
+        baseUrl:
+            'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings'),
+  );
 }
 
 class PersonalNotesApp extends StatelessWidget {

@@ -72,10 +72,13 @@ class SolidCrdtSync {
   ///
   /// Emits index entries when they are freshly fetched or updated from the server.
   /// Index entries contain lightweight copies of selected fields for efficient queries.
-  Stream<T> indexUpdatesStream<T>(String indexName) {
+  ///
+  /// The localName parameter refers to the localName specified in the index configuration,
+  /// which is used only for local identification within the app.
+  Stream<T> indexUpdatesStream<T>([String localName = defaultIndexLocalName]) {
     // TODO: Implement index updates stream
     throw UnimplementedError(
-        'indexUpdatesStream<T>(indexName) not yet implemented');
+        'indexUpdatesStream<T>(localName) not yet implemented');
   }
 
   /// Save an object (create or update).
