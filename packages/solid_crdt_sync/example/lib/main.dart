@@ -23,14 +23,14 @@ import 'services/notes_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Example: How to use index updates stream for efficient note browsing
   // final sync = await initializeSolidCrdtSync();
   // sync.indexUpdatesStream<NoteIndexEntry>().listen((entry) {
   //   print('Note index updated: ${entry.title} (${entry.createdAt})');
   //   // Update UI with lightweight index data for fast browsing
   // });
-  
+
   runApp(const PersonalNotesApp());
 }
 
@@ -52,10 +52,18 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
     storage: DriftStorage(web: webOptions),
     auth: SolidAuth(),
     indices: [
-      GroupIndex(Note, groupingProperties: [
-        GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
-            format: 'yyyy-MM')
-      ])
+      GroupIndex(
+          Note,
+          item: IndexItem(NoteIndexEntry, [
+            SchemaNoteDigitalDocument.name,
+            SchemaNoteDigitalDocument.dateCreated,
+            SchemaNoteDigitalDocument.dateModified,
+            SchemaNoteDigitalDocument.keywords
+          ]),
+          groupingProperties: [
+            GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+                format: 'yyyy-MM')
+          ])
     ],
 
     /* bind to generated code */

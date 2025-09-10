@@ -9,17 +9,31 @@ import 'package:rdf_core/rdf_core.dart';
 
 const defaultIndexLocalName = "default";
 
+/// Defines how index items are structured and deserialized.
+///
+/// Specifies both the Dart type for deserialization and the RDF properties
+/// to include in index items for efficient querying.
+class IndexItem {
+  /// Dart type for index item deserialization (e.g., NoteIndexEntry)
+  final Type itemType;
+  
+  /// RDF properties to include in index items
+  final List<IriTerm> properties;
+  
+  const IndexItem(this.itemType, this.properties);
+}
+
 abstract interface class CrdtIndexConfig {
-  /// The Dart type being indexed (e.g., Contact)
+  /// The Dart type being indexed (e.g., Note - the source data type)
   Type get dartType;
 
   /// Local name for referencing this index within the app (not used in Pod structure)
-  /// Defaults to [defaultIndexLocalName]. Must be unique per Type within the application.
+  /// Defaults to [defaultIndexLocalName]. Must be unique per index item type.
   /// Used for referencing in indexUpdatesStream<T>(localName) calls.
   String get localName;
 
-  /// Properties to include in index headers for efficient queries
-  List<IriTerm> get indexedProperties;
+  /// Configuration for index items (type and properties)
+  IndexItem get item;
 
   const CrdtIndexConfig();
 }
@@ -37,18 +51,18 @@ class GroupIndex extends CrdtIndexConfig {
   @override
   final String localName;
 
+  /// Configuration for index items (type and properties)
+  @override
+  final IndexItem item;
+
   /// Properties used for grouping resources
   final List<GroupingProperty> groupingProperties;
-
-  /// Properties to include in index headers for efficient queries
-  @override
-  final List<IriTerm> indexedProperties;
 
   const GroupIndex(
     this.dartType, {
     this.localName = defaultIndexLocalName,
+    required this.item,
     required this.groupingProperties,
-    this.indexedProperties = const [],
   }) : assert(groupingProperties.length > 0,
             'GroupIndex requires at least one grouping property');
 }
@@ -66,14 +80,14 @@ class FullIndex extends CrdtIndexConfig {
   @override
   final String localName;
 
-  /// Properties to include in index headers for efficient queries
+  /// Configuration for index items (type and properties)
   @override
-  final List<IriTerm> indexedProperties;
+  final IndexItem item;
 
   const FullIndex(
     this.dartType, {
     this.localName = defaultIndexLocalName,
-    required this.indexedProperties,
+    required this.item,
   });
 }
 
