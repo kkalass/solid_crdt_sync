@@ -2,11 +2,11 @@
 library;
 
 import 'package:rdf_mapper/rdf_mapper.dart';
-import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_core/src/mapping/solid_mapping_context.dart';
 import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
+import 'config/resource_config.dart';
 
 /// Type alias for mapper initializer functions.
 ///
@@ -24,37 +24,42 @@ class SolidCrdtSync {
   final Storage _storage;
   final RdfMapper _mapper;
   final Auth? _authProvider;
-  final CrdtMappingsConfig _crdtMappings;
+  final SyncConfig _config;
   SolidCrdtSync._({
     required Storage storage,
     required RdfMapper mapper,
     required Auth auth,
-    required CrdtMappingsConfig crdt,
+    required SyncConfig config,
   })  : _storage = storage,
         _mapper = mapper,
         _authProvider = auth,
-        _crdtMappings = crdt;
+        _config = config;
 
-  /// Set up the CRDT sync system with storage and optional components.
+  /// Set up the CRDT sync system with resource-focused configuration.
   ///
   /// This is the main entry point for applications. Creates a fully
   /// configured sync system that works locally by default.
+  ///
+  /// Configuration is organized around resources (Note, Category, etc.)
+  /// with their paths, CRDT mappings, and indices all defined together.
   static Future<SolidCrdtSync> setup({
     required Auth auth,
     required Storage storage,
     required MapperInitializerFunction mapperInitializer,
-    required CrdtMappingsConfig crdt,
-    List<CrdtIndexConfig> indices = const [],
+    required SyncConfig config,
   }) async {
     // Initialize storage
     await storage.initialize();
     throw UnimplementedError('Storage initialization not yet implemented');
     /*
+    final crdtMappings = config.createCrdtMappingsConfig();
+    final indices = config.getAllIndices();
+    
     return SolidCrdtSync._(
       storage: storage,
       mapper: mapper,
-      authProvider: authProvider,
-      crdtMappings: crdtMappings,
+      auth: auth,
+      crdt: crdtMappings,
     );
     */
   }
@@ -75,6 +80,8 @@ class SolidCrdtSync {
   ///
   /// The localName parameter refers to the localName specified in the index configuration,
   /// which is used only for local identification within the app.
+  ///
+  /// FIXME: how to specify the precise index in case of group indices?
   Stream<T> indexUpdatesStream<T>([String localName = defaultIndexLocalName]) {
     // TODO: Implement index updates stream
     throw UnimplementedError(

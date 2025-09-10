@@ -71,7 +71,7 @@ import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
 /// - [RdfGlobalResource] - The base annotation this extends
 /// - CRDT annotations: [CrdtLwwRegister], [CrdtFwwRegister], [CrdtOrSet], [CrdtImmutable]
 /// - [SolidCrdtSync] - The main synchronization engine
-class SolidPodResource extends RdfGlobalResource {
+class PodResource extends RdfGlobalResource {
   /// Creates a Solid Pod resource annotation.
   ///
   /// This annotation inherits all functionality from [RdfGlobalResource]
@@ -90,6 +90,5 @@ class SolidPodResource extends RdfGlobalResource {
   ///   late String title;
   /// }
   /// ```
-  const SolidPodResource(IriTerm? classIri)
-      : super(classIri, const IriStrategy());
+  const PodResource(IriTerm? classIri) : super(classIri, const IriStrategy());
 }

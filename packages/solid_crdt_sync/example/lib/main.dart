@@ -7,15 +7,15 @@
 /// - Simple, clean UI
 library;
 
+import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
-import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 
 import 'mapper_config.dart';
 import 'screens/notes_list_screen.dart';
@@ -34,12 +34,12 @@ void main() async {
   runApp(const PersonalNotesApp());
 }
 
-/// Initialize the CRDT sync system with all required components.
+/// Initialize the CRDT sync system with resource-focused configuration.
 ///
 /// This configures:
 /// - Local storage backend (Drift/SQLite)
 /// - RDF mapper with user dependencies
-/// - CRDT mapping files for conflict resolution
+/// - All resources (Note, Category) with their paths, indices, and CRDT mappings
 /// - Returns a fully configured sync system
 Future<SolidCrdtSync> initializeSolidCrdtSync() async {
   final DriftWebOptions webOptions = DriftWebOptions(
@@ -47,30 +47,55 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
     driftWorker: Uri.parse('drift_worker.js'),
   );
 
+  const baseUrl =
+      'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings';
+
   return await SolidCrdtSync.setup(
     /* control behaviour and system integration */
     storage: DriftStorage(web: webOptions),
     auth: SolidAuth(),
-    indices: [
-      GroupIndex(
-          Note,
-          item: IndexItem(NoteIndexEntry, [
-            SchemaNoteDigitalDocument.name,
-            SchemaNoteDigitalDocument.dateCreated,
-            SchemaNoteDigitalDocument.dateModified,
-            SchemaNoteDigitalDocument.keywords
-          ]),
-          groupingProperties: [
-            GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
-                format: 'yyyy-MM')
-          ])
-    ],
-
-    /* bind to generated code */
     mapperInitializer: createMapperInitializer(),
-    crdt: createCrdtMappings(
-        baseUrl:
-            'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings'),
+
+    /* resource-focused configuration */
+    config: SyncConfig(
+      resources: [
+        // Configure Note resource with grouping index by category
+        ResourceConfig(
+          type: Note,
+          defaultResourcePath: '/data/notes',
+          crdtMapping: Uri.parse('$baseUrl/note-v1.ttl'),
+          indices: [
+            GroupIndex(Note,
+                defaultIndexPath: '/index/notes',
+                itemFetchPolicy: ItemFetchPolicy.onRequest,
+                item: IndexItem(NoteIndexEntry, [
+                  SchemaNoteDigitalDocument.name,
+                  SchemaNoteDigitalDocument.dateCreated,
+                  SchemaNoteDigitalDocument.dateModified,
+                  SchemaNoteDigitalDocument.keywords,
+                  SchemaNoteDigitalDocument.about
+                ]),
+                groupingProperties: [
+                  GroupingProperty(SchemaNoteDigitalDocument.about,
+                      format: 'value', // Use category ID directly as group
+                      missingValue: 'uncategorized')
+                ]),
+          ],
+        ),
+
+        // Configure Category resource with full index
+        ResourceConfig(
+          type: Category,
+          defaultResourcePath: '/data/categories',
+          crdtMapping: Uri.parse('$baseUrl/category-v1.ttl'),
+          indices: [
+            FullIndex(Category,
+                defaultIndexPath: '/index/categories',
+                itemFetchPolicy: ItemFetchPolicy.prefetch)
+          ],
+        ),
+      ],
+    ),
   );
 }
 

@@ -3,14 +3,16 @@ library;
 
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
+import 'package:rdf_vocabularies_core/dcterms.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
+import 'category.dart';
 
 /// A personal note with title, content, and tags.
 ///
 /// Uses CRDT merge strategies:
 /// - LWW-Register for title and content (last writer wins)
 /// - OR-Set for tags (additions and removals merge)
-@SolidPodResource(SchemaNoteDigitalDocument.classIri)
+@PodResource(SchemaNoteDigitalDocument.classIri)
 class Note {
   /// Unique identifier for this note
   @RdfIriPart()
@@ -31,6 +33,12 @@ class Note {
   @CrdtOrSet()
   Set<String> tags;
 
+  /// Category this note belongs to - last writer wins on conflicts
+  @RdfProperty(SchemaNoteDigitalDocument.isPartOf,
+      iri: PodResourceRef(Category))
+  @CrdtLwwRegister()
+  String? categoryId;
+
   /// When this note was created
   @RdfProperty(SchemaNoteDigitalDocument.dateCreated)
   @CrdtImmutable()
@@ -46,6 +54,7 @@ class Note {
     required this.title,
     required this.content,
     Set<String>? tags,
+    this.categoryId,
     DateTime? createdAt,
     DateTime? modifiedAt,
   })  : tags = tags ?? <String>{},
@@ -58,6 +67,7 @@ class Note {
     String? title,
     String? content,
     Set<String>? tags,
+    String? categoryId,
     DateTime? createdAt,
     DateTime? modifiedAt,
   }) {
@@ -66,6 +76,7 @@ class Note {
       title: title ?? this.title,
       content: content ?? this.content,
       tags: tags ?? Set.from(this.tags),
+      categoryId: categoryId ?? this.categoryId,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? DateTime.now(),
     );

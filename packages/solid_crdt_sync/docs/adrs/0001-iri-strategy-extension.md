@@ -82,7 +82,24 @@ class Note {
 // - Seamless IRI mapping during offline-to-online sync
 // - Application-defined partitioning strategy
 ```
+Or maybe even
+```
+@PodResource(Schema.NoteDigitalDocument, /* somehow configure the path pattern */)
+class Note {
+  @RdfIriPart()
+  String id = "a7f2c4e8-1234-5678-9abc-def012345678";  // UUID
+}
+```
 
+and we also need to be able to reference such resources on the same pod, e.g. 
+```
+@PodResource(...)
+class Document {
+  // ...
+  @RdfProperty(..., iri: PodResourceRef(Note))
+  String noteRef;
+}
+```
 **Key Requirements:**
 1. **App-controlled IDs**: Developer controls identity/equality semantics
 2. **Computed path derivation**: Support application-defined partitioning (UUID → path structure)

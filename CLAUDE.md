@@ -174,3 +174,4 @@ This project uses Dart's built-in `test` package. Run the comprehensive test sui
 - Use clear, semantic naming that reflects RDF/Solid concepts
 - Document public APIs with usage examples
 - Maintain separation between sync logic and local storage concerns
+- We are in the initial development phase and must not our code with "legacy" or "backwards compatibility" code - just get rid of code that is not right (any more)

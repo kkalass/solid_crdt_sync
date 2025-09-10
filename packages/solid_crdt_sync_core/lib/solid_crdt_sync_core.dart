@@ -16,7 +16,6 @@ export 'src/solid_crdt_sync.dart';
 // Core interfaces
 export 'src/auth/auth_interface.dart';
 export 'src/storage/storage_interface.dart';
-export 'src/sync/sync_strategy.dart';
 
 // CRDT implementations
 export 'src/crdt/crdt_types.dart';
@@ -30,5 +29,7 @@ export 'src/sync/sync_engine.dart';
 
 // Mapping configuration
 export 'src/mapping/solid_mapping_context.dart';
-export 'src/mapping/crdt_mappings_config.dart';
 export 'src/index/index_config.dart';
+
+// Resource-focused configuration
+export 'src/config/resource_config.dart';
