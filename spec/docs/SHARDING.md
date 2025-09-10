@@ -115,6 +115,51 @@ In Solid's decentralized context, users are not system administrators and cannot
 
 **Example migration:** Resource `tomato-soup` with hash `...1112` starts in legacy `shard-mod-xxhash64-2-0-v1` (1112 % 2 = 0), eventually migrates to new `shard-mod-xxhash64-4-0-v2` (1112 % 4 = 0) when accessed.
 
+## Index Entry Conflict Resolution
+
+Index entries within shards use **LWW-Register (Last Writer Wins)** for all properties, providing simple and predictable conflict resolution during shard merging and updates.
+
+### CRDT Merge Behavior
+
+**All Properties Use LWW-Register:**
+- **Header properties** (e.g., `schema:name`, `schema:dateCreated`): Last writer wins
+- **Clock hash metadata** (e.g., `crdt:clockHash`): Last writer wins  
+- **Resource references** (e.g., `idx:resource`): Last writer wins
+
+**Rationale for Uniform LWW-Register:**
+- **Architectural simplicity**: No complex mapping file inheritance from indexed resource types
+- **Performance focus**: Index entries are cached data for efficiency, not authoritative sources
+- **Self-healing**: Inconsistencies can be resolved by regenerating from authoritative resources
+- **Predictable semantics**: "Most recent update wins" is deterministic across installations
+
+### Conflict Resolution Examples
+
+**Scenario 1: Header Property Update**
+```turtle
+# Installation A updates recipe title in index
+<idx:entry-123> schema:name "Updated Recipe Title" ;
+                crdt:clockEntry [...timestamp: T1...] .
+
+# Installation B updates same entry simultaneously  
+<idx:entry-123> schema:name "Different Recipe Title" ;
+                crdt:clockEntry [...timestamp: T2...] .
+
+# Result: Entry with latest timestamp wins (T2 > T1)
+<idx:entry-123> schema:name "Different Recipe Title" .
+```
+
+**Scenario 2: Shard Rebalancing Conflicts**
+```turtle
+# During migration, same entry appears in multiple shards temporarily
+# LWW-Register ensures consistent entry content across all shard copies
+# Empty shards are tombstoned after migration completes
+```
+
+**Self-Healing Process:**
+- Applications can trigger index validation by comparing index entries with source resources
+- Framework provides utilities to regenerate index entries from authoritative data
+- Inconsistencies are typically self-limiting due to LWW-Register's deterministic nature
+
 ## Configuration Version Conflict Handling
 
 When a client detects that `idx:configVersion` was not properly incremented, the system automatically resolves conflicts:

@@ -1167,6 +1167,13 @@ The framework provides two fundamental indexing approaches to handle different d
 
 **Important Distinction:** While the Hybrid Logical Clock hash tracks document-level changes, the header properties come from specific resources within those documents. For example, a recipe's `schema:name` property belongs to the `recipe#it` resource, not the document itself, but gets included in index headers for efficient discovery.
 
+**Index Entry CRDT Behavior:** All index entry properties use **LWW-Register (Last Writer Wins)** merge semantics, regardless of the CRDT algorithms used in the original indexed resources. This design choice:
+- **Simplifies architecture**: Avoids complex mapping file inheritance and type registry mechanisms  
+- **Recognizes index entries as cached data**: Index entries are performance optimizations, not authoritative sources
+- **Provides acceptable trade-offs**: Slight inconsistencies between index and source data are less critical than system simplicity
+- **Enables self-healing**: Index entries can be regenerated from authoritative sources if inconsistencies become problematic
+- **Maintains predictable semantics**: "Last installation to update this index entry wins" is simple and deterministic
+
 **Bidirectional Index Maintenance:** All index operations require updating both the index shard entries and the corresponding `idx:belongsToIndexShard` references in the indexed documents. Removing a document from an index means removing both its shard entry and updating the document to remove its `idx:belongsToIndexShard` reference to that shard. This principle applies to all indexing operations: population, cleanup, document updates, and maintenance tasks.
 
 #### 5.3.2. Framework Vocabulary

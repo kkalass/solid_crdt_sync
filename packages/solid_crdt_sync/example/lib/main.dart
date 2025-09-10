@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:personal_notes_app/models/note.dart';
+import 'package:personal_notes_app/models/note_index_entry.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
@@ -22,6 +23,14 @@ import 'services/notes_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Example: How to use index updates stream for efficient note browsing
+  // final sync = await initializeSolidCrdtSync();
+  // sync.indexUpdatesStream<NoteIndexEntry>().listen((entry) {
+  //   print('Note index updated: ${entry.title} (${entry.createdAt})');
+  //   // Update UI with lightweight index data for fast browsing
+  // });
+  
   runApp(const PersonalNotesApp());
 }
 
