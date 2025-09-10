@@ -6,6 +6,7 @@ import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_core/src/mapping/solid_mapping_context.dart';
 import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
+import 'package:solid_crdt_sync_core/src/index/index_config.dart';
 
 /// Type alias for mapper initializer functions.
 ///
@@ -43,6 +44,7 @@ class SolidCrdtSync {
     required Storage storage,
     required MapperInitializerFunction mapperInitializer,
     required CrdtMappingsConfig crdt,
+    List<CrdtIndexConfig> indices = const [],
   }) async {
     // Initialize storage
     await storage.initialize();

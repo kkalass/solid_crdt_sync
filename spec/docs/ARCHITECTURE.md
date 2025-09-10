@@ -1193,13 +1193,12 @@ The `idx:` vocabulary provides the building blocks for both indexing approaches:
 **Indexing Flexibility:** While most indices focus on primary resources (like `recipe#it`), the framework supports indexing any resource within a document. For example, a recipe document could have both a recipe index (indexing `recipe#it` for name, prep time) and a nutrition index (indexing `recipe#nutrition` for calories, protein). Both resources sync together via the same document-level Hybrid Logical Clock but serve different discovery purposes.
 * **`idx:groupedBy`:** Links GroupIndexTemplate to its GroupingRule
 * **`idx:property`:** Multi-value property linking to GroupingRuleProperty instances (in GroupingRule)
-* **`idx:groupTemplate`:** Template for group index paths using named substitution (in GroupingRule)
 * **`idx:shardingAlgorithm`:** Specifies the sharding algorithm configuration
 * **`idx:GroupingRule`:** Class defining how resources are assigned to groups
 * **`idx:GroupingRuleProperty`:** Individual property specification within a GroupingRule
 * **`idx:sourceProperty`:** Property to extract grouping value from (in GroupingRuleProperty)
 * **`idx:format`:** Format pattern for date/time values (in GroupingRuleProperty)  
-* **`idx:name`:** Variable name for template substitution (in GroupingRuleProperty)
+* **`idx:hierarchyLevel`:** Optional hierarchy level for multi-property grouping (in GroupingRuleProperty)
 * **`idx:missingValue`:** Default value when property is absent (in GroupingRuleProperty)
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
 
@@ -1217,7 +1216,9 @@ The GroupingRule determines group membership using the following process:
    - **Without `idx:missingValue`:** Return empty set (resource joins no groups)
 3. **Permutation Generation:** Compute Cartesian product of all property value sets
 4. **Format Application:** Apply `idx:format` to each value (for dates/times)
-5. **Template Substitution:** Apply `idx:groupTemplate` using named substitution with `idx:name` variables
+5. **Path Generation:** Generate deterministic group paths using hierarchy levels:
+   - **With `idx:hierarchyLevel`:** Sort properties by level, create nested path structure
+   - **Without hierarchy levels:** Sort properties by source IRI lexicographically, join with '-' separator
 6. **Set Deduplication:** Convert the list of group identifiers to a set, removing duplicates that arise from different source values formatting to the same string
 7. **Group Creation:** Create GroupIndex instances for all unique group identifiers
 
@@ -1227,55 +1228,62 @@ idx:groupedBy [
   a idx:GroupingRule;
   idx:property [
     a idx:GroupingRuleProperty;
-    idx:sourceProperty <predicate>;  # RDF property to extract from
-    idx:name "variableName";         # Variable name for template
-    idx:format "YYYY-MM";            # Optional formatting (dates/times)
-    idx:missingValue "default"       # Optional default if property absent
+    idx:sourceProperty <predicate>;     # RDF property to extract from
+    idx:format "yyyy-MM";               # Optional formatting (dates/times)
+    idx:hierarchyLevel 1;               # Optional hierarchy level (default: 1)
+    idx:missingValue "default"          # Optional default if property absent
   ];
-  idx:groupTemplate "groups/{variableName}/index"
+  # No groupTemplate - paths generated deterministically
 ];
 ```
 
 **Common Patterns:**
 
-*Time-Based Grouping:*
+*Simple Time-Based Grouping:*
 ```turtle
 idx:property [
   idx:sourceProperty schema:dateCreated;
-  idx:name "month";
-  idx:format "YYYY-MM"
+  idx:format "yyyy-MM"
 ];
-idx:groupTemplate "groups/{month}/index"
 # Result: groups/2024-08/index, groups/2024-09/index, etc.
+```
+
+*Hierarchical Time-Based Grouping:*
+```turtle
+idx:property [
+  idx:sourceProperty schema:dateCreated;
+  idx:format "yyyy";
+  idx:hierarchyLevel 1
+], [
+  idx:sourceProperty schema:dateCreated;
+  idx:format "MM";
+  idx:hierarchyLevel 2
+];
+# Result: groups/2024/08/index, groups/2024/09/index, etc.
 ```
 
 *Conditional Registration:*
 ```turtle
 idx:property [
   idx:sourceProperty crdt:deletedAt;
-  idx:name "year";
-  idx:format "YYYY"
+  idx:format "yyyy"
   # No missingValue = no group if property absent
 ];
-idx:groupTemplate "gc/{year}/index"
 # Only documents WITH crdt:deletedAt get indexed
+# Result: groups/2024/index, groups/2025/index, etc.
 ```
 
-*Multi-Value Permutations with Deduplication:*
+*Multi-Property Flat Grouping:*
 ```turtle
 idx:property [
   idx:sourceProperty schema:dateCreated;
-  idx:name "month";
-  idx:format "YYYY-MM"
+  idx:format "yyyy-MM"
 ], [
-  idx:sourceProperty schema:dateModified;  
-  idx:name "month";
-  idx:format "YYYY-MM"
+  idx:sourceProperty schema:category
+  # No format = use property value directly
 ];
-idx:groupTemplate "groups/{month}/index"
-# Resource with dateCreated="2024-08-15", dateModified="2024-08-20"
-# Before deduplication: ["groups/2024-08/index", "groups/2024-08/index"]
-# After deduplication: {"groups/2024-08/index"}
+# Resource with dateCreated="2024-08-15", category="work"
+# Result: groups/2024-08-work/index (lexicographic IRI ordering)
 ```
 
 #### 5.3.4. Sharding and Performance
@@ -1304,11 +1312,11 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 
 **Deterministic Naming Pattern:**
 - **FullIndex:** `index-full-${SHA256(indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
-- **GroupIndexTemplate:** `index-grouped-${SHA256(groupingRuleProperties|groupTemplate|indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
+- **GroupIndexTemplate:** `index-grouped-${SHA256(groupingRuleProperties|indexedClassIRI|shardingAlgorithmClass|hashAlgorithm)}/index`
 - **Hash computation:** SHA256 with pipe separators (`|`) between all structural inputs
 - **Full IRI usage:** Hash computation uses complete IRIs, not prefixed forms
 - **Directory structure:** Hash-derived directory name + consistent `index` document
-- **GroupingRuleProperties serialization:** Each GroupingRuleProperty serialized as `sourceProperty|name|format|missingValue`, multiple properties sorted by name (lexicographically) and concatenated with `&` separator
+- **GroupingRuleProperties serialization:** Each GroupingRuleProperty serialized as `sourceProperty|format|hierarchyLevel|missingValue`, multiple properties sorted using the same ordering rules as path generation (hierarchy level first, then lexicographic IRI ordering for properties without explicit levels) and concatenated with `&` separator
 
 **Hash Computation Examples:**
 ```turtle
@@ -1318,9 +1326,9 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 # Document: /indices/recipes/index-full-a1b2c3d4/index
 
 # GroupIndexTemplate for shopping entries with single property
-# groupingRuleProperties: "https://example.org/vocab/meal#requiredForDate|monthYear|YYYY-MM|"
+# groupingRuleProperties: "https://example.org/vocab/meal#requiredForDate|monthYear|yyyy-MM|"
 # (format: sourceProperty|name|format|missingValue - empty missingValue at end)
-# Input: "https://example.org/vocab/meal#requiredForDate|monthYear|YYYY-MM||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
+# Input: "https://example.org/vocab/meal#requiredForDate|monthYear|yyyy-MM||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
 # Directory: /indices/shopping-entries/index-grouped-e5f6g7h8/
 # Document: /indices/shopping-entries/index-grouped-e5f6g7h8/index
 
@@ -1486,7 +1494,7 @@ Rather than expensive Type Index container scanning, the framework maintains a d
 The following examples demonstrate concrete RDF structures for different types of indices, showing how the indexing architecture works in practice with real data.
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/index`**
-This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|YYYY-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
+This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|yyyy-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
 
 ```turtle
 @prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
@@ -1517,10 +1525,9 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
      idx:property [
        a idx:GroupingRuleProperty;
        idx:sourceProperty meal:requiredForDate;
-       idx:name "monthYear";
-       idx:format "YYYY-MM"
+       idx:format "yyyy-MM"
      ];
-     idx:groupTemplate "groups/{monthYear}/index"
+     # No groupTemplate - paths generated deterministically as: groups/{yyyy-MM}/index
    ].
 ```
 
@@ -1872,11 +1879,10 @@ Rather than scanning entire data containers, framework-managed documents with AN
      a idx:GroupingRule;
      idx:property [
        idx:sourceProperty crdt:deletedAt;
-       idx:name "deletionYear";
-       idx:format "YYYY"
+       idx:format "yyyy"
        # No idx:missingValue = only documents with deletedAt get indexed
      ];
-     idx:groupTemplate "gc/{deletionYear}/index"
+     # No groupTemplate - paths generated deterministically as: gc/{yyyy}/index
    ];
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;

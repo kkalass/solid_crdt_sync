@@ -8,6 +8,9 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:personal_notes_app/models/note.dart';
+import 'package:rdf_mapper/rdf_mapper.dart';
+import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
@@ -34,14 +37,23 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
     sqlite3Wasm: Uri.parse('sqlite3.wasm'),
     driftWorker: Uri.parse('drift_worker.js'),
   );
+
   return await SolidCrdtSync.setup(
-    storage: DriftStorage(web: webOptions),
-    auth: SolidAuth(),
-    mapperInitializer: createMapperInitializer(),
-    crdt: createCrdtMappings(
-        baseUrl:
-            'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings'),
-  );
+      /* control behaviour and system integration */
+      storage: DriftStorage(web: webOptions),
+      auth: SolidAuth(),
+
+      /* bind to generated code */
+      mapperInitializer: createMapperInitializer(),
+      crdt: createCrdtMappings(
+          baseUrl:
+              'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings'),
+      indices: [
+        GroupIndex(Note, groupingProperties: [
+          GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+              format: 'yyyy-MM')
+        ])
+      ]);
 }
 
 class PersonalNotesApp extends StatelessWidget {

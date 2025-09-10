@@ -36,7 +36,7 @@ idx:GroupIndex a rdfs:Class;
 
 idx:GroupingRule a rdfs:Class;
     rdfs:label "Grouping Rule";
-    rdfs:comment "A declarative rule that describes how a data resource should be assigned to a specific group based on its properties. Contains multiple GroupingRuleProperty instances and a group template." .
+    rdfs:comment "A declarative rule that describes how a data resource should be assigned to a specific group based on its properties. Contains multiple GroupingRuleProperty instances. Group paths are generated deterministically from the properties." .
 
 idx:GroupingRuleProperty a rdfs:Class;
     rdfs:label "Grouping Rule Property";
@@ -139,28 +139,22 @@ idx:sourceProperty a rdf:Property;
     rdfs:domain idx:GroupingRuleProperty;
     rdfs:range rdf:Property .
 
-idx:name a rdf:Property;
-    rdfs:label "name";
-    rdfs:comment "Variable name for template substitution. Must be unique within a GroupingRule.";
+idx:format a rdf:Property;
+    rdfs:label "format";
+    rdfs:comment "Optional format string to apply to the sourceProperty's value (e.g., 'yyyy-MM' for dates).";
     rdfs:domain idx:GroupingRuleProperty;
     rdfs:range xsd:string .
 
-idx:format a rdf:Property;
-    rdfs:label "format";
-    rdfs:comment "Optional format string to apply to the sourceProperty's value (e.g., 'YYYY-MM' for dates).";
+idx:hierarchyLevel a rdf:Property;
+    rdfs:label "hierarchy level";
+    rdfs:comment "Optional hierarchy level for multi-property grouping (default: 1). Properties with explicit levels create nested directory structures sorted by level. Properties without levels are joined with '-' separator after lexicographic IRI ordering.";
     rdfs:domain idx:GroupingRuleProperty;
-    rdfs:range xsd:string .
+    rdfs:range xsd:integer .
 
 idx:missingValue a rdf:Property;
     rdfs:label "missing value";
     rdfs:comment "Optional default value to use when the sourceProperty is absent. If not specified, resources without this property create no groups.";
     rdfs:domain idx:GroupingRuleProperty;
-    rdfs:range xsd:string .
-
-idx:groupTemplate a rdf:Property;
-    rdfs:label "group template";
-    rdfs:comment "The template for constructing the group IRI from the formatted value.";
-    rdfs:domain idx:GroupingRule;
     rdfs:range xsd:string .
 
 idx:basedOn a rdf:Property;
