@@ -67,6 +67,7 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
           indices: [
             GroupIndex(Note,
                 defaultIndexPath: '/index/notes',
+                // TODO: How/where to configure the actual groups to sync? And do they need their own fetch policy?
                 itemFetchPolicy: ItemFetchPolicy.onRequest,
                 item: IndexItem(NoteIndexEntry, [
                   SchemaNoteDigitalDocument.name,
