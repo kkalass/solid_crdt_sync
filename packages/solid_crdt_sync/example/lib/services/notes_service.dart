@@ -3,7 +3,6 @@ library;
 
 import 'dart:math';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
-import '../models/category.dart';
 import '../models/note.dart';
 
 /// Service for managing notes with local-first CRDT synchronization.
@@ -104,58 +103,6 @@ class NotesService {
     }).toList();
   }
 
-  // ===== Category Management =====
-  // Since categories use FullIndex with prefetch policy, they're immediately available
-
-  /// Get all categories sorted by name
-  Future<List<Category>> getAllCategories() async {
-    // TODO: This should work with the FullIndex - categories are prefetched
-    throw UnimplementedError('Get all categories not yet implemented');
-    /*
-    final categories = await _syncSystem.getAll<Category>();
-    categories.sort((a, b) => a.name.compareTo(b.name));
-    return categories;
-    */
-  }
-
-  /// Get a specific category by ID
-  Future<Category?> getCategory(String id) async {
-    // TODO: Should be fast since categories are prefetched
-    throw UnimplementedError('Get category by ID not yet implemented');
-    /*
-    return await _syncSystem.get<Category>(id);
-    */
-  }
-
-  /// Save a category (create or update)
-  Future<void> saveCategory(Category category) async {
-    await _syncSystem.save(category);
-  }
-
-  /// Delete a category
-  Future<void> deleteCategory(String id) async {
-    throw UnimplementedError('Delete category not yet implemented');
-    /*
-    await _syncSystem.delete<Category>(id);
-    */
-  }
-
-  /// Create a new category with generated ID
-  Category createCategory({
-    required String name,
-    String? description,
-    String? color,
-    String? icon,
-  }) {
-    return Category(
-      id: _generateCategoryId(),
-      name: name,
-      description: description,
-      color: color,
-      icon: icon,
-    );
-  }
-
   /// Get notes by category
   Future<List<Note>> getNotesByCategory(String categoryId) async {
     // TODO: This should use the GroupIndex by category efficiently
@@ -183,12 +130,5 @@ class NotesService {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final random = Random().nextInt(999999);
     return 'note_${timestamp}_$random';
-  }
-
-  /// Generate a unique ID for new categories
-  String _generateCategoryId() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = Random().nextInt(999999);
-    return 'category_${timestamp}_$random';
   }
 }

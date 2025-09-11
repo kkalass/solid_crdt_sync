@@ -6,17 +6,20 @@ import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 import '../models/note.dart';
 import '../services/notes_service.dart';
+import '../services/categories_service.dart';
 import 'categories_screen.dart';
 import 'note_editor_screen.dart';
 
 class NotesListScreen extends StatefulWidget {
   final SolidCrdtSync syncSystem;
   final NotesService notesService;
-  
+  final CategoriesService categoriesService;
+
   const NotesListScreen({
     super.key,
     required this.syncSystem,
     required this.notesService,
+    required this.categoriesService,
   });
 
   @override
@@ -27,14 +30,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
   List<Note> _notes = [];
   bool _loading = true;
   bool _isConnected = false;
-  
+
   @override
   void initState() {
     super.initState();
     _loadNotes();
     _checkConnectionStatus();
   }
-  
+
   Future<void> _loadNotes() async {
     setState(() => _loading = true);
     try {
@@ -52,20 +55,20 @@ class _NotesListScreenState extends State<NotesListScreen> {
       }
     }
   }
-  
+
   Future<void> _checkConnectionStatus() async {
     // TODO: Check if connected to Solid Pod
     // final connected = await widget.syncSystem.isConnected();
     // setState(() => _isConnected = connected);
   }
-  
+
   Future<void> _connectToSolid() async {
     try {
       // TODO: Show login screen and connect
       // final authProvider = SolidAuthProviderImpl();
       // await widget.syncSystem.connectToSolid(authProvider);
       // setState(() => _isConnected = true);
-      
+
       // For now, show a placeholder
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Solid connection not yet implemented')),
@@ -78,15 +81,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
       }
     }
   }
-  
+
   Future<void> _sync() async {
     if (!_isConnected) return;
-    
+
     try {
       // TODO: Trigger manual sync
       // await widget.syncSystem.sync();
       await _loadNotes(); // Reload notes after sync
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Sync completed')),
@@ -100,13 +103,13 @@ class _NotesListScreenState extends State<NotesListScreen> {
       }
     }
   }
-  
+
   void _openCategories() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CategoriesScreen(
-          notesService: widget.notesService,
+          categoriesService: widget.categoriesService,
         ),
       ),
     );
@@ -123,7 +126,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ),
     );
   }
-  
+
   void _editNote(Note note) {
     Navigator.push(
       context,
@@ -136,7 +139,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ),
     );
   }
-  
+
   Future<void> _deleteNote(Note note) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -155,7 +158,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       await widget.notesService.deleteNote(note.id);
       await _loadNotes();
@@ -179,7 +182,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
           IconButton(
             onPressed: _isConnected ? null : _connectToSolid,
             icon: Icon(_isConnected ? Icons.cloud_done : Icons.cloud_off),
-            tooltip: _isConnected ? 'Connected to Solid Pod' : 'Connect to Solid Pod',
+            tooltip: _isConnected
+                ? 'Connected to Solid Pod'
+                : 'Connect to Solid Pod',
           ),
           // Manual sync button (only when connected)
           if (_isConnected)
@@ -202,7 +207,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ),
     );
   }
-  
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -231,7 +236,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ),
     );
   }
-  
+
   Widget _buildNotesList() {
     return ListView.builder(
       itemCount: _notes.length,
@@ -262,11 +267,16 @@ class _NotesListScreenState extends State<NotesListScreen> {
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 4,
-                    children: note.tags.take(3).map((tag) => Chip(
-                      label: Text(tag, style: const TextStyle(fontSize: 11)),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    )).toList(),
+                    children: note.tags
+                        .take(3)
+                        .map((tag) => Chip(
+                              label: Text(tag,
+                                  style: const TextStyle(fontSize: 11)),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ))
+                        .toList(),
                   ),
                 ],
                 const SizedBox(height: 4),
@@ -301,11 +311,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
       },
     );
   }
-  
+
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    
+
     if (diff.inDays == 0) {
       if (diff.inHours == 0) {
         return '${diff.inMinutes}m ago';

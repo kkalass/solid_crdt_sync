@@ -21,6 +21,7 @@ import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
 import 'mapper_config.dart';
 import 'screens/notes_list_screen.dart';
 import 'services/notes_service.dart';
+import 'services/categories_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,6 +130,7 @@ class _AppInitializerState extends State<AppInitializer>
     with WidgetsBindingObserver {
   SolidCrdtSync? syncSystem;
   NotesService? notesService;
+  CategoriesService? categoriesService;
   String? errorMessage;
   bool isInitializing = true;
 
@@ -161,12 +163,14 @@ class _AppInitializerState extends State<AppInitializer>
       // Initialize the CRDT sync system
       final syncSys = await initializeSolidCrdtSync();
 
-      // Initialize notes service
+      // Initialize services
       final notesSvc = NotesService(syncSys);
+      final categoriesSvc = CategoriesService(syncSys);
 
       setState(() {
         syncSystem = syncSys;
         notesService = notesSvc;
+        categoriesService = categoriesSvc;
         isInitializing = false;
       });
     } catch (e) {
@@ -235,6 +239,7 @@ class _AppInitializerState extends State<AppInitializer>
     return NotesListScreen(
       syncSystem: syncSystem!,
       notesService: notesService!,
+      categoriesService: categoriesService!,
     );
   }
 }

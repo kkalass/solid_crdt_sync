@@ -3,7 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import '../models/category.dart';
-import '../services/notes_service.dart';
+import '../services/categories_service.dart';
 
 /// Screen for managing categories with local-first functionality.
 ///
@@ -12,11 +12,11 @@ import '../services/notes_service.dart';
 /// - CRUD operations on categories
 /// - Simple, clean UI for category management
 class CategoriesScreen extends StatefulWidget {
-  final NotesService notesService;
+  final CategoriesService categoriesService;
 
   const CategoriesScreen({
     super.key,
-    required this.notesService,
+    required this.categoriesService,
   });
 
   @override
@@ -41,7 +41,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         errorMessage = null;
       });
 
-      final loadedCategories = await widget.notesService.getAllCategories();
+      final loadedCategories =
+          await widget.categoriesService.getAllCategories();
 
       setState(() {
         categories = loadedCategories;
@@ -135,7 +136,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             ? null
                             : iconController.text.trim(),
                       )
-                    : widget.notesService.createCategory(
+                    : widget.categoriesService.createCategory(
                         name: name,
                         description: descriptionController.text.trim().isEmpty
                             ? null
@@ -148,7 +149,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             : iconController.text.trim(),
                       );
 
-                await widget.notesService.saveCategory(newCategory);
+                await widget.categoriesService.saveCategory(newCategory);
                 if (context.mounted) {
                   Navigator.of(context).pop(true);
                 }
@@ -199,7 +200,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     if (confirmed == true) {
       try {
-        await widget.notesService.deleteCategory(category.id);
+        await widget.categoriesService.deleteCategory(category.id);
         _loadCategories();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -298,7 +299,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                       ? _parseColor(category.color!)
                                       : Theme.of(context).primaryColor,
                                   child: Text(
-                                    category.icon ?? category.name[0].toUpperCase(),
+                                    category.icon ??
+                                        category.name[0].toUpperCase(),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -307,7 +309,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                 ),
                                 title: Text(
                                   category.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w500),
                                 ),
                                 subtitle: category.description != null
                                     ? Text(category.description!)
@@ -355,17 +358,25 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     if (colorString.startsWith('#') && colorString.length == 7) {
       return Color(int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
     }
-    
+
     // Basic color names
     switch (colorString.toLowerCase()) {
-      case 'red': return Colors.red;
-      case 'blue': return Colors.blue;
-      case 'green': return Colors.green;
-      case 'orange': return Colors.orange;
-      case 'purple': return Colors.purple;
-      case 'pink': return Colors.pink;
-      case 'teal': return Colors.teal;
-      default: return Colors.grey;
+      case 'red':
+        return Colors.red;
+      case 'blue':
+        return Colors.blue;
+      case 'green':
+        return Colors.green;
+      case 'orange':
+        return Colors.orange;
+      case 'purple':
+        return Colors.purple;
+      case 'pink':
+        return Colors.pink;
+      case 'teal':
+        return Colors.teal;
+      default:
+        return Colors.grey;
     }
   }
 
