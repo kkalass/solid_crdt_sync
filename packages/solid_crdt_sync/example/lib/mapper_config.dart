@@ -4,8 +4,6 @@
 /// solid_crdt_sync_generator based on the annotated models.
 library;
 
-import 'package:personal_notes_app/models/category.dart';
-import 'package:personal_notes_app/models/note.dart';
 import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';

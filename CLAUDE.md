@@ -116,6 +116,7 @@ solid_crdt_sync_annotations
 
 ## Development Guidelines
 
+
 ### Collaborative Development Approach
 
 **CRITICAL: Always discuss API design before implementing**
@@ -175,3 +176,7 @@ This project uses Dart's built-in `test` package. Run the comprehensive test sui
 - Document public APIs with usage examples
 - Maintain separation between sync logic and local storage concerns
 - We are in the initial development phase and must not our code with "legacy" or "backwards compatibility" code - just get rid of code that is not right (any more)
+
+### Code Quality
+  - Write idiomatic Dart following language conventions and best practices
+  - Use Dart's type system effectively - catch specific exceptions, handle nulls explicitly

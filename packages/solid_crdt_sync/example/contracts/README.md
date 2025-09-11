@@ -17,6 +17,7 @@ CRDT merge contract definitions:
 - `note-v1.ttl` - CRDT merge strategies for personal notes
 - `category-v1.ttl` - CRDT merge strategies for note categories
 - Define how properties merge during sync conflicts (LWW, OR-Set, Immutable)
+- eventually, those files should be generated from annotations
 
 ### `/auth/`
 OIDC client configuration:

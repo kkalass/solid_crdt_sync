@@ -5,8 +5,6 @@
 /// providers, and type index resolvers.
 library;
 
-import 'package:rdf_mapper/rdf_mapper.dart';
-
 /// Provides framework services to mapper initializer functions.
 ///
 /// When users provide a `mapperInitializer` function to `SolidCrdtSync.setup()`,
