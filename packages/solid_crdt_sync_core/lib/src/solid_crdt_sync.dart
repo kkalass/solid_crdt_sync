@@ -42,24 +42,29 @@ class SolidCrdtSync {
   ///
   /// Configuration is organized around resources (Note, Category, etc.)
   /// with their paths, CRDT mappings, and indices all defined together.
+  /// 
+  /// Throws [SyncConfigValidationException] if the configuration is invalid.
   static Future<SolidCrdtSync> setup({
     required Auth auth,
     required Storage storage,
     required MapperInitializerFunction mapperInitializer,
     required SyncConfig config,
   }) async {
+    // Validate configuration before proceeding
+    final validationResult = config.validate();
+    validationResult.throwIfInvalid();
+
     // Initialize storage
     await storage.initialize();
     throw UnimplementedError('Storage initialization not yet implemented');
     /*
-    final crdtMappings = config.createCrdtMappingsConfig();
     final indices = config.getAllIndices();
     
     return SolidCrdtSync._(
       storage: storage,
       mapper: mapper,
       auth: auth,
-      crdt: crdtMappings,
+      config: config,
     );
     */
   }

@@ -108,25 +108,23 @@ Rather than discouraging standard vocabularies, we encourage:
 
 ### Validation at Setup Time
 
-The `SyncConfig.validate()` method will check for RDF type IRI conflicts:
+Comprehensive validation is implemented using a validation context pattern in the `solid_crdt_sync_core` package:
 
-```dart
-class SyncConfig {
-  void validate() {
-    final rdfTypes = <String, Type>{};
-    for (final resource in resources) {
-      final rdfTypeIri = _getRdfTypeIri(resource.type);
-      if (rdfTypes.containsKey(rdfTypeIri)) {
-        throw ArgumentError(
-          'RDF type IRI collision: ${resource.type} and ${rdfTypes[rdfTypeIri]} '
-          'both use $rdfTypeIri. Each Dart type must have a unique RDF type IRI.'
-        );
-      }
-      rdfTypes[rdfTypeIri] = resource.type;
-    }
-  }
-}
-```
+- **ValidationResult**: Collects errors and warnings with structured context
+- **SyncConfig.validate()**: Validates all aspects of the configuration
+- **SyncConfigValidationException**: Thrown when validation fails with comprehensive error details
+
+Key validation rules implemented:
+
+1. **Resource Uniqueness**: No duplicate Dart types in configuration
+2. **Path Validation**: Default paths must be absolute and well-formed
+3. **CRDT Mapping URIs**: Must be absolute URIs (preferably HTTPS)
+4. **Index Configuration**: Local names must be unique per resource, GroupIndex must have grouping properties
+5. **RDF Type Collision Detection**: *TODO - requires RDF mapper integration*
+
+The validation is automatically called in `SolidCrdtSync.setup()` and will throw a detailed exception if any issues are found, allowing developers to fix all configuration problems in a single iteration.
+
+See `packages/solid_crdt_sync_core/lib/src/config/validation.dart` for implementation details.
 
 ### Documentation Guidelines
 

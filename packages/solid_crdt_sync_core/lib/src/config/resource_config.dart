@@ -6,6 +6,7 @@
 library;
 
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
+import 'validation.dart';
 
 /// Configuration for a single resource type in the sync system.
 ///
@@ -66,5 +67,157 @@ class SyncConfig {
           (resource) => resource?.type == type,
           orElse: () => null,
         );
+  }
+
+  /// Validate this configuration for consistency and correctness.
+  ValidationResult validate() {
+    final result = ValidationResult();
+    
+    _validateResourceUniqueness(result);
+    _validateDefaultPaths(result);
+    _validateCrdtMappings(result);
+    _validateIndexConfigurations(result);
+    
+    return result;
+  }
+  
+  void _validateResourceUniqueness(ValidationResult result) {
+    // Check for duplicate Dart types
+    final dartTypes = <Type>{};
+    for (final resource in resources) {
+      if (dartTypes.contains(resource.type)) {
+        result.addError(
+          'Duplicate resource type: ${resource.type}. Each Dart type can only be configured once.',
+          context: {'type': resource.type}
+        );
+      }
+      dartTypes.add(resource.type);
+    }
+
+    // TODO: Check for RDF type IRI collisions once we have RDF mapper integration
+    // This will require access to the RDF mapper to resolve Dart types to RDF type IRIs
+    // For now, we'll validate other aspects and add this check when mapper is available
+  }
+  
+  void _validateDefaultPaths(ValidationResult result) {
+    // Check for path conflicts and invalid paths
+    final resourcePaths = <String, List<Type>>{};
+    final indexPaths = <String, List<Type>>{};
+    
+    for (final resource in resources) {
+      // Check resource paths
+      if (resource.defaultResourcePath != null) {
+        final path = resource.defaultResourcePath!;
+        
+        if (path.isEmpty) {
+          result.addError(
+            'Default resource path cannot be empty for ${resource.type}',
+            context: {'type': resource.type}
+          );
+        } else if (!path.startsWith('/')) {
+          result.addError(
+            'Default resource path must start with "/" for ${resource.type}: $path',
+            context: {'type': resource.type, 'path': path}
+          );
+        }
+        
+        resourcePaths.putIfAbsent(path, () => []).add(resource.type);
+      }
+      
+      // Check index paths
+      for (final index in resource.indices) {
+        if (index.defaultIndexPath != null) {
+          final path = index.defaultIndexPath!;
+          
+          if (path.isEmpty) {
+            result.addError(
+              'Default index path cannot be empty for ${resource.type}',
+              context: {'type': resource.type, 'index': index}
+            );
+          } else if (!path.startsWith('/')) {
+            result.addError(
+              'Default index path must start with "/" for ${resource.type}: $path',
+              context: {'type': resource.type, 'path': path, 'index': index}
+            );
+          }
+          
+          indexPaths.putIfAbsent(path, () => []).add(resource.type);
+        }
+      }
+    }
+    
+    // Warn about path reuse (not necessarily an error)
+    resourcePaths.forEach((path, types) {
+      if (types.length > 1) {
+        result.addWarning(
+          'Multiple resource types use the same default path: $path (${types.join(', ')})',
+          context: {'path': path, 'types': types}
+        );
+      }
+    });
+    
+    indexPaths.forEach((path, types) {
+      if (types.length > 1) {
+        result.addWarning(
+          'Multiple indices use the same default path: $path (${types.join(', ')})',
+          context: {'path': path, 'types': types}
+        );
+      }
+    });
+  }
+  
+  void _validateCrdtMappings(ValidationResult result) {
+    for (final resource in resources) {
+      final uri = resource.crdtMapping;
+      
+      if (!uri.isAbsolute) {
+        result.addError(
+          'CRDT mapping URI must be absolute for ${resource.type}: $uri',
+          context: {'type': resource.type, 'uri': uri}
+        );
+      }
+      
+      if (uri.scheme != 'https' && uri.scheme != 'http') {
+        result.addWarning(
+          'CRDT mapping URI should use HTTPS for ${resource.type}: $uri',
+          context: {'type': resource.type, 'uri': uri}
+        );
+      }
+    }
+  }
+  
+  void _validateIndexConfigurations(ValidationResult result) {
+    for (final resource in resources) {
+      final localNames = <String>{};
+      
+      for (final index in resource.indices) {
+        // Check for empty or invalid local names
+        if (index.localName.isEmpty) {
+          result.addError(
+            'Index local name cannot be empty for ${resource.type}',
+            context: {'type': resource.type, 'index': index}
+          );
+        }
+        
+        // Check for duplicate local names within the same resource
+        if (localNames.contains(index.localName)) {
+          result.addError(
+            'Duplicate index local name "${index.localName}" for ${resource.type}',
+            context: {'type': resource.type, 'localName': index.localName}
+          );
+        }
+        localNames.add(index.localName);
+        
+        // Validate GroupIndex specific requirements
+        if (index is GroupIndex) {
+          if (index.groupingProperties.isEmpty) {
+            result.addError(
+              'GroupIndex must have at least one grouping property for ${resource.type}',
+              context: {'type': resource.type, 'index': index}
+            );
+          }
+        }
+      }
+    }
   }
 }
