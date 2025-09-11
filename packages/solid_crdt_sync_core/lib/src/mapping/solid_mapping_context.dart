@@ -12,13 +12,9 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 /// When users provide a `mapperInitializer` function to `SolidCrdtSync.setup()`,
 /// it receives this context object containing all the framework-managed
 /// services needed to configure RDF mapping for Solid Pods.
-abstract interface class SolidMappingContext {
-  /// Base RDF mapper configured with framework defaults.
-  ///
-  /// This can be used as a starting point, or users can create
-  /// their own mapper configuration.
-  RdfMapper get baseMapper;
+class SolidMappingContext {
+  // FIXME: We will need some way to handle IRI mapping
+  // Object get iriStrategy;
 
-// FIXME: We will need some way to handle IRI mapping
-// Object get iriStrategy;
+  SolidMappingContext();
 }

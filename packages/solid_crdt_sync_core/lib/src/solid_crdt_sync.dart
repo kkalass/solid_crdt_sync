@@ -42,7 +42,7 @@ class SolidCrdtSync {
   ///
   /// Configuration is organized around resources (Note, Category, etc.)
   /// with their paths, CRDT mappings, and indices all defined together.
-  /// 
+  ///
   /// Throws [SyncConfigValidationException] if the configuration is invalid.
   static Future<SolidCrdtSync> setup({
     required Auth auth,
@@ -50,8 +50,9 @@ class SolidCrdtSync {
     required MapperInitializerFunction mapperInitializer,
     required SyncConfig config,
   }) async {
+    final mapper = mapperInitializer(SolidMappingContext());
     // Validate configuration before proceeding
-    final validationResult = config.validate();
+    final validationResult = config.validate(mapper);
     validationResult.throwIfInvalid();
 
     // Initialize storage

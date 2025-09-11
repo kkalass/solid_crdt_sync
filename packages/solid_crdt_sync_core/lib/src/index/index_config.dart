@@ -39,7 +39,9 @@ abstract interface class CrdtIndexConfig {
   Type get dartType;
 
   /// Local name for referencing this index within the app (not used in Pod structure)
-  /// Defaults to [defaultIndexLocalName]. Must be unique per index item type.
+  /// Defaults to [defaultIndexLocalName]. Must be unique per index item type
+  /// across all resources (e.g., if multiple resources use NoteIndexEntry,
+  /// they must have different local names).
   /// Used for referencing in indexUpdatesStream<T>(localName) calls.
   String get localName;
 

@@ -119,8 +119,8 @@ Key validation rules implemented:
 1. **Resource Uniqueness**: No duplicate Dart types in configuration
 2. **Path Validation**: Default paths must be absolute and well-formed
 3. **CRDT Mapping URIs**: Must be absolute URIs (preferably HTTPS)
-4. **Index Configuration**: Local names must be unique per resource, GroupIndex must have grouping properties
-5. **RDF Type Collision Detection**: *TODO - requires RDF mapper integration*
+4. **Index Configuration**: Local names must be unique per index item type across all resources, GroupIndex must have grouping properties
+5. **RDF Type Collision Detection**: Validates that each Dart type maps to a unique RDF type IRI using the RDF mapper
 
 The validation is automatically called in `SolidCrdtSync.setup()` and will throw a detailed exception if any issues are found, allowing developers to fix all configuration problems in a single iteration.
 
