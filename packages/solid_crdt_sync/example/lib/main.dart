@@ -22,6 +22,8 @@ import 'mapper_config.dart';
 import 'screens/notes_list_screen.dart';
 import 'services/notes_service.dart';
 import 'services/categories_service.dart';
+import 'storage/database.dart' show AppDatabase;
+import 'storage/repositories.dart' show CategoryRepository, NoteRepository;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,18 +45,14 @@ void main() async {
 /// - RDF mapper with user dependencies
 /// - All resources (Note, Category) with their paths, indices, and CRDT mappings
 /// - Returns a fully configured sync system
-Future<SolidCrdtSync> initializeSolidCrdtSync() async {
-  final DriftWebOptions webOptions = DriftWebOptions(
-    sqlite3Wasm: Uri.parse('sqlite3.wasm'),
-    driftWorker: Uri.parse('drift_worker.js'),
-  );
-
+Future<SolidCrdtSync> initializeSolidCrdtSync(
+    {DriftWebOptions? driftWeb, DriftNativeOptions? driftNative}) async {
   const baseUrl =
       'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings';
 
   return await SolidCrdtSync.setup(
     /* control behaviour and system integration */
-    storage: DriftStorage(web: webOptions),
+    storage: DriftStorage(web: driftWeb, native: driftNative),
     auth: SolidAuth(),
     mapperInitializer: createMapperInitializer(),
 
@@ -129,6 +127,9 @@ class AppInitializer extends StatefulWidget {
 class _AppInitializerState extends State<AppInitializer>
     with WidgetsBindingObserver {
   SolidCrdtSync? syncSystem;
+  AppDatabase? appDatabase;
+  CategoryRepository? categoryRepository;
+  NoteRepository? noteRepository;
   NotesService? notesService;
   CategoriesService? categoriesService;
   String? errorMessage;
@@ -145,6 +146,9 @@ class _AppInitializerState extends State<AppInitializer>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     // Clean up resources when the widget is disposed
+    categoryRepository?.dispose();
+    noteRepository?.dispose();
+    appDatabase?.close();
     syncSystem?.close();
     super.dispose();
   }
@@ -154,21 +158,39 @@ class _AppInitializerState extends State<AppInitializer>
     super.didChangeAppLifecycleState(state);
     // Close resources when the app is being terminated
     if (state == AppLifecycleState.detached) {
+      categoryRepository?.dispose();
+      noteRepository?.dispose();
+      appDatabase?.close();
       syncSystem?.close();
     }
   }
 
   Future<void> _initializeApp() async {
     try {
-      // Initialize the CRDT sync system
-      final syncSys = await initializeSolidCrdtSync();
+      final DriftWebOptions webOptions = DriftWebOptions(
+        sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+        driftWorker: Uri.parse('drift_worker.js'),
+      );
 
-      // Initialize services
-      final notesSvc = NotesService(syncSys);
-      final categoriesSvc = CategoriesService(syncSys);
+      // Initialize the CRDT sync system
+      final syncSys = await initializeSolidCrdtSync(driftWeb: webOptions);
+
+      // Initialize app database (Drift)
+      final appDb = AppDatabase(web: webOptions);
+
+      // Initialize repositories with database DAOs and sync system
+      final categoryRepo = CategoryRepository(appDb.categoryDao, syncSys);
+      final noteRepo = NoteRepository(appDb.noteDao, syncSys);
+
+      // Initialize services with repositories
+      final notesSvc = NotesService(noteRepo);
+      final categoriesSvc = CategoriesService(categoryRepo, noteRepo);
 
       setState(() {
         syncSystem = syncSys;
+        appDatabase = appDb;
+        categoryRepository = categoryRepo;
+        noteRepository = noteRepo;
         notesService = notesSvc;
         categoriesService = categoriesSvc;
         isInitializing = false;

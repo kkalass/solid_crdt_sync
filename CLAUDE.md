@@ -114,6 +114,10 @@ solid_crdt_sync_annotations
 - Examples demonstrate real-world usage patterns, not toy scenarios
 - API documentation includes both what and why for each component
 
+### Architecture Decision Records (ADRs)
+
+**Location**: `packages/solid_crdt_sync/docs/adrs/` - See README.md and template.md in that directory for process and format.
+
 ## Development Guidelines
 
 

@@ -102,6 +102,33 @@ class SolidCrdtSync {
     throw UnimplementedError('save<T>(object) not yet implemented');
   }
 
+  /// Save an object with CRDT processing and immediate app notification.
+  ///
+  /// This is the recommended method for app integration as it ensures
+  /// atomic consistency between sync system and app storage.
+  ///
+  /// Process:
+  /// 1. CRDT processing (merge with existing, clock increment)
+  /// 2. Store locally in sync system
+  /// 3. Notify app immediately via callback
+  /// 4. Schedule async Pod sync
+  Future<void> saveWithCallback<T>(
+    T object, {
+    required void Function(T processedObject) onLocalUpdate,
+  }) async {
+    // TODO: Implement CRDT processing and callback pattern
+    throw UnimplementedError('saveWithCallback<T>() not yet implemented');
+  }
+
+  /// Stream of remote updates for objects that changed on the Pod.
+  ///
+  /// Emits objects when they are updated remotely and merged locally.
+  /// Use this to keep app storage synchronized with remote changes.
+  Stream<T> remoteUpdates<T>() {
+    // TODO: Implement remote updates stream
+    throw UnimplementedError('remoteUpdates<T>() not yet implemented');
+  }
+
   /// Close the sync system and free resources.
   Future<void> close() async {
     await _storage.close();

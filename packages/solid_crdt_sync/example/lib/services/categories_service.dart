@@ -2,43 +2,40 @@
 library;
 
 import 'dart:math';
-import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import '../models/category.dart';
 import '../models/note.dart';
+import '../storage/repositories.dart';
 
 /// Service for managing categories with local-first CRDT synchronization.
 ///
-/// Provides a simple API for CRUD operations while handling RDF mapping
-/// and sync automatically in the background. Categories use FullIndex with
-/// prefetch policy for immediate availability.
+/// This service demonstrates the add-on architecture where:
+/// - Repository handles all local queries, operations AND sync coordination
+/// - Service focuses purely on business logic and cross-entity operations
+/// - Repositories are "sync-aware storage" that handle CRDT processing automatically
+///
+/// Categories use FullIndex with prefetch policy for immediate availability.
 class CategoriesService {
-  final SolidCrdtSync _syncSystem;
+  final CategoryRepository _categoryRepository;
+  final NoteRepository _noteRepository;
 
-  CategoriesService(this._syncSystem);
+  CategoriesService(this._categoryRepository, this._noteRepository);
 
   /// Get all categories sorted by name
   Future<List<Category>> getAllCategories() async {
-    // TODO: This should work with the FullIndex - categories are prefetched
-    throw UnimplementedError('Get all categories not yet implemented');
-    /*
-    final categories = await _syncSystem.getAll<Category>();
-    categories.sort((a, b) => a.name.compareTo(b.name));
-    return categories;
-    */
+    // Query from repository - fast and flexible
+    return await _categoryRepository.getAllCategories();
   }
 
   /// Get a specific category by ID
   Future<Category?> getCategory(String id) async {
-    // TODO: Should be fast since categories are prefetched
-    throw UnimplementedError('Get category by ID not yet implemented');
-    /*
-    return await _syncSystem.get<Category>(id);
-    */
+    // Query from repository - immediate response
+    return await _categoryRepository.getCategory(id);
   }
 
   /// Save a category (create or update)
   Future<void> saveCategory(Category category) async {
-    await _syncSystem.save(category);
+    // Repository handles sync coordination automatically
+    await _categoryRepository.saveCategory(category);
   }
 
   /// Delete a category
@@ -46,10 +43,9 @@ class CategoriesService {
   /// Note: This does not check if the category is in use by notes.
   /// Consider using [deleteCategoryIfUnused] for safer deletion.
   Future<void> deleteCategory(String id) async {
-    throw UnimplementedError('Delete category not yet implemented');
-    /*
-    await _syncSystem.delete<Category>(id);
-    */
+    // For now, delete directly from repository
+    // TODO: Implement CRDT deletion via sync system
+    await _categoryRepository.deleteCategory(id);
   }
 
   /// Delete a category only if it's not used by any notes
@@ -85,41 +81,34 @@ class CategoriesService {
 
   /// Get all notes that belong to a specific category
   ///
-  /// This method queries notes by category, which should use the GroupIndex
-  /// by category efficiently when implemented.
+  /// This method queries notes by category from repository.
+  /// In the future, this could be optimized using GroupIndex.
   Future<List<Note>> getNotesInCategory(String categoryId) async {
-    // TODO: This should use the GroupIndex by category efficiently
-    throw UnimplementedError('Get notes in category not yet implemented');
-    /*
-    final notes = await _syncSystem.getAll<Note>();
-    return notes.where((note) => note.categoryId == categoryId).toList();
-    */
+    return await _noteRepository.getNotesByCategory(categoryId);
   }
 
   /// Get count of notes in each category
   ///
   /// Returns a map of category ID to note count.
   Future<Map<String, int>> getCategoryNoteCounts() async {
-    throw UnimplementedError('Get category note counts not yet implemented');
-    /*
-    final notes = await _syncSystem.getAll<Note>();
+    final notes = await _noteRepository.getAllNotes();
     final counts = <String, int>{};
-    
+
     for (final note in notes) {
       if (note.categoryId != null) {
         counts[note.categoryId!] = (counts[note.categoryId!] ?? 0) + 1;
       }
     }
-    
+
     return counts;
-    */
   }
 
   /// Check if a category exists
   Future<bool> categoryExists(String id) async {
-    final category = await getCategory(id);
-    return category != null;
+    return await _categoryRepository.categoryExists(id);
   }
+
+  // Note: No dispose method needed - repositories handle their own cleanup
 
   /// Generate a unique ID for new categories
   String _generateCategoryId() {

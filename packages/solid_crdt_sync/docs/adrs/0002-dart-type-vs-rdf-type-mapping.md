@@ -1,7 +1,7 @@
 # ADR-0002: Dart Type vs RDF Type Mapping Strategy
 
 ## Status
-Accepted
+ACCEPTED
 
 *Implemented in commit 0683c20 with comprehensive validation system.*
 

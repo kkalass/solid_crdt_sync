@@ -2,37 +2,111 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:personal_notes_app/models/category.dart';
+import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/services/categories_service.dart';
+import 'package:personal_notes_app/storage/repositories.dart';
 
-/// Simple mock implementation for testing
-class MockSolidCrdtSync implements SolidCrdtSync {
-  final List<dynamic> savedObjects = [];
-
+/// Mock repository for testing
+class MockCategoryRepository implements CategoryRepository {
+  final List<Category> savedCategories = [];
+  final List<Category> storedCategories = [];
+  
   @override
-  Future<void> save<T>(T object) async {
-    savedObjects.add(object);
+  Future<void> saveCategory(Category category) async {
+    savedCategories.add(category);
+    // Simulate storing the category
+    storedCategories.removeWhere((c) => c.id == category.id);
+    storedCategories.add(category);
   }
-
+  
   @override
-  Future<void> close() async {}
-
+  Future<List<Category>> getAllCategories() async => List.from(storedCategories);
+  
   @override
-  Stream<T> dataUpdatesStream<T>() => Stream.empty();
-
+  Future<Category?> getCategory(String id) async {
+    try {
+      return storedCategories.firstWhere((c) => c.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+  
   @override
-  Stream<T> indexUpdatesStream<T>([String localName = '']) => Stream.empty();
+  Future<void> deleteCategory(String id) async {
+    storedCategories.removeWhere((c) => c.id == id);
+  }
+  
+  @override
+  Future<bool> categoryExists(String id) async {
+    return storedCategories.any((c) => c.id == id);
+  }
+  
+  @override
+  Future<void> clear() async {
+    storedCategories.clear();
+  }
+  
+  @override
+  void dispose() {}
+}
+
+/// Mock repository for testing
+class MockNoteRepository implements NoteRepository {
+  final List<Note> storedNotes = [];
+  
+  @override
+  Future<List<Note>> getAllNotes() async => List.from(storedNotes);
+  
+  @override
+  Future<Note?> getNote(String id) async {
+    try {
+      return storedNotes.firstWhere((n) => n.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  @override
+  Future<void> saveNote(Note note) async {
+    storedNotes.removeWhere((n) => n.id == note.id);
+    storedNotes.add(note);
+  }
+  
+  @override
+  Future<void> deleteNote(String id) async {
+    storedNotes.removeWhere((n) => n.id == id);
+  }
+  
+  @override
+  Future<List<Note>> getNotesByCategory(String categoryId) async {
+    return storedNotes.where((n) => n.categoryId == categoryId).toList();
+  }
+  
+  @override
+  Future<List<Note>> getUncategorizedNotes() async {
+    return storedNotes.where((n) => n.categoryId == null).toList();
+  }
+  
+  @override
+  Future<void> clear() async {
+    storedNotes.clear();
+  }
+  
+  @override
+  void dispose() {}
 }
 
 void main() {
   group('CategoriesService', () {
-    late MockSolidCrdtSync mockSyncSystem;
+    late MockCategoryRepository mockCategoryRepository;
+    late MockNoteRepository mockNoteRepository;
     late CategoriesService categoriesService;
 
     setUp(() {
-      mockSyncSystem = MockSolidCrdtSync();
-      categoriesService = CategoriesService(mockSyncSystem);
+      mockCategoryRepository = MockCategoryRepository();
+      mockNoteRepository = MockNoteRepository();
+      categoriesService = CategoriesService(mockCategoryRepository, mockNoteRepository);
     });
 
     group('createCategory', () {
@@ -72,7 +146,7 @@ void main() {
     });
 
     group('saveCategory', () {
-      test('calls syncSystem.save with category', () async {
+      test('calls repository.saveCategory with category', () async {
         final category = Category(
           id: 'test_id',
           name: 'Test Category',
@@ -80,7 +154,7 @@ void main() {
 
         await categoriesService.saveCategory(category);
 
-        expect(mockSyncSystem.savedObjects, contains(category));
+        expect(mockCategoryRepository.savedCategories, contains(category));
       });
     });
 

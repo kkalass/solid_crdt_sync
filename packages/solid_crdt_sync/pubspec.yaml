@@ -1,5 +1,5 @@
 name: solid_crdt_sync
-description: Local-first CRDT synchronization with Solid Pods - Main package with documentation and examples
+description: Bring your own persistence layer and make it syncable to a Solid Pod - Local-first CRDT synchronization
 version: 0.1.0+1
 publish_to: none
 

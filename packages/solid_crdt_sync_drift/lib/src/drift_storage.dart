@@ -13,16 +13,17 @@ import 'database.dart';
 /// CRDT metadata, and index entries using the Drift ORM.
 class DriftStorage implements Storage {
   final DriftWebOptions? web;
+  final DriftNativeOptions? native;
   late final SolidCrdtDatabase _db;
   bool _initialized = false;
 
-  DriftStorage({this.web});
+  DriftStorage({this.web, this.native});
 
   @override
   Future<void> initialize() async {
     if (_initialized) return;
 
-    _db = SolidCrdtDatabase(web: web);
+    _db = SolidCrdtDatabase(web: web, native: native);
 
     // Ensure database is ready
     await _db.customSelect('SELECT 1').get();

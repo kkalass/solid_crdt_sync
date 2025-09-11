@@ -2,37 +2,67 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/services/notes_service.dart';
+import 'package:personal_notes_app/storage/repositories.dart';
 
-/// Simple mock implementation for testing
-class MockSolidCrdtSync implements SolidCrdtSync {
-  final List<dynamic> savedObjects = [];
-
+/// Mock repository for testing
+class MockNoteRepository implements NoteRepository {
+  final List<Note> savedNotes = [];
+  final List<Note> storedNotes = [];
+  
   @override
-  Future<void> save<T>(T object) async {
-    savedObjects.add(object);
+  Future<void> saveNote(Note note) async {
+    savedNotes.add(note);
+    // Simulate storing the note
+    storedNotes.removeWhere((n) => n.id == note.id);
+    storedNotes.add(note);
   }
-
+  
   @override
-  Future<void> close() async {}
-
+  Future<List<Note>> getAllNotes() async => List.from(storedNotes);
+  
   @override
-  Stream<T> dataUpdatesStream<T>() => Stream.empty();
-
+  Future<Note?> getNote(String id) async {
+    try {
+      return storedNotes.firstWhere((n) => n.id == id);
+    } catch (e) {
+      return null;
+    }
+  }
+  
   @override
-  Stream<T> indexUpdatesStream<T>([String localName = '']) => Stream.empty();
+  Future<void> deleteNote(String id) async {
+    storedNotes.removeWhere((n) => n.id == id);
+  }
+  
+  @override
+  Future<List<Note>> getNotesByCategory(String categoryId) async {
+    return storedNotes.where((n) => n.categoryId == categoryId).toList();
+  }
+  
+  @override
+  Future<List<Note>> getUncategorizedNotes() async {
+    return storedNotes.where((n) => n.categoryId == null).toList();
+  }
+  
+  @override
+  Future<void> clear() async {
+    storedNotes.clear();
+  }
+  
+  @override
+  void dispose() {}
 }
 
 void main() {
   group('NotesService', () {
-    late MockSolidCrdtSync mockSyncSystem;
+    late MockNoteRepository mockNoteRepository;
     late NotesService notesService;
 
     setUp(() {
-      mockSyncSystem = MockSolidCrdtSync();
-      notesService = NotesService(mockSyncSystem);
+      mockNoteRepository = MockNoteRepository();
+      notesService = NotesService(mockNoteRepository);
     });
 
     group('createNote', () {
@@ -71,7 +101,7 @@ void main() {
     });
 
     group('saveNote', () {
-      test('calls syncSystem.save with note', () async {
+      test('calls repository.saveNote with note', () async {
         final note = Note(
           id: 'test_id',
           title: 'Test Note',
@@ -81,7 +111,7 @@ void main() {
 
         await notesService.saveNote(note);
 
-        expect(mockSyncSystem.savedObjects, contains(note));
+        expect(mockNoteRepository.savedNotes, contains(note));
       });
     });
 
@@ -99,8 +129,8 @@ void main() {
       });
     });
 
-    // Note: Tests for methods that depend on getAllNotes() cannot be fully
-    // tested until the SolidCrdtSync API is implemented. These tests focus
-    // on the logic that doesn't require the sync system to be functional.
+    // Note: More comprehensive tests would be added to test repository
+    // interactions and business logic. These tests focus on the service
+    // logic that doesn't require complex repository state.
   });
 }

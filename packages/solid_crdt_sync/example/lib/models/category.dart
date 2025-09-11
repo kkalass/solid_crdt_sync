@@ -45,6 +45,11 @@ class Category {
   @CrdtImmutable()
   DateTime createdAt;
 
+  /// When this category was last modified
+  @RdfProperty(SchemaCreativeWork.dateModified)
+  @CrdtLwwRegister()
+  DateTime modifiedAt;
+
   Category({
     required this.id,
     required this.name,
@@ -52,7 +57,9 @@ class Category {
     this.color,
     this.icon,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+    DateTime? modifiedAt,
+  }) : createdAt = createdAt ?? DateTime.now(),
+       modifiedAt = modifiedAt ?? DateTime.now();
 
   /// Create a copy of this category with updated fields
   Category copyWith({
@@ -62,6 +69,7 @@ class Category {
     String? color,
     String? icon,
     DateTime? createdAt,
+    DateTime? modifiedAt,
   }) {
     return Category(
       id: id ?? this.id,
@@ -70,6 +78,7 @@ class Category {
       color: color ?? this.color,
       icon: icon ?? this.icon,
       createdAt: createdAt ?? this.createdAt,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
     );
   }
 

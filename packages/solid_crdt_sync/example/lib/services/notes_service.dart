@@ -2,47 +2,41 @@
 library;
 
 import 'dart:math';
-import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import '../models/note.dart';
+import '../storage/repositories.dart';
 
 /// Service for managing notes with local-first CRDT synchronization.
 ///
-/// Provides a simple API for CRUD operations while handling RDF mapping
-/// and sync automatically in the background.
+/// This service demonstrates the add-on architecture where:
+/// - Repository handles all local queries, operations AND sync coordination
+/// - Service focuses purely on business logic
+/// - Repository is "sync-aware storage" that handles CRDT processing automatically
 class NotesService {
-  final SolidCrdtSync _syncSystem;
+  final NoteRepository _noteRepository;
 
-  NotesService(this._syncSystem);
+  NotesService(this._noteRepository);
 
   /// Get all notes sorted by modification date (newest first)
   Future<List<Note>> getAllNotes() async {
-    throw UnimplementedError('Get all notes not yet implemented');
-    /*
-    final notes = await _syncSystem.getAll<Note>();
-    notes.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
-    return notes;
-    */
+    // Repository handles queries and returns sorted results
+    return await _noteRepository.getAllNotes();
   }
 
   /// Get a specific note by ID
   Future<Note?> getNote(String id) async {
-    throw UnimplementedError('Get note by ID not yet implemented');
-    /*
-    return await _syncSystem.get<Note>(id);
-    */
+    return await _noteRepository.getNote(id);
   }
 
   /// Save a note (create or update)
   Future<void> saveNote(Note note) async {
-    await _syncSystem.save(note);
+    // Repository handles sync coordination automatically
+    await _noteRepository.saveNote(note);
   }
 
   /// Delete a note
   Future<void> deleteNote(String id) async {
-    throw UnimplementedError('Delete note not yet implemented');
-    /*
-    await _syncSystem.delete<Note>(id);
-    */
+    // Repository handles deletion (including future CRDT deletion)
+    await _noteRepository.deleteNote(id);
   }
 
   /// Create a new note with generated ID
@@ -105,15 +99,12 @@ class NotesService {
 
   /// Get notes by category
   Future<List<Note>> getNotesByCategory(String categoryId) async {
-    // TODO: This should use the GroupIndex by category efficiently
-    final notes = await getAllNotes();
-    return notes.where((note) => note.categoryId == categoryId).toList();
+    return await _noteRepository.getNotesByCategory(categoryId);
   }
 
   /// Get notes without a category (uncategorized)
   Future<List<Note>> getUncategorizedNotes() async {
-    final notes = await getAllNotes();
-    return notes.where((note) => note.categoryId == null).toList();
+    return await _noteRepository.getUncategorizedNotes();
   }
 
   /// Assign a note to a category
@@ -131,4 +122,6 @@ class NotesService {
     final random = Random().nextInt(999999);
     return 'note_${timestamp}_$random';
   }
+
+  // Note: No dispose method needed - repository handles its own cleanup
 }

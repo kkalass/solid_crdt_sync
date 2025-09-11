@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
     
   # Drift (SQLite) storage
+  drift: ^2.19.0
   drift_flutter: ^0.2.0
   
   # Solid CRDT Sync packages
@@ -45,6 +46,7 @@ dev_dependencies:
   
   # Code generation
   build_runner: ^2.4.0
+  drift_dev: ^2.19.0
   rdf_mapper_generator: ^0.10.1
 
 flutter:

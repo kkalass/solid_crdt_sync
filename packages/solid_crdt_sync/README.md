@@ -1,5 +1,7 @@
 # solid_crdt_sync
 
+**Bring your own persistence layer and make it syncable to a Solid Pod.**
+
 Local-first CRDT synchronization with Solid Pods. Build Flutter apps that work offline and sync seamlessly with Solid Pods using conflict-free replicated data types (CRDTs).
 
 ## Quick Start

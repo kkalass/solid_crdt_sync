@@ -1,5 +1,7 @@
 # Personal Notes App
 
+**Bring your own persistence layer and make it syncable to a Solid Pod.**
+
 A simple local-first personal notes application demonstrating the `solid_crdt_sync` framework.
 
 ## Overview
