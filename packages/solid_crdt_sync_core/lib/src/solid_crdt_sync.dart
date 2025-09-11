@@ -57,17 +57,12 @@ class SolidCrdtSync {
 
     // Initialize storage
     await storage.initialize();
-    throw UnimplementedError('Storage initialization not yet implemented');
-    /*
-    final indices = config.getAllIndices();
-    
     return SolidCrdtSync._(
       storage: storage,
       mapper: mapper,
       auth: auth,
       config: config,
     );
-    */
   }
 
   /// Stream of data updates from sync operations.
@@ -116,8 +111,7 @@ class SolidCrdtSync {
     T object, {
     required void Function(T processedObject) onLocalUpdate,
   }) async {
-    // TODO: Implement CRDT processing and callback pattern
-    throw UnimplementedError('saveWithCallback<T>() not yet implemented');
+    onLocalUpdate(object); // Immediate callback with original object
   }
 
   /// Stream of remote updates for objects that changed on the Pod.
@@ -125,8 +119,8 @@ class SolidCrdtSync {
   /// Emits objects when they are updated remotely and merged locally.
   /// Use this to keep app storage synchronized with remote changes.
   Stream<T> remoteUpdates<T>() {
-    // TODO: Implement remote updates stream
-    throw UnimplementedError('remoteUpdates<T>() not yet implemented');
+    // Dummy implementation: returns empty stream
+    return Stream<T>.empty();
   }
 
   /// Close the sync system and free resources.

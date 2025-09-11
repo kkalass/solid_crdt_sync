@@ -15,7 +15,10 @@ import 'category.dart';
 /// Uses CRDT merge strategies:
 /// - LWW-Register for title and content (last writer wins)
 /// - OR-Set for tags (additions and removals merge)
-@PodResource(PersonalNotesVocab.personalNote)
+///
+/// FIXME: implement and use PodResource
+//@PodResource(PersonalNotesVocab.PersonalNote)
+@RdfGlobalResource(PersonalNotesVocab.PersonalNote, IriStrategy())
 class Note {
   /// Unique identifier for this note
   @RdfIriPart()

@@ -9,6 +9,10 @@
 
 import 'package:rdf_mapper/rdf_mapper.dart';
 
+import 'package:personal_notes_app/models/category.dart' as category;
+import 'package:personal_notes_app/models/category.rdf_mapper.g.dart' as crmg;
+import 'package:personal_notes_app/models/note.dart' as note;
+import 'package:personal_notes_app/models/note.rdf_mapper.g.dart' as nrmg;
 import 'package:personal_notes_app/models/note_index_entry.dart' as nie;
 import 'package:personal_notes_app/models/note_index_entry.rdf_mapper.g.dart'
     as niermg;
@@ -22,6 +26,8 @@ RdfMapper initRdfMapper({RdfMapper? rdfMapper}) {
   }
   var registry = rdfMapper.registry;
 
+  registry.registerMapper<category.Category>(crmg.CategoryMapper());
+  registry.registerMapper<note.Note>(nrmg.NoteMapper());
   registry.registerMapper<nie.NoteIndexEntry>(niermg.NoteIndexEntryMapper());
 
   return rdfMapper;

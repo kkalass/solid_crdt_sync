@@ -9,6 +9,7 @@ library;
 
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:personal_notes_app/init_rdf_mapper.g.dart';
 import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
@@ -18,7 +19,6 @@ import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
 
-import 'mapper_config.dart';
 import 'screens/notes_list_screen.dart';
 import 'services/notes_service.dart';
 import 'services/categories_service.dart';
@@ -27,13 +27,6 @@ import 'storage/repositories.dart' show CategoryRepository, NoteRepository;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Example: How to use index updates stream for efficient note browsing
-  // final sync = await initializeSolidCrdtSync();
-  // sync.indexUpdatesStream<NoteIndexEntry>().listen((entry) {
-  //   print('Note index updated: ${entry.title} (${entry.createdAt})');
-  //   // Update UI with lightweight index data for fast browsing
-  // });
 
   runApp(const PersonalNotesApp());
 }
@@ -54,7 +47,7 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
     /* control behaviour and system integration */
     storage: DriftStorage(web: driftWeb, native: driftNative),
     auth: SolidAuth(),
-    mapperInitializer: createMapperInitializer(),
+    mapperInitializer: (_) => initRdfMapper(),
 
     /* resource-focused configuration */
     config: SyncConfig(

@@ -14,7 +14,10 @@ import '../vocabulary/personal_notes_vocab.dart';
 /// Uses CRDT merge strategies:
 /// - LWW-Register for name and description (last writer wins)
 /// - Immutable for creation date
-@PodResource(PersonalNotesVocab.notesCategory)
+///
+/// FIXME: implement and use PodResource
+//@PodResource(PersonalNotesVocab.NotesCategory)
+@RdfGlobalResource(PersonalNotesVocab.NotesCategory, IriStrategy())
 class Category {
   /// Unique identifier for this category
   @RdfIriPart()
@@ -58,8 +61,8 @@ class Category {
     this.icon,
     DateTime? createdAt,
     DateTime? modifiedAt,
-  }) : createdAt = createdAt ?? DateTime.now(),
-       modifiedAt = modifiedAt ?? DateTime.now();
+  })  : createdAt = createdAt ?? DateTime.now(),
+        modifiedAt = modifiedAt ?? DateTime.now();
 
   /// Create a copy of this category with updated fields
   Category copyWith({
