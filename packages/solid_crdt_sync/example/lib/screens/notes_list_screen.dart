@@ -6,6 +6,7 @@ import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 import '../models/note.dart';
 import '../services/notes_service.dart';
+import 'categories_screen.dart';
 import 'note_editor_screen.dart';
 
 class NotesListScreen extends StatefulWidget {
@@ -100,6 +101,17 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
   }
   
+  void _openCategories() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CategoriesScreen(
+          notesService: widget.notesService,
+        ),
+      ),
+    );
+  }
+
   void _createNote() {
     Navigator.push(
       context,
@@ -157,6 +169,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
         title: const Text('Personal Notes'),
         elevation: 0,
         actions: [
+          // Categories button
+          IconButton(
+            onPressed: _openCategories,
+            icon: const Icon(Icons.category),
+            tooltip: 'Manage Categories',
+          ),
           // Connect to Solid Pod button
           IconButton(
             onPressed: _isConnected ? null : _connectToSolid,
