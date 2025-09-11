@@ -94,12 +94,13 @@ class SyncConfig {
         result.addError(
             'Duplicate resource type: ${resource.type}. Each Dart type can only be configured once.',
             context: {'type': resource.type});
+        continue; // Skip further processing for this resource
       }
       dartTypes.add(resource.type);
 
       // Check for RDF type IRI collisions
       try {
-        final rdfTypeIri = getTypeIri(mapper, resource);
+        final rdfTypeIri = _getTypeIri(mapper, resource);
         if (rdfTypeIri != null) {
           final rdfTypeIriString = rdfTypeIri.iri;
           if (rdfTypeIris.containsKey(rdfTypeIriString)) {
@@ -116,20 +117,17 @@ class SyncConfig {
           }
           rdfTypeIris[rdfTypeIriString] = resource.type;
         } else {
-          result.addWarning(
-              'No RDF type IRI found for ${resource.type}. Ensure the type is properly annotated.',
+          result.addError(
+              'No RDF type IRI found for ${resource.type}. Resource types must be annotated with @PodResource.',
               context: {'type': resource.type});
         }
       } catch (e) {
-        result.addWarning(
+        result.addError(
             'Could not resolve RDF type IRI for ${resource.type}: $e',
             context: {'type': resource.type, 'error': e.toString()});
       }
     }
   }
-
-  IriTerm? getTypeIri(RdfMapper mapper, ResourceConfig resource) =>
-      mapper.registry.getResourceSerializerByType(resource.type).typeIri;
 
   void _validateDefaultPaths(ValidationResult result) {
     // Check for path conflicts and invalid paths
@@ -202,7 +200,7 @@ class SyncConfig {
             context: {'type': resource.type, 'uri': uri});
       }
 
-      if (uri.scheme != 'https' && uri.scheme != 'http') {
+      if (uri.scheme == 'http') {
         result.addWarning(
             'CRDT mapping URI should use HTTPS for ${resource.type}: $uri',
             context: {'type': resource.type, 'uri': uri});
@@ -261,5 +259,14 @@ class SyncConfig {
         }
       });
     });
+  }
+}
+
+IriTerm? _getTypeIri(RdfMapper mapper, ResourceConfig resource) {
+  final registry = mapper.registry;
+  try {
+    return registry.getResourceSerializerByType(resource.type).typeIri;
+  } on SerializerNotFoundException {
+    return null;
   }
 }
