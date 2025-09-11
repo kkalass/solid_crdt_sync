@@ -1,48 +1,28 @@
 @prefix : <https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings/note-v1#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix crdt: <https://w3id.org/crdt#> .
-@prefix algo: <https://w3id.org/crdt/algorithms#> .
+@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
+@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
+@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
 @prefix schema: <https://schema.org/> .
 @prefix pnotes: <https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/vocabulary/personal-notes#> .
 
-# CRDT Mapping for Personal Notes
-# Defines merge strategies for schema:NoteDigitalDocument properties
+# CRDT Document Mapping for Personal Notes
+# Defines merge strategies for PersonalNote properties
+# TODO: generate from Dart code annotations
 
-:NoteMergeContract
-    a crdt:MergeContract ;
-    rdfs:label "Personal Note CRDT Merge Contract v1" ;
+<> a mc:DocumentMapping ;
+    rdfs:label "Personal Note CRDT Document Mapping v1" ;
     rdfs:comment "Defines how personal notes should merge when conflicts occur during sync." ;
-    crdt:forType schema:NoteDigitalDocument ;
-    crdt:version "1.0.0" ;
-    crdt:propertyMergeStrategies [
-        # Title: Last writer wins
-        crdt:property schema:name ;
-        crdt:mergeAlgorithm algo:LWWRegister ;
-        crdt:conflictResolution "last-write-wins"
-    ] , [
-        # Content: Last writer wins  
-        crdt:property schema:text ;
-        crdt:mergeAlgorithm algo:LWWRegister ;
-        crdt:conflictResolution "last-write-wins"
-    ] , [
-        # Tags: OR-Set (additions and removals merge)
-        crdt:property schema:keywords ;
-        crdt:mergeAlgorithm algo:ORSet ;
-        crdt:conflictResolution "observed-remove-wins"
-    ] , [
-        # Category reference: Last writer wins
-        crdt:property schema:isPartOf ;
-        crdt:mergeAlgorithm algo:LWWRegister ;
-        crdt:conflictResolution "last-write-wins"
-    ] , [
-        # Creation timestamp: Immutable
-        crdt:property schema:dateCreated ;
-        crdt:mergeAlgorithm algo:Immutable ;
-        crdt:conflictResolution "first-write-wins"
-    ] , [
-        # Last modified: Last writer wins
-        crdt:property schema:dateModified ;
-        crdt:mergeAlgorithm algo:LWWRegister ;
-        crdt:conflictResolution "last-write-wins"
-    ] .
+    mc:imports ( mappings:core-v1 ) ;
+    mc:classMapping ( [
+        a mc:ClassMapping ;
+        mc:appliesToClass pnotes:PersonalNote ;
+        mc:rule
+            [ mc:predicate schema:name ; algo:mergeWith algo:LWW_Register ],
+            [ mc:predicate schema:text ; algo:mergeWith algo:LWW_Register ],
+            [ mc:predicate schema:keywords ; algo:mergeWith algo:OR_Set ],
+            [ mc:predicate pnotes:belongsToCategory ; algo:mergeWith algo:LWW_Register ],
+            [ mc:predicate schema:dateCreated ; algo:mergeWith algo:LWW_Register ],
+            [ mc:predicate schema:dateModified ; algo:mergeWith algo:LWW_Register ]
+    ] ) .
