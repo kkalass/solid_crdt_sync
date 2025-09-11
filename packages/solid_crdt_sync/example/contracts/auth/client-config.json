@@ -1,0 +1,25 @@
+{
+  "client_name": "Personal Notes App - solid_crdt_sync Example",
+  "client_uri": "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/",
+  "logo_uri": "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/icon.png",
+  "tos_uri": "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/terms.html",
+  "policy_uri": "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/privacy.html",
+  "software_id": "solid_crdt_sync_personal_notes_example",
+  "software_version": "1.0.0",
+  "redirect_uris": [
+    "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/",
+    "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/auth-callback.html"
+  ],
+  "post_logout_redirect_uris": [
+    "https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "grant_types": [
+    "authorization_code"
+  ],
+  "application_type": "web",
+  "token_endpoint_auth_method": "none",
+  "scope": "openid profile webid"
+}

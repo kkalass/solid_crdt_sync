@@ -7,6 +7,7 @@ library;
 
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
+import '../vocabulary/personal_notes_vocab.dart';
 
 /// Lightweight index entry for Note resources.
 ///
@@ -35,7 +36,7 @@ class NoteIndexEntry {
   final Set<String> tags;
 
   /// Category ID for grouping
-  @RdfProperty(SchemaNoteDigitalDocument.about)
+  @RdfProperty(PersonalNotesVocab.belongsToCategory)
   final String? categoryId;
 
   const NoteIndexEntry({

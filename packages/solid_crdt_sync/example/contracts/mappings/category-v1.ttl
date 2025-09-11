@@ -1,0 +1,43 @@
+@prefix : <https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings/category-v1#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix crdt: <https://w3id.org/crdt#> .
+@prefix algo: <https://w3id.org/crdt/algorithms#> .
+@prefix schema: <https://schema.org/> .
+@prefix pnotes: <https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/vocabulary/personal-notes#> .
+
+# CRDT Mapping for Notes Categories
+# Defines merge strategies for NotesCategory properties
+
+:CategoryMergeContract
+    a crdt:MergeContract ;
+    rdfs:label "Notes Category CRDT Merge Contract v1" ;
+    rdfs:comment "Defines how note categories should merge when conflicts occur during sync." ;
+    crdt:forType pnotes:NotesCategory ;
+    crdt:version "1.0.0" ;
+    crdt:propertyMergeStrategies [
+        # Category name: Last writer wins
+        crdt:property schema:name ;
+        crdt:mergeAlgorithm algo:LWWRegister ;
+        crdt:conflictResolution "last-write-wins"
+    ] , [
+        # Category description: Last writer wins
+        crdt:property schema:description ;
+        crdt:mergeAlgorithm algo:LWWRegister ;
+        crdt:conflictResolution "last-write-wins"
+    ] , [
+        # Creation timestamp: Immutable
+        crdt:property schema:dateCreated ;
+        crdt:mergeAlgorithm algo:Immutable ;
+        crdt:conflictResolution "first-write-wins"
+    ] , [
+        # Category color: Last writer wins
+        crdt:property pnotes:categoryColor ;
+        crdt:mergeAlgorithm algo:LWWRegister ;
+        crdt:conflictResolution "last-write-wins"
+    ] , [
+        # Category icon: Last writer wins
+        crdt:property pnotes:categoryIcon ;
+        crdt:mergeAlgorithm algo:LWWRegister ;
+        crdt:conflictResolution "last-write-wins"
+    ] .

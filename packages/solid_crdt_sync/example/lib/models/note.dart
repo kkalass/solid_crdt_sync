@@ -3,16 +3,19 @@ library;
 
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
-import 'package:rdf_vocabularies_core/dcterms.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
+import '../vocabulary/personal_notes_vocab.dart';
 import 'category.dart';
 
 /// A personal note with title, content, and tags.
 ///
+/// Uses our custom PersonalNote type that specializes schema:NoteDigitalDocument
+/// for personal note-taking use cases, following ADR-0002 guidance.
+///
 /// Uses CRDT merge strategies:
 /// - LWW-Register for title and content (last writer wins)
 /// - OR-Set for tags (additions and removals merge)
-@PodResource(SchemaNoteDigitalDocument.classIri)
+@PodResource(PersonalNotesVocab.personalNote)
 class Note {
   /// Unique identifier for this note
   @RdfIriPart()
@@ -34,7 +37,7 @@ class Note {
   Set<String> tags;
 
   /// Category this note belongs to - last writer wins on conflicts
-  @RdfProperty(SchemaNoteDigitalDocument.isPartOf,
+  @RdfProperty(PersonalNotesVocab.belongsToCategory,
       iri: PodResourceRef(Category))
   @CrdtLwwRegister()
   String? categoryId;

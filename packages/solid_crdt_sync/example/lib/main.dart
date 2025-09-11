@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
+import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
@@ -74,10 +75,10 @@ Future<SolidCrdtSync> initializeSolidCrdtSync() async {
                   SchemaNoteDigitalDocument.dateCreated,
                   SchemaNoteDigitalDocument.dateModified,
                   SchemaNoteDigitalDocument.keywords,
-                  SchemaNoteDigitalDocument.about
+                  PersonalNotesVocab.belongsToCategory
                 ]),
                 groupingProperties: [
-                  GroupingProperty(SchemaNoteDigitalDocument.about,
+                  GroupingProperty(PersonalNotesVocab.belongsToCategory,
                       format: 'value', // Use category ID directly as group
                       missingValue: 'uncategorized')
                 ]),
