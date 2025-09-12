@@ -571,7 +571,7 @@ This creates clean separation: compatible applications collaborate safely on man
 
 ```turtle
 # In Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
 @prefix schema: <https://schema.org/> .
 @prefix meal: <https://example.org/vocab/meal#> .
@@ -594,8 +594,8 @@ This creates clean separation: compatible applications collaborate safely on man
 
 ```turtle
 # Also in Public Type Index at https://alice.podprovider.org/settings/publicTypeIndex.ttl
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
 
 <> solid:hasRegistration [
       a solid:TypeRegistration;
@@ -875,8 +875,8 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
 
 ```turtle
 @prefix schema: <https://schema.org/> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix : <#> .
 
@@ -983,8 +983,8 @@ This resource demonstrates semantic date-based organization and shows how shoppi
 
 ```turtle
 @prefix schema: <https://schema.org/> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -1016,11 +1016,11 @@ Now let's examine what the `shopping-entry-v1` merge contract actually contains.
 
 ```turtle
 # At https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
-@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix mc: <https://w3id.org/solid-crdt-sync/vocab/merge-contract#> .
+@prefix algo: <https://w3id.org/solid-crdt-sync/vocab/crdt-algorithms#> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 @prefix schema: <https://schema.org/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
@@ -1340,8 +1340,8 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 # Document: /indices/shopping-entries/index-grouped-e5f6g7h8/index
 
 # GroupIndexTemplate with single property (GC index example)
-# groupingRuleProperties: "https://kkalass.github.io/solid_crdt_sync/vocab/crdt#deletedAt|deletionYear|YYYY|"
-# Input: "https://kkalass.github.io/solid_crdt_sync/vocab/crdt#deletedAt|deletionYear|YYYY||gc/{deletionYear}/index|https://kkalass.github.io/solid_crdt_sync/vocab/sync#ManagedDocument|ModuloHashSharding|xxhash64"
+# groupingRuleProperties: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|deletionYear|YYYY|"
+# Input: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|deletionYear|YYYY||gc/{deletionYear}/index|https://w3id.org/solid-crdt-sync/vocab/sync#ManagedDocument|ModuloHashSharding|xxhash64"
 # Directory: /indices/gc/index-grouped-f9g8h7i6/
 # Document: /indices/gc/index-grouped-f9g8h7i6/index
 
@@ -1504,10 +1504,10 @@ The following examples demonstrate concrete RDF structures for different types o
 This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|yyyy-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
 @prefix schema: <https://schema.org/> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 @prefix meal: <https://example.org/vocab/meal#> .
 
 # Note: The mappings: namespace contains CRDT merge contracts for specification components
@@ -1542,8 +1542,8 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
 This is a concrete index for shopping list entries from August 2024 meal plans.
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
 
 <> a idx:GroupIndex;
    sync:isGovernedBy mappings:index-v1;
@@ -1564,10 +1564,10 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
 This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and Hybrid Logical Clock hash, no header properties).
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 
 <> a idx:Shard;
    sync:isGovernedBy mappings:shard-v1;
@@ -1588,10 +1588,10 @@ This document contains entries pointing to shopping list data resources from Aug
 This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing. The name hash is derived from SHA256(https://schema.org/Recipe|ModuloHashSharding|xxhash64).
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
 @prefix schema: <https://schema.org/> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 
 <> a idx:FullIndex;
    sync:isGovernedBy mappings:index-v1;
@@ -1626,11 +1626,11 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
 This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header properties (schema:name, schema:keywords, etc.) as specified in the FullIndex's `idx:indexedProperty` list to support browsing without loading full recipe data.
 
 ```turtle
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
 @prefix schema: <https://schema.org/> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 
 <> a idx:Shard;
    sync:isGovernedBy mappings:shard-v1;

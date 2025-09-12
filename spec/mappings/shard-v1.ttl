@@ -1,9 +1,9 @@
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
-@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
+@prefix algo: <https://w3id.org/solid-crdt-sync/vocab/crdt-algorithms#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix mc: <https://w3id.org/solid-crdt-sync/vocab/merge-contract#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 
 # CRDT mappings for shard documents
 # Used by framework for shard synchronization and entry management

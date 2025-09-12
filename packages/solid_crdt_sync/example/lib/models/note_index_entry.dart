@@ -29,7 +29,7 @@ class NoteIndexEntry {
   /// Note ID - same as the full Note resource
   @RdfProperty(
       IriTerm.prevalidated(
-          'https://kkalass.github.io/solid_crdt_sync/vocab/idx#resource'),
+          'https://w3id.org/solid-crdt-sync/vocab/idx#resource'),
       iri: PodResourceRef(Note))
   final String id;
 

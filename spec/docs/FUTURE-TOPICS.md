@@ -49,37 +49,23 @@ These topics must be completed for v1 release. They represent essential function
 
 ---
 
-## 3. Permanent IRI Strategy
+## 3. Permanent IRI Strategy ✅ COMPLETED
 
-**Priority**: Critical for v1 Release  
-**Current Issue**: Framework uses temporary GitHub Pages IRIs (`https://kkalass.github.io/solid_crdt_sync/vocab/` and `https://kkalass.github.io/solid_crdt_sync/mappings/`) which are not suitable for production use due to maintenance and permanence concerns.
+**Priority**: ~~Critical for v1 Release~~ **RESOLVED**  
+**Status**: Successfully implemented W3ID.org permanent identifier service integration.
 
-**Key Decision Points**:
+**Implemented Solution**: W3ID.org Permanent Identifier Service
+- **Final IRIs**: `w3id.org/solid-crdt-sync/vocab/` and `w3id.org/solid-crdt-sync/mappings/`
+- **Benefits Realized**: Permanent identifiers with no maintenance burden, academic backing, designed specifically for this use case
+- **External Dependency**: Managed through W3ID.org redirect service
 
-**Domain Registration Option**:
-- **Pros**: Full control over namespace, immediate availability, standard practice
-- **Cons**: Long-term maintenance commitment, domain renewal costs, single point of failure
+**Completed Implementation**:
+- ✅ **Vocabulary IRIs**: Permanent identifiers established for `crdt:`, `algo:`, `sync:`, `idx:`, and `mc:` vocabularies
+- ✅ **Mapping IRIs**: Stable base for merge contract mappings (`core-v1.ttl`, etc.)
+- ✅ **Migration Completed**: All RDF files, examples, and generated code updated to use W3ID.org IRIs
+- ✅ **Documentation Updated**: Examples and specifications reflect final IRI decisions
 
-**W3C Standards Track Option**: 
-- **Pros**: Maximum permanence and legitimacy, W3C maintenance backing
-- **Cons**: Lengthy standards process, requires community consensus, may not be accepted
-
-**W3ID.org Permanent Identifier Service Option**:
-- **Pros**: Designed specifically for permanent identifiers, no maintenance burden, academic backing
-- **Cons**: External dependency, less direct control over redirects
-- **Proposed IRIs**: `w3id.org/solid-crdt-sync/vocab/` and `w3id.org/solid-crdt-sync/mappings/`
-
-**v1 Requirements**:
-- **Vocabulary IRIs**: Permanent identifiers for `crdt:`, `algo:`, `sync:`, `idx:`, and `mc:` vocabularies
-- **Mapping IRIs**: Stable base for merge contract mappings (`core-v1.ttl`, etc.)
-- **Migration Strategy**: Clear upgrade path from current GitHub Pages IRIs
-- **Documentation**: Updated examples and specifications with final IRI decisions
-
-**Current Status**: We are currently pursuing the W3ID.org option and have submitted a pull request for `https://w3id.org/solid-crdt-sync/` namespace approval. Pending acceptance of this PR.
-
-**Implementation Strategy**: This decision affects all RDF files, examples, and generated code. Should be resolved early in v1 development to minimize migration overhead.
-
-**Related**: All vocabulary files in `vocabularies/` directory and mapping files in `mappings/` directory depend on this decision.
+**Related**: All vocabulary files in `vocabularies/` directory and mapping files in `mappings/` directory now use permanent W3ID.org identifiers.
 
 ---
 
@@ -313,10 +299,10 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ## Implementation Priority Overview
 
-**v1 Critical Requirements (3 topics)**:
+**v1 Critical Requirements (2 remaining topics)**:
 1. Extended CRDT Algorithm and RDF Structure Support
 2. Framework Version Compatibility Strategy
-3. Permanent IRI Strategy
+3. ~~Permanent IRI Strategy~~ ✅ **COMPLETED**
 
 **v2+ Future Research (7 topics)**:
 

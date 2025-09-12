@@ -2,11 +2,11 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
+@prefix mc: <https://w3id.org/solid-crdt-sync/vocab/merge-contract#> .
 
 # --- Ontology Definition ---
 
-<https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract> a owl:Ontology;
+<https://w3id.org/solid-crdt-sync/vocab/merge-contract> a owl:Ontology;
     rdfs:label "CRDT Merge Contract Definition Language";
     rdfs:comment "A vocabulary for defining merge contracts and mapping rules for CRDT synchronization." .
 

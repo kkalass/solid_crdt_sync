@@ -1,9 +1,9 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 
 # Template for Client Installation Document
 # Placeholders: {WEBID_URI}, {APP_ID}, {TIMESTAMP}, {INSTALLATION_URI}

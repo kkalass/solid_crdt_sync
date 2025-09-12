@@ -56,8 +56,6 @@ abstract interface class CrdtIndexConfig {
   /// the synchronization of the data still happens.
   IndexItem? get item;
 
-  ItemFetchPolicy get itemFetchPolicy;
-
   const CrdtIndexConfig();
 }
 
@@ -85,16 +83,12 @@ class GroupIndex extends CrdtIndexConfig {
   /// Properties used for grouping resources
   final List<GroupingProperty> groupingProperties;
 
-  @override
-  final ItemFetchPolicy itemFetchPolicy;
-
   const GroupIndex(
     this.dartType, {
     this.localName = defaultIndexLocalName,
     this.defaultIndexPath,
     required this.item,
     required this.groupingProperties,
-    this.itemFetchPolicy = ItemFetchPolicy.onRequest,
   }) : assert(groupingProperties.length > 0,
             'GroupIndex requires at least one grouping property');
 }
@@ -120,7 +114,6 @@ class FullIndex extends CrdtIndexConfig {
   @override
   final IndexItem? item;
 
-  @override
   final ItemFetchPolicy itemFetchPolicy;
 
   const FullIndex(

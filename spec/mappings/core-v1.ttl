@@ -1,11 +1,11 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
-@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix mc: <https://kkalass.github.io/solid_crdt_sync/vocab/merge-contract#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix mappings: <https://kkalass.github.io/solid_crdt_sync/mappings/> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
+@prefix algo: <https://w3id.org/solid-crdt-sync/vocab/crdt-algorithms#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix mc: <https://w3id.org/solid-crdt-sync/vocab/merge-contract#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
+@prefix mappings: <https://w3id.org/solid-crdt-sync/mappings/> .
 
 # Core merge contract mappings for CRDT framework infrastructure
 # This DocumentMapping provides essential merge rules that most applications need

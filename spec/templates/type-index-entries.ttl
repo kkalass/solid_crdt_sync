@@ -1,7 +1,7 @@
 @prefix solid: <http://www.w3.org/ns/solid/terms#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
-@prefix idx: <https://kkalass.github.io/solid_crdt_sync/vocab/idx#> .
-@prefix crdt: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-mechanics#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
+@prefix idx: <https://w3id.org/solid-crdt-sync/vocab/idx#> .
+@prefix crdt: <https://w3id.org/solid-crdt-sync/vocab/crdt-mechanics#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 # Template for Type Index entries required by the framework

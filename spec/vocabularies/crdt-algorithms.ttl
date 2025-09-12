@@ -2,12 +2,12 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix algo: <https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms#> .
-@prefix sync: <https://kkalass.github.io/solid_crdt_sync/vocab/sync#> .
+@prefix algo: <https://w3id.org/solid-crdt-sync/vocab/crdt-algorithms#> .
+@prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
 
 # --- Ontology Definition ---
 
-<https://kkalass.github.io/solid_crdt_sync/vocab/crdt-algorithms> a owl:Ontology;
+<https://w3id.org/solid-crdt-sync/vocab/crdt-algorithms> a owl:Ontology;
     rdfs:label "CRDT Algorithms Vocabulary";
     rdfs:comment "A vocabulary defining merge algorithms and strategies for state-based CRDTs on RDF data. These algorithms specify how conflicting values should be resolved during synchronization." .
 

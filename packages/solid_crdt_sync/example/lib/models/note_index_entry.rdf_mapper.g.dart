@@ -40,7 +40,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
 
     final String id = reader.require(
       const IriTerm.prevalidated(
-        'https://kkalass.github.io/solid_crdt_sync/vocab/idx#resource',
+        'https://w3id.org/solid-crdt-sync/vocab/idx#resource',
       ),
       deserializer: _idMapper,
     );
@@ -81,7 +81,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
         .resourceBuilder(subject)
         .addValue(
           const IriTerm.prevalidated(
-            'https://kkalass.github.io/solid_crdt_sync/vocab/idx#resource',
+            'https://w3id.org/solid-crdt-sync/vocab/idx#resource',
           ),
           resource.id,
           serializer: _idMapper,
