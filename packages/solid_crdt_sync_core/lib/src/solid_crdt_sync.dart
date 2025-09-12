@@ -107,29 +107,48 @@ class SolidCrdtSync {
         'indexUpdatesStream<T>(localName) not yet implemented');
   }
 
-  /// Save an object (create or update).
+  /// Save an object with CRDT processing and optional app notification.
   ///
   /// Stores the object locally and triggers sync if connected to Solid Pod.
-  Future<void> save<T>(T object) async {
-    // TODO: Implement using mapper + storage
-    throw UnimplementedError('save<T>(object) not yet implemented');
-  }
-
-  /// Save an object with CRDT processing and immediate app notification.
-  ///
-  /// This is the recommended method for app integration as it ensures
-  /// atomic consistency between sync system and app storage.
+  /// When onLocalUpdate callback is provided, ensures atomic consistency
+  /// between sync system and app storage.
   ///
   /// Process:
   /// 1. CRDT processing (merge with existing, clock increment)
   /// 2. Store locally in sync system
-  /// 3. Notify app immediately via callback
+  /// 3. Notify app immediately via callback (if provided)
   /// 4. Schedule async Pod sync
-  Future<void> saveWithCallback<T>(
+  Future<void> save<T>(
     T object, {
-    required void Function(T processedObject) onLocalUpdate,
+    Future<void> Function(T processedObject)? onLocalUpdate,
   }) async {
-    onLocalUpdate(object); // Immediate callback with original object
+    // TODO: Implement using mapper + storage
+    if (onLocalUpdate != null) {
+      await onLocalUpdate(object); // Immediate callback with original object
+    }
+    // throw UnimplementedError('save<T>(object) not yet implemented');
+  }
+
+  /// Delete a document with CRDT processing and optional app notification.
+  ///
+  /// This performs document-level deletion, marking the entire document as deleted
+  /// and affecting all resources contained within, following CRDT semantics.
+  ///
+  /// Process:
+  /// 1. Add crdt:deletedAt timestamp to document
+  /// 2. Perform universal emptying (remove semantic content, keep framework metadata)
+  /// 3. Store updated document in sync system
+  /// 4. Notify app immediately via callback (if provided)
+  /// 5. Schedule async Pod sync
+  Future<void> deleteDocument<T>(
+    T object, {
+    Future<void> Function(T deletedObject)? onLocalUpdate,
+  }) async {
+    // TODO: Implement document deletion with CRDT tombstone
+    if (onLocalUpdate != null) {
+      await onLocalUpdate(object); // Immediate callback with deleted object
+    }
+    // throw UnimplementedError('deleteDocument<T>(object) not yet implemented');
   }
 
   /// Stream of hydration updates for objects that changed in sync storage.

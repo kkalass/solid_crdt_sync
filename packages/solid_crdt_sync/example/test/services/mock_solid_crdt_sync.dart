@@ -9,8 +9,11 @@ class MockSolidCrdtSync implements SolidCrdtSync {
   final List<dynamic> savedObjects = [];
 
   @override
-  Future<void> save<T>(T object) async {
+  Future<void> save<T>(T object, {Future<void> Function(T processedObject)? onLocalUpdate}) async {
     savedObjects.add(object);
+    if (onLocalUpdate != null) {
+      await onLocalUpdate(object);
+    }
   }
 
   @override
@@ -23,10 +26,11 @@ class MockSolidCrdtSync implements SolidCrdtSync {
   Stream<T> indexUpdatesStream<T>([String localName = '']) => Stream.empty();
 
   @override
-  Future<void> saveWithCallback<T>(T object,
-      {required void Function(T processedObject) onLocalUpdate}) async {
-    savedObjects.add(object);
-    onLocalUpdate(object);
+  Future<void> deleteDocument<T>(T object, {Future<void> Function(T deletedObject)? onLocalUpdate}) async {
+    savedObjects.removeWhere((item) => item == object);
+    if (onLocalUpdate != null) {
+      await onLocalUpdate(object);
+    }
   }
 
   @override

@@ -86,7 +86,7 @@ class CategoryRepository {
   /// Save a category (insert or update) with sync coordination
   Future<void> saveCategory(models.Category category) async {
     // Use sync system's robust save method with callback
-    await _syncSystem.saveWithCallback<models.Category>(
+    await _syncSystem.save<models.Category>(
       category,
       onLocalUpdate: (processedCategory) async {
         // Local storage is updated immediately after CRDT processing
@@ -224,7 +224,7 @@ class NoteRepository {
   /// Save a note (insert or update) with sync coordination
   Future<void> saveNote(models.Note note) async {
     // Use sync system's robust save method with callback
-    await _syncSystem.saveWithCallback<models.Note>(
+    await _syncSystem.save<models.Note>(
       note,
       onLocalUpdate: (processedNote) async {
         // Local storage is updated immediately after CRDT processing
@@ -234,11 +234,19 @@ class NoteRepository {
     );
   }
 
-  /// Delete a note by ID
+  /// Delete a note by ID (hard deletion - entire document)
   Future<void> deleteNote(String id) async {
-    // For now, delete directly from local storage
-    // TODO: Implement CRDT deletion via sync system
-    await _noteDao.deleteNoteById(id);
+    final note = await getNote(id);
+    if (note != null) {
+      // Use sync system's document deletion with callback
+      await _syncSystem.deleteDocument<models.Note>(
+        note,
+        onLocalUpdate: (deletedNote) async {
+          // Local storage is updated immediately after CRDT processing
+          await _noteDao.deleteNoteById(deletedNote.id);
+        },
+      );
+    }
   }
 
   /// Get notes by category
