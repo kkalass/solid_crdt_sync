@@ -53,6 +53,11 @@ class Category {
   @CrdtLwwRegister()
   DateTime modifiedAt;
 
+  /// Whether this category is archived (soft deleted)
+  @RdfProperty(PersonalNotesVocab.archived)
+  @CrdtLwwRegister()
+  bool archived;
+
   Category({
     required this.id,
     required this.name,
@@ -61,6 +66,7 @@ class Category {
     this.icon,
     DateTime? createdAt,
     DateTime? modifiedAt,
+    this.archived = false,
   })  : createdAt = createdAt ?? DateTime.now(),
         modifiedAt = modifiedAt ?? DateTime.now();
 
@@ -73,6 +79,7 @@ class Category {
     String? icon,
     DateTime? createdAt,
     DateTime? modifiedAt,
+    bool? archived,
   }) {
     return Category(
       id: id ?? this.id,
@@ -82,6 +89,7 @@ class Category {
       icon: icon ?? this.icon,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
+      archived: archived ?? this.archived,
     );
   }
 

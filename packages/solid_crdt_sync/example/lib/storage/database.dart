@@ -29,6 +29,9 @@ class Categories extends Table {
   /// Last modification timestamp
   DateTimeColumn get modifiedAt => dateTime()();
 
+  /// Whether this category is archived (soft deleted)
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -80,7 +83,7 @@ class AppDatabase extends _$AppDatabase {
       : super(_openConnection(web: web, native: native));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -108,6 +111,10 @@ class AppDatabase extends _$AppDatabase {
         // Add HydrationCursors table in version 2
         await m.createTable(hydrationCursors);
       }
+      if (from < 3) {
+        // Add archived column to categories table in version 3
+        await m.addColumn(categories, categories.archived);
+      }
     },
   );
 }
@@ -117,8 +124,16 @@ class AppDatabase extends _$AppDatabase {
 class CategoryDao extends DatabaseAccessor<AppDatabase> with _$CategoryDaoMixin {
   CategoryDao(super.db);
 
-  /// Get all categories ordered by name
+  /// Get all categories ordered by name (non-archived only)
   Future<List<Category>> getAllCategories() {
+    return (select(categories)
+      ..where((c) => c.archived.equals(false))
+      ..orderBy([(c) => OrderingTerm(expression: c.name)]))
+      .get();
+  }
+
+  /// Get all categories including archived ones, ordered by name
+  Future<List<Category>> getAllCategoriesIncludingArchived() {
     return (select(categories)
       ..orderBy([(c) => OrderingTerm(expression: c.name)]))
       .get();

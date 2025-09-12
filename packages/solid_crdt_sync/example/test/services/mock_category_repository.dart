@@ -17,6 +17,10 @@ class MockCategoryRepository implements CategoryRepository {
 
   @override
   Future<List<Category>> getAllCategories() async =>
+      storedCategories.where((c) => !c.archived).toList();
+
+  @override
+  Future<List<Category>> getAllCategoriesIncludingArchived() async =>
       List.from(storedCategories);
 
   @override
@@ -25,6 +29,15 @@ class MockCategoryRepository implements CategoryRepository {
       return storedCategories.firstWhere((c) => c.id == id);
     } catch (e) {
       return null;
+    }
+  }
+
+  @override
+  Future<void> archiveCategory(String id) async {
+    final categoryIndex = storedCategories.indexWhere((c) => c.id == id);
+    if (categoryIndex != -1) {
+      final category = storedCategories[categoryIndex];
+      storedCategories[categoryIndex] = category.copyWith(archived: true);
     }
   }
 

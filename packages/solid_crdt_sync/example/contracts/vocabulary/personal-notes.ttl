@@ -60,3 +60,11 @@
     rdfs:domain :NotesCategory ;
     rdfs:range xsd:string ;
     rdfs:isDefinedBy <https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/vocabulary/personal-notes> .
+
+:archived
+    a owl:DatatypeProperty ;
+    rdfs:label "archived" ;
+    rdfs:comment "Indicates that a category is archived (soft deleted) but remains referenceable." ;
+    rdfs:domain :NotesCategory ;
+    rdfs:range xsd:boolean ;
+    rdfs:isDefinedBy <https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/vocabulary/personal-notes> .

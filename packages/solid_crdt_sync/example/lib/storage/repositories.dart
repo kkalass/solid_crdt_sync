@@ -65,9 +65,15 @@ class CategoryRepository {
     await categoryDao.deleteCategoryById(category.id);
   }
 
-  /// Get all categories ordered by name
+  /// Get all categories ordered by name (non-archived only)
   Future<List<models.Category>> getAllCategories() async {
     final driftCategories = await _categoryDao.getAllCategories();
+    return driftCategories.map(_categoryFromDrift).toList();
+  }
+
+  /// Get all categories including archived ones, ordered by name
+  Future<List<models.Category>> getAllCategoriesIncludingArchived() async {
+    final driftCategories = await _categoryDao.getAllCategoriesIncludingArchived();
     return driftCategories.map(_categoryFromDrift).toList();
   }
 
@@ -88,6 +94,22 @@ class CategoryRepository {
         await _categoryDao.insertOrUpdateCategory(companion);
       },
     );
+  }
+
+  /// Archive a category (soft delete) - sets archived flag to true
+  /// 
+  /// Soft delete - marks category as archived but keeps it referenceable.
+  /// This is the recommended approach for categories since they may be 
+  /// referenced by external applications.
+  Future<void> archiveCategory(String id) async {
+    final category = await getCategory(id);
+    if (category != null) {
+      final archivedCategory = category.copyWith(
+        archived: true,
+        modifiedAt: DateTime.now(),
+      );
+      await saveCategory(archivedCategory);
+    }
   }
 
   /// Delete a category by ID
@@ -122,6 +144,7 @@ class CategoryRepository {
       icon: drift.icon,
       createdAt: drift.createdAt,
       modifiedAt: drift.modifiedAt,
+      archived: drift.archived,
     );
   }
 
@@ -136,6 +159,7 @@ class CategoryRepository {
       icon: Value(category.icon),
       createdAt: Value(category.createdAt),
       modifiedAt: Value(category.modifiedAt),
+      archived: Value(category.archived),
     );
   }
 }

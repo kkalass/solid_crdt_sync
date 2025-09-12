@@ -20,10 +20,15 @@ class CategoriesService {
 
   CategoriesService(this._categoryRepository, this._noteRepository);
 
-  /// Get all categories sorted by name
+  /// Get all categories sorted by name (non-archived only)
   Future<List<Category>> getAllCategories() async {
     // Query from repository - fast and flexible
     return await _categoryRepository.getAllCategories();
+  }
+
+  /// Get all categories including archived ones, sorted by name
+  Future<List<Category>> getAllCategoriesIncludingArchived() async {
+    return await _categoryRepository.getAllCategoriesIncludingArchived();
   }
 
   /// Get a specific category by ID
@@ -36,6 +41,15 @@ class CategoriesService {
   Future<void> saveCategory(Category category) async {
     // Repository handles sync coordination automatically
     await _categoryRepository.saveCategory(category);
+  }
+
+  /// Archive a category (soft delete) - sets archived flag to true
+  /// 
+  /// Soft delete - marks category as archived but keeps it referenceable.
+  /// This is the recommended approach for categories since they may be 
+  /// referenced by external applications.
+  Future<void> archiveCategory(String id) async {
+    await _categoryRepository.archiveCategory(id);
   }
 
   /// Delete a category

@@ -27,6 +27,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   List<Category>? categories;
   String? errorMessage;
   bool isLoading = true;
+  bool showArchived = false;
 
   @override
   void initState() {
@@ -41,8 +42,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         errorMessage = null;
       });
 
-      final loadedCategories =
-          await widget.categoriesService.getAllCategories();
+      final loadedCategories = showArchived
+          ? await widget.categoriesService.getAllCategoriesIncludingArchived()
+          : await widget.categoriesService.getAllCategories();
 
       setState(() {
         categories = loadedCategories;
@@ -124,7 +126,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
               try {
                 final newCategory = isEditing
-                    ? category!.copyWith(
+                    ? category.copyWith(
                         name: name,
                         description: descriptionController.text.trim().isEmpty
                             ? null
@@ -169,6 +171,47 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     if (result == true) {
       _loadCategories();
+    }
+  }
+
+  Future<void> _archiveCategory(Category category) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Archive Category'),
+        content: Text(
+          'Are you sure you want to archive "${category.name}"?\n\n'
+          'The category will be hidden but remain referenceable for existing notes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await widget.categoriesService.archiveCategory(category.id);
+        _loadCategories();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Archived category "${category.name}"')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to archive category: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -223,6 +266,23 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       appBar: AppBar(
         title: const Text('Categories'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Show archived'),
+              Switch(
+                value: showArchived,
+                onChanged: (value) {
+                  setState(() {
+                    showArchived = value;
+                  });
+                  _loadCategories();
+                },
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -307,10 +367,38 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                     ),
                                   ),
                                 ),
-                                title: Text(
-                                  category.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w500),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        category.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          color: category.archived ? Colors.grey : null,
+                                          decoration: category.archived ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                    ),
+                                    if (category.archived)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade300,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'ARCHIVED',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 subtitle: category.description != null
                                     ? Text(category.description!)
@@ -320,6 +408,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                     switch (action) {
                                       case 'edit':
                                         _showCategoryDialog(category: category);
+                                        break;
+                                      case 'archive':
+                                        _archiveCategory(category);
                                         break;
                                       case 'delete':
                                         _deleteCategory(category);
@@ -331,6 +422,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                       value: 'edit',
                                       child: Text('Edit'),
                                     ),
+                                    if (!category.archived)
+                                      const PopupMenuItem(
+                                        value: 'archive',
+                                        child: Text('Archive'),
+                                      ),
                                     const PopupMenuItem(
                                       value: 'delete',
                                       child: Text('Delete'),

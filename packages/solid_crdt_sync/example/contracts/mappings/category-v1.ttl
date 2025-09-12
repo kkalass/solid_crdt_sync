@@ -23,5 +23,6 @@
             [ mc:predicate schema:description ; algo:mergeWith algo:LWW_Register ],
             [ mc:predicate pnotes:categoryColor ; algo:mergeWith algo:LWW_Register ],
             [ mc:predicate pnotes:categoryIcon ; algo:mergeWith algo:LWW_Register ],
+            [ mc:predicate pnotes:archived ; algo:mergeWith algo:LWW_Register ],
             [ mc:predicate schema:dateCreated ; algo:mergeWith algo:LWW_Register ]
     ] ) .

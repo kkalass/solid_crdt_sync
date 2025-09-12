@@ -47,9 +47,19 @@ class $CategoriesTable extends Categories
   late final GeneratedColumn<DateTime> modifiedAt = GeneratedColumn<DateTime>(
       'modified_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _archivedMeta =
+      const VerificationMeta('archived');
+  @override
+  late final GeneratedColumn<bool> archived = GeneratedColumn<bool>(
+      'archived', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("archived" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, name, description, color, icon, createdAt, modifiedAt];
+      [id, name, description, color, icon, createdAt, modifiedAt, archived];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -99,6 +109,10 @@ class $CategoriesTable extends Categories
     } else if (isInserting) {
       context.missing(_modifiedAtMeta);
     }
+    if (data.containsKey('archived')) {
+      context.handle(_archivedMeta,
+          archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta));
+    }
     return context;
   }
 
@@ -122,6 +136,8 @@ class $CategoriesTable extends Categories
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       modifiedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}modified_at'])!,
+      archived: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}archived'])!,
     );
   }
 
@@ -152,6 +168,9 @@ class Category extends DataClass implements Insertable<Category> {
 
   /// Last modification timestamp
   final DateTime modifiedAt;
+
+  /// Whether this category is archived (soft deleted)
+  final bool archived;
   const Category(
       {required this.id,
       required this.name,
@@ -159,7 +178,8 @@ class Category extends DataClass implements Insertable<Category> {
       this.color,
       this.icon,
       required this.createdAt,
-      required this.modifiedAt});
+      required this.modifiedAt,
+      required this.archived});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -176,6 +196,7 @@ class Category extends DataClass implements Insertable<Category> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['modified_at'] = Variable<DateTime>(modifiedAt);
+    map['archived'] = Variable<bool>(archived);
     return map;
   }
 
@@ -191,6 +212,7 @@ class Category extends DataClass implements Insertable<Category> {
       icon: icon == null && nullToAbsent ? const Value.absent() : Value(icon),
       createdAt: Value(createdAt),
       modifiedAt: Value(modifiedAt),
+      archived: Value(archived),
     );
   }
 
@@ -205,6 +227,7 @@ class Category extends DataClass implements Insertable<Category> {
       icon: serializer.fromJson<String?>(json['icon']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       modifiedAt: serializer.fromJson<DateTime>(json['modifiedAt']),
+      archived: serializer.fromJson<bool>(json['archived']),
     );
   }
   @override
@@ -218,6 +241,7 @@ class Category extends DataClass implements Insertable<Category> {
       'icon': serializer.toJson<String?>(icon),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'modifiedAt': serializer.toJson<DateTime>(modifiedAt),
+      'archived': serializer.toJson<bool>(archived),
     };
   }
 
@@ -228,7 +252,8 @@ class Category extends DataClass implements Insertable<Category> {
           Value<String?> color = const Value.absent(),
           Value<String?> icon = const Value.absent(),
           DateTime? createdAt,
-          DateTime? modifiedAt}) =>
+          DateTime? modifiedAt,
+          bool? archived}) =>
       Category(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -237,6 +262,7 @@ class Category extends DataClass implements Insertable<Category> {
         icon: icon.present ? icon.value : this.icon,
         createdAt: createdAt ?? this.createdAt,
         modifiedAt: modifiedAt ?? this.modifiedAt,
+        archived: archived ?? this.archived,
       );
   Category copyWithCompanion(CategoriesCompanion data) {
     return Category(
@@ -249,6 +275,7 @@ class Category extends DataClass implements Insertable<Category> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       modifiedAt:
           data.modifiedAt.present ? data.modifiedAt.value : this.modifiedAt,
+      archived: data.archived.present ? data.archived.value : this.archived,
     );
   }
 
@@ -261,14 +288,15 @@ class Category extends DataClass implements Insertable<Category> {
           ..write('color: $color, ')
           ..write('icon: $icon, ')
           ..write('createdAt: $createdAt, ')
-          ..write('modifiedAt: $modifiedAt')
+          ..write('modifiedAt: $modifiedAt, ')
+          ..write('archived: $archived')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, description, color, icon, createdAt, modifiedAt);
+  int get hashCode => Object.hash(
+      id, name, description, color, icon, createdAt, modifiedAt, archived);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -279,7 +307,8 @@ class Category extends DataClass implements Insertable<Category> {
           other.color == this.color &&
           other.icon == this.icon &&
           other.createdAt == this.createdAt &&
-          other.modifiedAt == this.modifiedAt);
+          other.modifiedAt == this.modifiedAt &&
+          other.archived == this.archived);
 }
 
 class CategoriesCompanion extends UpdateCompanion<Category> {
@@ -290,6 +319,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   final Value<String?> icon;
   final Value<DateTime> createdAt;
   final Value<DateTime> modifiedAt;
+  final Value<bool> archived;
   final Value<int> rowid;
   const CategoriesCompanion({
     this.id = const Value.absent(),
@@ -299,6 +329,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.icon = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.modifiedAt = const Value.absent(),
+    this.archived = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CategoriesCompanion.insert({
@@ -309,6 +340,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     this.icon = const Value.absent(),
     required DateTime createdAt,
     required DateTime modifiedAt,
+    this.archived = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -322,6 +354,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     Expression<String>? icon,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? modifiedAt,
+    Expression<bool>? archived,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -332,6 +365,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       if (icon != null) 'icon': icon,
       if (createdAt != null) 'created_at': createdAt,
       if (modifiedAt != null) 'modified_at': modifiedAt,
+      if (archived != null) 'archived': archived,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -344,6 +378,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       Value<String?>? icon,
       Value<DateTime>? createdAt,
       Value<DateTime>? modifiedAt,
+      Value<bool>? archived,
       Value<int>? rowid}) {
     return CategoriesCompanion(
       id: id ?? this.id,
@@ -353,6 +388,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       icon: icon ?? this.icon,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
+      archived: archived ?? this.archived,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -381,6 +417,9 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     if (modifiedAt.present) {
       map['modified_at'] = Variable<DateTime>(modifiedAt.value);
     }
+    if (archived.present) {
+      map['archived'] = Variable<bool>(archived.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -397,6 +436,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('icon: $icon, ')
           ..write('createdAt: $createdAt, ')
           ..write('modifiedAt: $modifiedAt, ')
+          ..write('archived: $archived, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1037,6 +1077,7 @@ typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
   Value<String?> icon,
   required DateTime createdAt,
   required DateTime modifiedAt,
+  Value<bool> archived,
   Value<int> rowid,
 });
 typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
@@ -1047,6 +1088,7 @@ typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
   Value<String?> icon,
   Value<DateTime> createdAt,
   Value<DateTime> modifiedAt,
+  Value<bool> archived,
   Value<int> rowid,
 });
 
@@ -1100,6 +1142,9 @@ class $$CategoriesTableFilterComposer
   ColumnFilters<DateTime> get modifiedAt => $composableBuilder(
       column: $table.modifiedAt, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<bool> get archived => $composableBuilder(
+      column: $table.archived, builder: (column) => ColumnFilters(column));
+
   Expression<bool> notesRefs(
       Expression<bool> Function($$NotesTableFilterComposer f) f) {
     final $$NotesTableFilterComposer composer = $composerBuilder(
@@ -1151,6 +1196,9 @@ class $$CategoriesTableOrderingComposer
 
   ColumnOrderings<DateTime> get modifiedAt => $composableBuilder(
       column: $table.modifiedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get archived => $composableBuilder(
+      column: $table.archived, builder: (column) => ColumnOrderings(column));
 }
 
 class $$CategoriesTableAnnotationComposer
@@ -1182,6 +1230,9 @@ class $$CategoriesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get modifiedAt => $composableBuilder(
       column: $table.modifiedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
 
   Expression<T> notesRefs<T extends Object>(
       Expression<T> Function($$NotesTableAnnotationComposer a) f) {
@@ -1235,6 +1286,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String?> icon = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> modifiedAt = const Value.absent(),
+            Value<bool> archived = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               CategoriesCompanion(
@@ -1245,6 +1297,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             icon: icon,
             createdAt: createdAt,
             modifiedAt: modifiedAt,
+            archived: archived,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1255,6 +1308,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             Value<String?> icon = const Value.absent(),
             required DateTime createdAt,
             required DateTime modifiedAt,
+            Value<bool> archived = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               CategoriesCompanion.insert(
@@ -1265,6 +1319,7 @@ class $$CategoriesTableTableManager extends RootTableManager<
             icon: icon,
             createdAt: createdAt,
             modifiedAt: modifiedAt,
+            archived: archived,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

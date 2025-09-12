@@ -42,4 +42,8 @@ class PersonalNotesVocab {
   /// An icon identifier or emoji associated with a category for UI display.
   /// Domain: NotesCategory, Range: xsd:string
   static const categoryIcon = IriTerm.prevalidated('${baseIri}categoryIcon');
+
+  /// Indicates that a category is archived (soft deleted).
+  /// Domain: NotesCategory, Range: xsd:boolean
+  static const archived = IriTerm.prevalidated('${baseIri}archived');
 }

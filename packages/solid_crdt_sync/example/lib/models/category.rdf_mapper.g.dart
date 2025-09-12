@@ -41,6 +41,7 @@ class CategoryMapper implements GlobalResourceMapper<category.Category> {
     final String? icon = reader.optional(PersonalNotesVocab.categoryIcon);
     final DateTime createdAt = reader.require(SchemaCreativeWork.dateCreated);
     final DateTime modifiedAt = reader.require(SchemaCreativeWork.dateModified);
+    final bool archived = reader.require(PersonalNotesVocab.archived);
 
     return category.Category(
       id: id,
@@ -50,6 +51,7 @@ class CategoryMapper implements GlobalResourceMapper<category.Category> {
       icon: icon,
       createdAt: createdAt,
       modifiedAt: modifiedAt,
+      archived: archived,
     );
   }
 
@@ -79,6 +81,7 @@ class CategoryMapper implements GlobalResourceMapper<category.Category> {
         )
         .addValue(SchemaCreativeWork.dateCreated, resource.createdAt)
         .addValue(SchemaCreativeWork.dateModified, resource.modifiedAt)
+        .addValue(PersonalNotesVocab.archived, resource.archived)
         .build();
   }
 }
