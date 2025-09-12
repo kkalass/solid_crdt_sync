@@ -18,11 +18,12 @@ typedef MapperInitializerFunction = RdfMapper Function(
 
 /// Result of hydrating app storage from sync storage.
 class HydrationResult<T> {
-  final List<T> items;           // New/updated items
-  final List<T> deletedItems;    // Deleted items (last known state)
-  final String? originalCursor;  // Expected current cursor (for consistency check)
-  final String? nextCursor;      // New cursor after hydration
-  final bool hasMore;            // Whether more data is available
+  final List<T> items; // New/updated items
+  final List<T> deletedItems; // Deleted items (last known state)
+  final String?
+      originalCursor; // Expected current cursor (for consistency check)
+  final String? nextCursor; // New cursor after hydration
+  final bool hasMore; // Whether more data is available
 
   const HydrationResult({
     required this.items,
@@ -83,71 +84,37 @@ class SolidCrdtSync {
     );
   }
 
-  /// Stream of data updates from sync operations.
-  ///
-  /// Emits objects when they are freshly fetched or updated from the server,
-  /// not existing local data. Use this to react to new data coming through sync.
-  Stream<T> dataUpdatesStream<T>() {
-    // TODO: Implement data updates stream
-    throw UnimplementedError('dataUpdatesStream<T>() not yet implemented');
-  }
-
-  /// Stream of index entry updates from sync operations.
-  ///
-  /// Emits index entries when they are freshly fetched or updated from the server.
-  /// Index entries contain lightweight copies of selected fields for efficient queries.
-  ///
-  /// The localName parameter refers to the localName specified in the index configuration,
-  /// which is used only for local identification within the app.
-  ///
-  /// FIXME: how to specify the precise index in case of group indices?
-  Stream<T> indexUpdatesStream<T>([String localName = defaultIndexLocalName]) {
-    // TODO: Implement index updates stream
-    throw UnimplementedError(
-        'indexUpdatesStream<T>(localName) not yet implemented');
-  }
-
-  /// Save an object with CRDT processing and optional app notification.
+  /// Save an object with CRDT processing.
   ///
   /// Stores the object locally and triggers sync if connected to Solid Pod.
-  /// When onLocalUpdate callback is provided, ensures atomic consistency
-  /// between sync system and app storage.
+  /// Application state is updated via the hydration stream - repositories should
+  /// listen to hydrateStreaming() to receive updates.
   ///
   /// Process:
   /// 1. CRDT processing (merge with existing, clock increment)
   /// 2. Store locally in sync system
-  /// 3. Notify app immediately via callback (if provided)
+  /// 3. Hydration stream automatically emits update
   /// 4. Schedule async Pod sync
-  Future<void> save<T>(
-    T object, {
-    Future<void> Function(T processedObject)? onLocalUpdate,
-  }) async {
+  Future<void> save<T>(T object) async {
     // TODO: Implement using mapper + storage
-    if (onLocalUpdate != null) {
-      await onLocalUpdate(object); // Immediate callback with original object
-    }
     // throw UnimplementedError('save<T>(object) not yet implemented');
   }
 
-  /// Delete a document with CRDT processing and optional app notification.
+  /// Delete a document with CRDT processing.
   ///
   /// This performs document-level deletion, marking the entire document as deleted
   /// and affecting all resources contained within, following CRDT semantics.
+  /// Application state is updated via the hydration stream - repositories should
+  /// listen to hydrateStreaming() to receive deletion notifications.
   ///
   /// Process:
   /// 1. Add crdt:deletedAt timestamp to document
   /// 2. Perform universal emptying (remove semantic content, keep framework metadata)
   /// 3. Store updated document in sync system
-  /// 4. Notify app immediately via callback (if provided)
+  /// 4. Hydration stream automatically emits deletion
   /// 5. Schedule async Pod sync
-  Future<void> deleteDocument<T>(
-    T object, {
-    Future<void> Function(T deletedObject)? onLocalUpdate,
-  }) async {
+  Future<void> deleteDocument<T>(T object) async {
     // TODO: Implement document deletion with CRDT tombstone
-    if (onLocalUpdate != null) {
-      await onLocalUpdate(object); // Immediate callback with deleted object
-    }
     // throw UnimplementedError('deleteDocument<T>(object) not yet implemented');
   }
 
@@ -155,7 +122,7 @@ class SolidCrdtSync {
   ///
   /// Emits HydrationResult batches when objects are updated in sync storage.
   /// Each result includes originalCursor for consistency checking.
-  Stream<HydrationResult<T>> hydrationUpdates<T>() {
+  Stream<HydrationResult<T>> _hydrationUpdates<T>() {
     // TODO: Implement hydration updates stream
     return Stream<HydrationResult<T>>.empty();
   }
@@ -164,7 +131,7 @@ class SolidCrdtSync {
   ///
   /// Returns items that have been updated or deleted since the cursor position.
   /// Use null cursor to load from the beginning.
-  Future<HydrationResult<T>> loadChangesSince<T>(
+  Future<HydrationResult<T>> _loadChangesSince<T>(
     String? cursor, {
     int limit = 100,
   }) async {
@@ -192,7 +159,7 @@ class SolidCrdtSync {
   /// - [onUpdate]: Called for each new/updated item
   /// - [onDelete]: Called for each deleted item (with last known state)
   /// - [onCursorUpdate]: Called to persist cursor for next hydration
-  Future<void> hydrateOnce<T>({
+  Future<void> _hydrateOnce<T>({
     required String? lastCursor,
     required Future<void> Function(T item) onUpdate,
     required Future<void> Function(T item) onDelete,
@@ -201,20 +168,20 @@ class SolidCrdtSync {
   }) async {
     String? currentCursor = lastCursor;
     HydrationResult<T> result;
-    
+
     do {
-      result = await loadChangesSince<T>(currentCursor, limit: limit);
-      
+      result = await _loadChangesSince<T>(currentCursor, limit: limit);
+
       // Apply updates
       for (final item in result.items) {
         await onUpdate(item);
       }
-      
-      // Apply deletions  
+
+      // Apply deletions
       for (final item in result.deletedItems) {
         await onDelete(item);
       }
-      
+
       // Update cursor
       if (result.nextCursor != null) {
         await onCursorUpdate(result.nextCursor!);
@@ -250,7 +217,7 @@ class SolidCrdtSync {
   }) async {
     // 1. Initial catch-up hydration
     final initialCursor = await getCurrentCursor();
-    await hydrateOnce<T>(
+    await _hydrateOnce<T>(
       lastCursor: initialCursor,
       onUpdate: onUpdate,
       onDelete: onDelete,
@@ -259,9 +226,9 @@ class SolidCrdtSync {
     );
 
     // 2. Set up live hydration updates
-    return hydrationUpdates<T>().listen((result) async {
+    return _hydrationUpdates<T>().listen((result) async {
       final currentCursor = await getCurrentCursor();
-      
+
       if (result.originalCursor == currentCursor) {
         // Cursor matches - safe to apply changes
         for (final item in result.items) {
@@ -275,7 +242,7 @@ class SolidCrdtSync {
         }
       } else {
         // Cursor mismatch - trigger catch-up hydration using existing callbacks
-        await hydrateOnce<T>(
+        await _hydrateOnce<T>(
           lastCursor: currentCursor,
           onUpdate: onUpdate,
           onDelete: onDelete,
