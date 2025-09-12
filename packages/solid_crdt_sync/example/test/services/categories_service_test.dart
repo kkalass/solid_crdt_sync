@@ -3,109 +3,10 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_notes_app/models/category.dart';
-import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/services/categories_service.dart';
-import 'package:personal_notes_app/storage/repositories.dart';
 
-/// Mock repository for testing
-class MockCategoryRepository implements CategoryRepository {
-  final List<Category> savedCategories = [];
-  final List<Category> storedCategories = [];
-  
-  @override
-  Future<void> saveCategory(Category category) async {
-    savedCategories.add(category);
-    // Simulate storing the category
-    storedCategories.removeWhere((c) => c.id == category.id);
-    storedCategories.add(category);
-  }
-  
-  @override
-  Future<List<Category>> getAllCategories() async => List.from(storedCategories);
-  
-  @override
-  Future<Category?> getCategory(String id) async {
-    try {
-      return storedCategories.firstWhere((c) => c.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  @override
-  Future<void> deleteCategory(String id) async {
-    storedCategories.removeWhere((c) => c.id == id);
-  }
-  
-  @override
-  Future<bool> categoryExists(String id) async {
-    return storedCategories.any((c) => c.id == id);
-  }
-  
-  @override
-  Future<void> clear() async {
-    storedCategories.clear();
-  }
-  
-  @override
-  Future<void> initialize() async {
-    // Mock implementation - no-op for tests
-  }
-  
-  @override
-  void dispose() {}
-}
-
-/// Mock repository for testing
-class MockNoteRepository implements NoteRepository {
-  final List<Note> storedNotes = [];
-  
-  @override
-  Future<List<Note>> getAllNotes() async => List.from(storedNotes);
-  
-  @override
-  Future<Note?> getNote(String id) async {
-    try {
-      return storedNotes.firstWhere((n) => n.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  @override
-  Future<void> saveNote(Note note) async {
-    storedNotes.removeWhere((n) => n.id == note.id);
-    storedNotes.add(note);
-  }
-  
-  @override
-  Future<void> deleteNote(String id) async {
-    storedNotes.removeWhere((n) => n.id == id);
-  }
-  
-  @override
-  Future<List<Note>> getNotesByCategory(String categoryId) async {
-    return storedNotes.where((n) => n.categoryId == categoryId).toList();
-  }
-  
-  @override
-  Future<List<Note>> getUncategorizedNotes() async {
-    return storedNotes.where((n) => n.categoryId == null).toList();
-  }
-  
-  @override
-  Future<void> clear() async {
-    storedNotes.clear();
-  }
-  
-  @override
-  Future<void> initialize() async {
-    // Mock implementation - no-op for tests
-  }
-  
-  @override
-  void dispose() {}
-}
+import 'mock_category_repository.dart';
+import 'mock_note_repository.dart';
 
 void main() {
   group('CategoriesService', () {
@@ -116,7 +17,8 @@ void main() {
     setUp(() {
       mockCategoryRepository = MockCategoryRepository();
       mockNoteRepository = MockNoteRepository();
-      categoriesService = CategoriesService(mockCategoryRepository, mockNoteRepository);
+      categoriesService =
+          CategoriesService(mockCategoryRepository, mockNoteRepository);
     });
 
     group('createCategory', () {

@@ -10,52 +10,59 @@ import 'database.dart';
 
 /// Repository for Category business logic operations.
 ///
-/// This layer handles business logic, model conversion between 
+/// This layer handles business logic, model conversion between
 /// Drift entities and application models, AND sync coordination.
 /// Repository becomes "sync-aware storage" following add-on architecture.
 class CategoryRepository {
   final CategoryDao _categoryDao;
-  final CursorDao _cursorDao;
   final SolidCrdtSync _syncSystem;
-  StreamSubscription? _hydrationSubscription;
-  
+  final StreamSubscription _hydrationSubscription;
+
   static const String _resourceType = 'category';
 
-  CategoryRepository(this._categoryDao, this._cursorDao, this._syncSystem);
+  /// Private constructor - use [create] factory method instead
+  CategoryRepository._(
+    this._categoryDao,
+    this._syncSystem,
+    this._hydrationSubscription,
+  );
 
-  /// Initialize the repository with hydration from sync storage.
+  /// Create and initialize a CategoryRepository with hydration from sync storage.
   ///
-  /// This should be called once during app startup to:
-  /// 1. Catch up on any missed changes since last shutdown
-  /// 2. Set up live hydration for ongoing updates
-  Future<void> initialize() async {
-    _hydrationSubscription = await _syncSystem.hydrateStreaming<models.Category>(
-      getCurrentCursor: () => _getStoredCursor(),
-      onUpdate: (category) => _handleCategoryUpdate(category),
-      onDelete: (category) => _handleCategoryDelete(category),
-      onCursorUpdate: (cursor) => _storeCursor(cursor),
-    );
+  /// This factory method:
+  /// 1. Sets up hydration subscription for live updates
+  /// 2. Performs initial catch-up from last cursor position
+  /// 3. Returns a fully initialized repository
+  static Future<CategoryRepository> create(
+    CategoryDao categoryDao,
+    CursorDao cursorDao,
+    SolidCrdtSync syncSystem,
+  ) async {
+    final repository = CategoryRepository._(
+        categoryDao,
+        syncSystem,
+        await syncSystem.hydrateStreaming<models.Category>(
+          getCurrentCursor: () => cursorDao.getCursor(_resourceType),
+          onUpdate: (category) => _handleCategoryUpdate(categoryDao, category),
+          onDelete: (category) => _handleCategoryDelete(categoryDao, category),
+          onCursorUpdate: (cursor) =>
+              cursorDao.storeCursor(_resourceType, cursor),
+        ));
+
+    return repository;
   }
 
   /// Handle category update from sync storage
-  Future<void> _handleCategoryUpdate(models.Category category) async {
+  static Future<void> _handleCategoryUpdate(
+      CategoryDao categoryDao, models.Category category) async {
     final companion = _categoryToDriftCompanion(category);
-    await _categoryDao.insertOrUpdateCategory(companion);
+    await categoryDao.insertOrUpdateCategory(companion);
   }
 
   /// Handle category deletion from sync storage
-  Future<void> _handleCategoryDelete(models.Category category) async {
-    await _categoryDao.deleteCategoryById(category.id);
-  }
-
-  /// Get stored hydration cursor
-  Future<String?> _getStoredCursor() async {
-    return await _cursorDao.getCursor(_resourceType);
-  }
-
-  /// Store hydration cursor
-  Future<void> _storeCursor(String cursor) async {
-    await _cursorDao.storeCursor(_resourceType, cursor);
+  static Future<void> _handleCategoryDelete(
+      CategoryDao categoryDao, models.Category category) async {
+    await categoryDao.deleteCategoryById(category.id);
   }
 
   /// Get all categories ordered by name
@@ -102,7 +109,7 @@ class CategoryRepository {
 
   /// Dispose resources when repository is no longer needed
   void dispose() {
-    _hydrationSubscription?.cancel();
+    _hydrationSubscription.cancel();
   }
 
   /// Convert Drift Category to app Category model
@@ -119,7 +126,8 @@ class CategoryRepository {
   }
 
   /// Convert app Category model to Drift CategoriesCompanion
-  CategoriesCompanion _categoryToDriftCompanion(models.Category category) {
+  static CategoriesCompanion _categoryToDriftCompanion(
+      models.Category category) {
     return CategoriesCompanion(
       id: Value(category.id),
       name: Value(category.name),
@@ -134,52 +142,59 @@ class CategoryRepository {
 
 /// Repository for Note business logic operations.
 ///
-/// This layer handles business logic, model conversion between 
+/// This layer handles business logic, model conversion between
 /// Drift entities and application models, AND sync coordination.
 /// Repository becomes "sync-aware storage" following add-on architecture.
 class NoteRepository {
   final NoteDao _noteDao;
-  final CursorDao _cursorDao;
   final SolidCrdtSync _syncSystem;
-  StreamSubscription? _hydrationSubscription;
-  
+  final StreamSubscription _hydrationSubscription;
+
   static const String _resourceType = 'note';
 
-  NoteRepository(this._noteDao, this._cursorDao, this._syncSystem);
+  /// Private constructor - use [create] factory method instead
+  NoteRepository._(
+    this._noteDao,
+    this._syncSystem,
+    this._hydrationSubscription,
+  );
 
-  /// Initialize the repository with hydration from sync storage.
+  /// Create and initialize a NoteRepository with hydration from sync storage.
   ///
-  /// This should be called once during app startup to:
-  /// 1. Catch up on any missed changes since last shutdown
-  /// 2. Set up live hydration for ongoing updates
-  Future<void> initialize() async {
-    _hydrationSubscription = await _syncSystem.hydrateStreaming<models.Note>(
-      getCurrentCursor: () => _getStoredCursor(),
-      onUpdate: (note) => _handleNoteUpdate(note),
-      onDelete: (note) => _handleNoteDelete(note),
-      onCursorUpdate: (cursor) => _storeCursor(cursor),
-    );
+  /// This factory method:
+  /// 1. Sets up hydration subscription for live updates
+  /// 2. Performs initial catch-up from last cursor position
+  /// 3. Returns a fully initialized repository
+  static Future<NoteRepository> create(
+    NoteDao noteDao,
+    CursorDao cursorDao,
+    SolidCrdtSync syncSystem,
+  ) async {
+    final repository = NoteRepository._(
+        noteDao,
+        syncSystem,
+        await syncSystem.hydrateStreaming<models.Note>(
+          getCurrentCursor: () => cursorDao.getCursor(_resourceType),
+          onUpdate: (note) => _handleNoteUpdate(noteDao, note),
+          onDelete: (note) => _handleNoteDelete(noteDao, note),
+          onCursorUpdate: (cursor) =>
+              cursorDao.storeCursor(_resourceType, cursor),
+        ));
+
+    return repository;
   }
 
   /// Handle note update from sync storage
-  Future<void> _handleNoteUpdate(models.Note note) async {
+  static Future<void> _handleNoteUpdate(
+      NoteDao noteDao, models.Note note) async {
     final companion = _noteToDriftCompanion(note);
-    await _noteDao.insertOrUpdateNote(companion);
+    await noteDao.insertOrUpdateNote(companion);
   }
 
   /// Handle note deletion from sync storage
-  Future<void> _handleNoteDelete(models.Note note) async {
-    await _noteDao.deleteNoteById(note.id);
-  }
-
-  /// Get stored hydration cursor
-  Future<String?> _getStoredCursor() async {
-    return await _cursorDao.getCursor(_resourceType);
-  }
-
-  /// Store hydration cursor
-  Future<void> _storeCursor(String cursor) async {
-    await _cursorDao.storeCursor(_resourceType, cursor);
+  static Future<void> _handleNoteDelete(
+      NoteDao noteDao, models.Note note) async {
+    await noteDao.deleteNoteById(note.id);
   }
 
   /// Get all notes ordered by modification date (newest first)
@@ -233,7 +248,7 @@ class NoteRepository {
 
   /// Dispose resources when repository is no longer needed
   void dispose() {
-    _hydrationSubscription?.cancel();
+    _hydrationSubscription.cancel();
   }
 
   /// Convert Drift Note to app Note model
@@ -249,7 +264,7 @@ class NoteRepository {
   }
 
   /// Convert app Note model to Drift NotesCompanion
-  NotesCompanion _noteToDriftCompanion(models.Note note) {
+  static NotesCompanion _noteToDriftCompanion(models.Note note) {
     return NotesCompanion(
       id: Value(note.id),
       title: Value(note.title),
