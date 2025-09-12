@@ -75,6 +75,8 @@ These topics must be completed for v1 release. They represent essential function
 - **Migration Strategy**: Clear upgrade path from current GitHub Pages IRIs
 - **Documentation**: Updated examples and specifications with final IRI decisions
 
+**Current Status**: We are currently pursuing the W3ID.org option and have submitted a pull request for `https://w3id.org/solid-crdt-sync/` namespace approval. Pending acceptance of this PR.
+
 **Implementation Strategy**: This decision affects all RDF files, examples, and generated code. Should be resolved early in v1 development to minimize migration overhead.
 
 **Related**: All vocabulary files in `vocabularies/` directory and mapping files in `mappings/` directory depend on this decision.
@@ -87,7 +89,7 @@ These topics represent interesting research directions and framework improvement
 
 ---
 
-## 3. Multi-Pod Application Integration
+## 1. Multi-Pod Application Integration
 
 **Status**: Future Research  
 **Current Limitation**: Framework focuses on single-Pod CRDT synchronization but doesn't address applications that need to integrate data from multiple Pods, including Pods not owned by the user.
@@ -165,7 +167,7 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 **Related**: Builds on all current framework concepts but extends them into distributed, multi-authority scenarios that go beyond the current single-Pod collaborative model.
 
-## 4. Custom Tombstone Format Optimization
+## 2. Custom Tombstone Format Optimization
 
 **Status**: Future Research  
 **Current Approach**: Uses RDF Reification for semantic correctness but with significant overhead.
@@ -182,7 +184,7 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ---
 
-## 5. Provenance and Audit Trail Support
+## 3. Provenance and Audit Trail Support
 
 **Status**: Future Research  
 **Problem**: Framework tracks basic causality through Hybrid Logical Clocks but doesn't provide rich provenance information for auditing and compliance needs.
@@ -209,7 +211,7 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ---
 
-## 6. Legacy Data Import (Optional Extension)
+## 4. Legacy Data Import (Optional Extension)
 
 **Status**: Future Research  
 **Problem**: Framework requires new data to be CRDT-managed from creation, but many users have existing Solid data.
@@ -232,7 +234,7 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ---
 
-## 7. Proactive Access Control Integration
+## 5. Proactive Access Control Integration
 
 **Status**: Future Research  
 **Problem**: Framework assumes access control is handled externally, but production systems may need proactive permission checking to improve user experience.
@@ -253,7 +255,7 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ---
 
-## 8. Data Validation Integration
+## 6. Data Validation Integration
 
 **Status**: Future Research  
 **Problem**: Framework performs CRDT merge operations without semantic validation, potentially allowing invalid data states.
@@ -280,7 +282,7 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ---
 
-## 9. Private Type Index Support
+## 7. Private Type Index Support
 
 **Status**: Future Research (Low Priority)  
 **Current Approach**: Framework uses only the Public Type Index, making all CRDT-managed resources discoverable by other applications.
@@ -318,13 +320,13 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 **v2+ Future Research (7 topics)**:
 
-4. Multi-Pod Application Integration
-5. Custom Tombstone Format Optimization
-6. Provenance and Audit Trail Support
-7. Legacy Data Import
-8. Proactive Access Control Integration
-9. Data Validation Integration
-10. Private Type Index Support
+1. Multi-Pod Application Integration
+2. Custom Tombstone Format Optimization
+3. Provenance and Audit Trail Support
+4. Legacy Data Import
+5. Proactive Access Control Integration
+6. Data Validation Integration
+7. Private Type Index Support
 
 ---
 
