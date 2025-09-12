@@ -1,7 +1,9 @@
 /// Business logic for managing categories with CRDT sync.
 library;
 
+import 'dart:async';
 import 'dart:math';
+
 import '../models/category.dart';
 import '../models/note.dart';
 import '../storage/repositories.dart';
@@ -44,37 +46,12 @@ class CategoriesService {
   }
 
   /// Archive a category (soft delete) - sets archived flag to true
-  /// 
+  ///
   /// Soft delete - marks category as archived but keeps it referenceable.
-  /// This is the recommended approach for categories since they may be 
+  /// This is the recommended approach for categories since they may be
   /// referenced by external applications.
   Future<void> archiveCategory(String id) async {
     await _categoryRepository.archiveCategory(id);
-  }
-
-  /// Delete a category
-  ///
-  /// Note: This does not check if the category is in use by notes.
-  /// Consider using [deleteCategoryIfUnused] for safer deletion.
-  Future<void> deleteCategory(String id) async {
-    // For now, delete directly from repository
-    // TODO: Implement CRDT deletion via sync system
-    await _categoryRepository.deleteCategory(id);
-  }
-
-  /// Delete a category only if it's not used by any notes
-  ///
-  /// Returns true if category was deleted, false if it's in use.
-  Future<bool> deleteCategoryIfUnused(String id) async {
-    // Check if category is used by any notes
-    final notesInCategory = await getNotesInCategory(id);
-
-    if (notesInCategory.isNotEmpty) {
-      return false; // Category is in use, cannot delete
-    }
-
-    await deleteCategory(id);
-    return true;
   }
 
   /// Create a new category with generated ID

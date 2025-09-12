@@ -42,11 +42,6 @@ class MockNoteRepository implements NoteRepository {
     return storedNotes.where((n) => n.categoryId == null).toList();
   }
   
-  @override
-  Future<void> clear() async {
-    storedNotes.clear();
-  }
-  
 
   @override
   void dispose() {}

@@ -215,51 +215,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }
   }
 
-  Future<void> _deleteCategory(Category category) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Category'),
-        content: Text(
-          'Are you sure you want to delete "${category.name}"?\n\n'
-          'Notes in this category will become uncategorized.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await widget.categoriesService.deleteCategory(category.id);
-        _loadCategories();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Deleted category "${category.name}"')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete category: $e')),
-          );
-        }
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -412,9 +367,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                       case 'archive':
                                         _archiveCategory(category);
                                         break;
-                                      case 'delete':
-                                        _deleteCategory(category);
-                                        break;
                                     }
                                   },
                                   itemBuilder: (context) => [
@@ -427,10 +379,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                         value: 'archive',
                                         child: Text('Archive'),
                                       ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('Delete'),
-                                    ),
                                   ],
                                 ),
                               ),

@@ -112,21 +112,9 @@ class CategoryRepository {
     }
   }
 
-  /// Delete a category by ID
-  Future<void> deleteCategory(String id) async {
-    // For now, delete directly from local storage
-    // TODO: Implement CRDT deletion via sync system
-    await _categoryDao.deleteCategoryById(id);
-  }
-
   /// Check if a category exists
   Future<bool> categoryExists(String id) async {
     return await _categoryDao.categoryExists(id);
-  }
-
-  /// Clear all categories (for testing)
-  Future<void> clear() async {
-    await _categoryDao.clearAllCategories();
   }
 
   /// Dispose resources when repository is no longer needed
@@ -263,11 +251,6 @@ class NoteRepository {
   Future<List<models.Note>> getUncategorizedNotes() async {
     final driftNotes = await _noteDao.getUncategorizedNotes();
     return driftNotes.map(_noteFromDrift).toList();
-  }
-
-  /// Clear all notes (for testing)
-  Future<void> clear() async {
-    await _noteDao.clearAllNotes();
   }
 
   /// Dispose resources when repository is no longer needed

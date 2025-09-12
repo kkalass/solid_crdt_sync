@@ -42,18 +42,8 @@ class MockCategoryRepository implements CategoryRepository {
   }
 
   @override
-  Future<void> deleteCategory(String id) async {
-    storedCategories.removeWhere((c) => c.id == id);
-  }
-
-  @override
   Future<bool> categoryExists(String id) async {
     return storedCategories.any((c) => c.id == id);
-  }
-
-  @override
-  Future<void> clear() async {
-    storedCategories.clear();
   }
 
   @override
