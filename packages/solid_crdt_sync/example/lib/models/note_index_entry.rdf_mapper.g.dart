@@ -21,8 +21,12 @@ import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
 /// This mapper handles serialization and deserialization between Dart objects
 /// and RDF triples for resources of type `nie.NoteIndexEntry`.
 class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
+  final IriTermMapper<String> _idMapper;
+
   /// Constructor
-  const NoteIndexEntryMapper();
+  const NoteIndexEntryMapper({
+    IriTermMapper<String> idMapper = const IriFullMapper(),
+  }) : _idMapper = idMapper;
 
   @override
   IriTerm? get typeIri => null;
@@ -34,14 +38,20 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
   ) {
     final reader = context.reader(subject);
 
-    final String title = reader.require(SchemaNoteDigitalDocument.name);
-    final DateTime createdAt = reader.require(
+    final String id = reader.require(
+      const IriTerm.prevalidated(
+        'https://kkalass.github.io/solid_crdt_sync/vocab/idx#resource',
+      ),
+      deserializer: _idMapper,
+    );
+    final String name = reader.require(SchemaNoteDigitalDocument.name);
+    final DateTime dateCreated = reader.require(
       SchemaNoteDigitalDocument.dateCreated,
     );
-    final DateTime modifiedAt = reader.require(
+    final DateTime dateModified = reader.require(
       SchemaNoteDigitalDocument.dateModified,
     );
-    final Set<String> tags = reader.requireCollection<Set<String>, String>(
+    final Set<String> keywords = reader.requireCollection<Set<String>, String>(
       SchemaNoteDigitalDocument.keywords,
       UnorderedItemsSetMapper.new,
     );
@@ -50,10 +60,11 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
     );
 
     return nie.NoteIndexEntry(
-      title: title,
-      createdAt: createdAt,
-      modifiedAt: modifiedAt,
-      tags: tags,
+      id: id,
+      name: name,
+      dateCreated: dateCreated,
+      dateModified: dateModified,
+      keywords: keywords,
       categoryId: categoryId,
     );
   }
@@ -68,12 +79,19 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
 
     return context
         .resourceBuilder(subject)
-        .addValue(SchemaNoteDigitalDocument.name, resource.title)
-        .addValue(SchemaNoteDigitalDocument.dateCreated, resource.createdAt)
-        .addValue(SchemaNoteDigitalDocument.dateModified, resource.modifiedAt)
+        .addValue(
+          const IriTerm.prevalidated(
+            'https://kkalass.github.io/solid_crdt_sync/vocab/idx#resource',
+          ),
+          resource.id,
+          serializer: _idMapper,
+        )
+        .addValue(SchemaNoteDigitalDocument.name, resource.name)
+        .addValue(SchemaNoteDigitalDocument.dateCreated, resource.dateCreated)
+        .addValue(SchemaNoteDigitalDocument.dateModified, resource.dateModified)
         .addCollection<Set<String>, String>(
           SchemaNoteDigitalDocument.keywords,
-          resource.tags,
+          resource.keywords,
           UnorderedItemsSetMapper.new,
         )
         .when(

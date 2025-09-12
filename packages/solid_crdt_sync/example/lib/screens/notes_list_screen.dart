@@ -4,7 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
-import '../models/note.dart';
+import '../models/note_index_entry.dart';
 import '../services/notes_service.dart';
 import '../services/categories_service.dart';
 import 'categories_screen.dart';
@@ -27,9 +27,10 @@ class NotesListScreen extends StatefulWidget {
 }
 
 class _NotesListScreenState extends State<NotesListScreen> {
-  List<Note> _notes = [];
+  List<NoteIndexEntry> _noteEntries = [];
   bool _loading = true;
   bool _isConnected = false;
+  String? _selectedCategoryFilter;
 
   @override
   void initState() {
@@ -41,9 +42,19 @@ class _NotesListScreenState extends State<NotesListScreen> {
   Future<void> _loadNotes() async {
     setState(() => _loading = true);
     try {
-      final notes = await widget.notesService.getAllNotes();
+      List<NoteIndexEntry> noteEntries;
+      
+      if (_selectedCategoryFilter != null) {
+        // Demonstrate group loading: ensure category group is available before browsing
+        noteEntries = await widget.notesService
+            .getNoteIndexEntriesByCategoryWithLoading(_selectedCategoryFilter!);
+      } else {
+        // Load all note index entries for browsing
+        noteEntries = await widget.notesService.getAllNoteIndexEntries();
+      }
+      
       setState(() {
-        _notes = notes;
+        _noteEntries = noteEntries;
         _loading = false;
       });
     } catch (error) {
@@ -53,6 +64,52 @@ class _NotesListScreenState extends State<NotesListScreen> {
           SnackBar(content: Text('Error loading notes: $error')),
         );
       }
+    }
+  }
+
+  /// Filter notes by category - demonstrates group loading behavior
+  Future<void> _filterByCategory(String? categoryId) async {
+    setState(() {
+      _selectedCategoryFilter = categoryId;
+    });
+    
+    // Demonstrate smart loading strategy decisions
+    if (categoryId != null) {
+      await _applySmartLoadingStrategy(categoryId);
+    }
+    
+    // Reload notes with the new filter
+    await _loadNotes();
+    
+    // Show feedback about group loading (for demonstration)
+    if (mounted && categoryId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Loaded notes for category: $categoryId\n'
+                      'Group loading ensures index is available.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  /// Demonstrate application-level smart loading strategy decisions
+  Future<void> _applySmartLoadingStrategy(String categoryId) async {
+    // This demonstrates how the application can decide between different loading strategies
+    // based on user behavior, category type, or other factors
+    
+    if (categoryId == 'work') {
+      // Work notes: User likely to browse multiple items - prefetch full data
+      await widget.notesService.prefetchGroupData(categoryId);
+      print('Strategy: Prefetching full data for work notes (heavy usage expected)');
+    } else if (categoryId == 'archive') {
+      // Archive notes: User likely just browsing - load index only
+      await widget.notesService.ensureGroupIndexLoaded(categoryId);
+      print('Strategy: Index-only for archived notes (light browsing expected)');
+    } else {
+      // Personal notes: Balanced approach - ensure index, prefetch on demand
+      await widget.notesService.ensureGroupIndexLoaded(categoryId);
+      print('Strategy: Index-first for $categoryId notes (balanced approach)');
     }
   }
 
@@ -127,25 +184,38 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
   }
 
-  void _editNote(Note note) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => NoteEditorScreen(
-          notesService: widget.notesService,
-          note: note,
-          onSaved: _loadNotes,
+  Future<void> _editNote(NoteIndexEntry noteEntry) async {
+    // Load full note data on-demand for editing
+    final note = await widget.notesService.getNote(noteEntry.id);
+    if (note == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Note not found: ${noteEntry.id}')),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NoteEditorScreen(
+            notesService: widget.notesService,
+            note: note,
+            onSaved: _loadNotes,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
-  Future<void> _deleteNote(Note note) async {
+  Future<void> _deleteNote(NoteIndexEntry noteEntry) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Note'),
-        content: Text('Are you sure you want to delete "${note.title}"?'),
+        content: Text('Are you sure you want to delete "${noteEntry.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -160,7 +230,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
 
     if (confirmed == true) {
-      await widget.notesService.deleteNote(note.id);
+      await widget.notesService.deleteNote(noteEntry.id);
       await _loadNotes();
     }
   }
@@ -172,6 +242,58 @@ class _NotesListScreenState extends State<NotesListScreen> {
         title: const Text('Personal Notes'),
         elevation: 0,
         actions: [
+          // Category filter dropdown - demonstrates group loading
+          PopupMenuButton<String?>(
+            icon: Icon(_selectedCategoryFilter != null 
+                ? Icons.filter_alt 
+                : Icons.filter_alt_outlined),
+            tooltip: 'Filter by Category',
+            onSelected: _filterByCategory,
+            itemBuilder: (context) => [
+              const PopupMenuItem<String?>(
+                value: null,
+                child: Row(
+                  children: [
+                    Icon(Icons.clear_all),
+                    SizedBox(width: 8),
+                    Text('All Notes'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              // Demo categories to show group loading behavior
+              const PopupMenuItem<String>(
+                value: 'work',
+                child: Row(
+                  children: [
+                    Icon(Icons.work),
+                    SizedBox(width: 8),
+                    Text('Work Notes'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'personal',
+                child: Row(
+                  children: [
+                    Icon(Icons.person),
+                    SizedBox(width: 8),
+                    Text('Personal Notes'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'archive',
+                child: Row(
+                  children: [
+                    Icon(Icons.archive),
+                    SizedBox(width: 8),
+                    Text('Archived Notes'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           // Categories button
           IconButton(
             onPressed: _openCategories,
@@ -197,7 +319,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _notes.isEmpty
+          : _noteEntries.isEmpty
               ? _buildEmptyState()
               : _buildNotesList(),
       floatingActionButton: FloatingActionButton(
@@ -239,38 +361,41 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   Widget _buildNotesList() {
     return ListView.builder(
-      itemCount: _notes.length,
+      itemCount: _noteEntries.length,
       itemBuilder: (context, index) {
-        final note = _notes[index];
+        final noteEntry = _noteEntries[index];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: ListTile(
             title: Text(
-              note.title.isEmpty ? 'Untitled' : note.title,
+              noteEntry.name.isEmpty ? 'Untitled' : noteEntry.name,
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: note.title.isEmpty ? Colors.grey : null,
+                color: noteEntry.name.isEmpty ? Colors.grey : null,
               ),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (note.content.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    note.content,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                // Note: content not available in index entries - this is expected
+                // Users need to tap to load full note for content
+                const SizedBox(height: 4),
+                Text(
+                  'Tap to view content...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
                   ),
-                ],
-                if (note.tags.isNotEmpty) ...[
+                ),
+                if (noteEntry.keywords.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 4,
-                    children: note.tags
+                    children: noteEntry.keywords
                         .take(3)
-                        .map((tag) => Chip(
-                              label: Text(tag,
+                        .map((keyword) => Chip(
+                              label: Text(keyword,
                                   style: const TextStyle(fontSize: 11)),
                               materialTapTargetSize:
                                   MaterialTapTargetSize.shrinkWrap,
@@ -281,12 +406,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
                 ],
                 const SizedBox(height: 4),
                 Text(
-                  'Modified ${_formatDate(note.modifiedAt)}',
+                  'Modified ${_formatDate(noteEntry.dateModified)}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),
-            onTap: () => _editNote(note),
+            onTap: () => _editNote(noteEntry),
             trailing: PopupMenuButton(
               itemBuilder: (context) => [
                 PopupMenuItem(
@@ -302,7 +427,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
               ],
               onSelected: (value) {
                 if (value == 'delete') {
-                  _deleteNote(note);
+                  _deleteNote(noteEntry);
                 }
               },
             ),

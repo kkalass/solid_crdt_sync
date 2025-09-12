@@ -5,9 +5,13 @@
 /// like Hybrid Logical Clock hashes for change detection.
 library;
 
+import 'package:personal_notes_app/models/note.dart';
+import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
+import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
 import '../vocabulary/personal_notes_vocab.dart';
+import 'package:rdf_vocabularies_core/dc.dart';
 
 /// Lightweight index entry for Note resources.
 ///
@@ -19,35 +23,65 @@ import '../vocabulary/personal_notes_vocab.dart';
 /// No CRDT annotations needed - the framework handles conflict resolution.
 @RdfLocalResource()
 class NoteIndexEntry {
+  // FIXME: This is actually the resource reference in the index shard entry,
+  // but I guess this should work and is probably also quite understandable.
+  // TODO: provide generated sync vocabulary?
+  /// Note ID - same as the full Note resource
+  @RdfProperty(
+      IriTerm.prevalidated(
+          'https://kkalass.github.io/solid_crdt_sync/vocab/idx#resource'),
+      iri: PodResourceRef(Note))
+  final String id;
+
   /// Note title for display in lists
   @RdfProperty(SchemaNoteDigitalDocument.name)
-  final String title;
+  final String name;
 
   /// Creation date for sorting and grouping
   @RdfProperty(SchemaNoteDigitalDocument.dateCreated)
-  final DateTime createdAt;
+  final DateTime dateCreated;
 
   /// Last modification time
   @RdfProperty(SchemaNoteDigitalDocument.dateModified)
-  final DateTime modifiedAt;
+  final DateTime dateModified;
 
-  /// Tags for filtering
+  /// Keywords/tags for filtering
   @RdfProperty(SchemaNoteDigitalDocument.keywords)
-  final Set<String> tags;
+  final Set<String> keywords;
 
   /// Category ID for grouping
   @RdfProperty(PersonalNotesVocab.belongsToCategory)
   final String? categoryId;
 
   const NoteIndexEntry({
-    required this.title,
-    required this.createdAt,
-    required this.modifiedAt,
-    this.tags = const {},
+    required this.id,
+    required this.name,
+    required this.dateCreated,
+    required this.dateModified,
+    this.keywords = const {},
     this.categoryId,
   });
 
+  /// Create a copy with updated fields
+  NoteIndexEntry copyWith({
+    String? id,
+    String? name,
+    DateTime? dateCreated,
+    DateTime? dateModified,
+    Set<String>? keywords,
+    String? categoryId,
+  }) {
+    return NoteIndexEntry(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      dateCreated: dateCreated ?? this.dateCreated,
+      dateModified: dateModified ?? this.dateModified,
+      keywords: keywords ?? this.keywords,
+      categoryId: categoryId ?? this.categoryId,
+    );
+  }
+
   @override
   String toString() =>
-      'NoteIndexEntry(title: $title, createdAt: $createdAt, tags: $tags)';
+      'NoteIndexEntry(id: $id, name: $name, keywords: $keywords)';
 }

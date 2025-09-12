@@ -809,6 +809,414 @@ class NotesCompanion extends UpdateCompanion<Note> {
   }
 }
 
+class $NoteIndexEntriesTable extends NoteIndexEntries
+    with TableInfo<$NoteIndexEntriesTable, NoteIndexEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NoteIndexEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _dateCreatedMeta =
+      const VerificationMeta('dateCreated');
+  @override
+  late final GeneratedColumn<DateTime> dateCreated = GeneratedColumn<DateTime>(
+      'date_created', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _dateModifiedMeta =
+      const VerificationMeta('dateModified');
+  @override
+  late final GeneratedColumn<DateTime> dateModified = GeneratedColumn<DateTime>(
+      'date_modified', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _keywordsMeta =
+      const VerificationMeta('keywords');
+  @override
+  late final GeneratedColumn<String> keywords = GeneratedColumn<String>(
+      'keywords', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _categoryIdMeta =
+      const VerificationMeta('categoryId');
+  @override
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+      'category_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _groupIdMeta =
+      const VerificationMeta('groupId');
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+      'group_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, dateCreated, dateModified, keywords, categoryId, groupId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'note_index_entries';
+  @override
+  VerificationContext validateIntegrity(Insertable<NoteIndexEntry> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('date_created')) {
+      context.handle(
+          _dateCreatedMeta,
+          dateCreated.isAcceptableOrUnknown(
+              data['date_created']!, _dateCreatedMeta));
+    } else if (isInserting) {
+      context.missing(_dateCreatedMeta);
+    }
+    if (data.containsKey('date_modified')) {
+      context.handle(
+          _dateModifiedMeta,
+          dateModified.isAcceptableOrUnknown(
+              data['date_modified']!, _dateModifiedMeta));
+    } else if (isInserting) {
+      context.missing(_dateModifiedMeta);
+    }
+    if (data.containsKey('keywords')) {
+      context.handle(_keywordsMeta,
+          keywords.isAcceptableOrUnknown(data['keywords']!, _keywordsMeta));
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+          _categoryIdMeta,
+          categoryId.isAcceptableOrUnknown(
+              data['category_id']!, _categoryIdMeta));
+    }
+    if (data.containsKey('group_id')) {
+      context.handle(_groupIdMeta,
+          groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta));
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NoteIndexEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NoteIndexEntry(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      dateCreated: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}date_created'])!,
+      dateModified: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}date_modified'])!,
+      keywords: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}keywords']),
+      categoryId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
+      groupId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}group_id'])!,
+    );
+  }
+
+  @override
+  $NoteIndexEntriesTable createAlias(String alias) {
+    return $NoteIndexEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
+  /// Note ID (primary key, references note)
+  final String id;
+
+  /// Note name/title (from indexed properties)
+  final String name;
+
+  /// Creation timestamp (from indexed properties)
+  final DateTime dateCreated;
+
+  /// Last modification timestamp (from indexed properties)
+  final DateTime dateModified;
+
+  /// Keywords (from indexed properties)
+  final String? keywords;
+
+  /// Category ID (from indexed properties)
+  final String? categoryId;
+
+  /// Group ID - which GroupIndex group this entry belongs to
+  final String groupId;
+  const NoteIndexEntry(
+      {required this.id,
+      required this.name,
+      required this.dateCreated,
+      required this.dateModified,
+      this.keywords,
+      this.categoryId,
+      required this.groupId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['date_created'] = Variable<DateTime>(dateCreated);
+    map['date_modified'] = Variable<DateTime>(dateModified);
+    if (!nullToAbsent || keywords != null) {
+      map['keywords'] = Variable<String>(keywords);
+    }
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<String>(categoryId);
+    }
+    map['group_id'] = Variable<String>(groupId);
+    return map;
+  }
+
+  NoteIndexEntriesCompanion toCompanion(bool nullToAbsent) {
+    return NoteIndexEntriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      dateCreated: Value(dateCreated),
+      dateModified: Value(dateModified),
+      keywords: keywords == null && nullToAbsent
+          ? const Value.absent()
+          : Value(keywords),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      groupId: Value(groupId),
+    );
+  }
+
+  factory NoteIndexEntry.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NoteIndexEntry(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      dateCreated: serializer.fromJson<DateTime>(json['dateCreated']),
+      dateModified: serializer.fromJson<DateTime>(json['dateModified']),
+      keywords: serializer.fromJson<String?>(json['keywords']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
+      groupId: serializer.fromJson<String>(json['groupId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'dateCreated': serializer.toJson<DateTime>(dateCreated),
+      'dateModified': serializer.toJson<DateTime>(dateModified),
+      'keywords': serializer.toJson<String?>(keywords),
+      'categoryId': serializer.toJson<String?>(categoryId),
+      'groupId': serializer.toJson<String>(groupId),
+    };
+  }
+
+  NoteIndexEntry copyWith(
+          {String? id,
+          String? name,
+          DateTime? dateCreated,
+          DateTime? dateModified,
+          Value<String?> keywords = const Value.absent(),
+          Value<String?> categoryId = const Value.absent(),
+          String? groupId}) =>
+      NoteIndexEntry(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        dateCreated: dateCreated ?? this.dateCreated,
+        dateModified: dateModified ?? this.dateModified,
+        keywords: keywords.present ? keywords.value : this.keywords,
+        categoryId: categoryId.present ? categoryId.value : this.categoryId,
+        groupId: groupId ?? this.groupId,
+      );
+  NoteIndexEntry copyWithCompanion(NoteIndexEntriesCompanion data) {
+    return NoteIndexEntry(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      dateCreated:
+          data.dateCreated.present ? data.dateCreated.value : this.dateCreated,
+      dateModified: data.dateModified.present
+          ? data.dateModified.value
+          : this.dateModified,
+      keywords: data.keywords.present ? data.keywords.value : this.keywords,
+      categoryId:
+          data.categoryId.present ? data.categoryId.value : this.categoryId,
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteIndexEntry(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('dateCreated: $dateCreated, ')
+          ..write('dateModified: $dateModified, ')
+          ..write('keywords: $keywords, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('groupId: $groupId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id, name, dateCreated, dateModified, keywords, categoryId, groupId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NoteIndexEntry &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.dateCreated == this.dateCreated &&
+          other.dateModified == this.dateModified &&
+          other.keywords == this.keywords &&
+          other.categoryId == this.categoryId &&
+          other.groupId == this.groupId);
+}
+
+class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<DateTime> dateCreated;
+  final Value<DateTime> dateModified;
+  final Value<String?> keywords;
+  final Value<String?> categoryId;
+  final Value<String> groupId;
+  final Value<int> rowid;
+  const NoteIndexEntriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.dateCreated = const Value.absent(),
+    this.dateModified = const Value.absent(),
+    this.keywords = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.groupId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NoteIndexEntriesCompanion.insert({
+    required String id,
+    required String name,
+    required DateTime dateCreated,
+    required DateTime dateModified,
+    this.keywords = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    required String groupId,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name),
+        dateCreated = Value(dateCreated),
+        dateModified = Value(dateModified),
+        groupId = Value(groupId);
+  static Insertable<NoteIndexEntry> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<DateTime>? dateCreated,
+    Expression<DateTime>? dateModified,
+    Expression<String>? keywords,
+    Expression<String>? categoryId,
+    Expression<String>? groupId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (dateCreated != null) 'date_created': dateCreated,
+      if (dateModified != null) 'date_modified': dateModified,
+      if (keywords != null) 'keywords': keywords,
+      if (categoryId != null) 'category_id': categoryId,
+      if (groupId != null) 'group_id': groupId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NoteIndexEntriesCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<DateTime>? dateCreated,
+      Value<DateTime>? dateModified,
+      Value<String?>? keywords,
+      Value<String?>? categoryId,
+      Value<String>? groupId,
+      Value<int>? rowid}) {
+    return NoteIndexEntriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      dateCreated: dateCreated ?? this.dateCreated,
+      dateModified: dateModified ?? this.dateModified,
+      keywords: keywords ?? this.keywords,
+      categoryId: categoryId ?? this.categoryId,
+      groupId: groupId ?? this.groupId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (dateCreated.present) {
+      map['date_created'] = Variable<DateTime>(dateCreated.value);
+    }
+    if (dateModified.present) {
+      map['date_modified'] = Variable<DateTime>(dateModified.value);
+    }
+    if (keywords.present) {
+      map['keywords'] = Variable<String>(keywords.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<String>(categoryId.value);
+    }
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NoteIndexEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('dateCreated: $dateCreated, ')
+          ..write('dateModified: $dateModified, ')
+          ..write('keywords: $keywords, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('groupId: $groupId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $HydrationCursorsTable extends HydrationCursors
     with TableInfo<$HydrationCursorsTable, HydrationCursor> {
   @override
@@ -1056,17 +1464,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $NotesTable notes = $NotesTable(this);
+  late final $NoteIndexEntriesTable noteIndexEntries =
+      $NoteIndexEntriesTable(this);
   late final $HydrationCursorsTable hydrationCursors =
       $HydrationCursorsTable(this);
   late final CategoryDao categoryDao = CategoryDao(this as AppDatabase);
   late final NoteDao noteDao = NoteDao(this as AppDatabase);
+  late final NoteIndexEntryDao noteIndexEntryDao =
+      NoteIndexEntryDao(this as AppDatabase);
   late final CursorDao cursorDao = CursorDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [categories, notes, hydrationCursors];
+      [categories, notes, noteIndexEntries, hydrationCursors];
 }
 
 typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
@@ -1650,6 +2062,211 @@ typedef $$NotesTableProcessedTableManager = ProcessedTableManager<
     (Note, $$NotesTableReferences),
     Note,
     PrefetchHooks Function({bool categoryId})>;
+typedef $$NoteIndexEntriesTableCreateCompanionBuilder
+    = NoteIndexEntriesCompanion Function({
+  required String id,
+  required String name,
+  required DateTime dateCreated,
+  required DateTime dateModified,
+  Value<String?> keywords,
+  Value<String?> categoryId,
+  required String groupId,
+  Value<int> rowid,
+});
+typedef $$NoteIndexEntriesTableUpdateCompanionBuilder
+    = NoteIndexEntriesCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<DateTime> dateCreated,
+  Value<DateTime> dateModified,
+  Value<String?> keywords,
+  Value<String?> categoryId,
+  Value<String> groupId,
+  Value<int> rowid,
+});
+
+class $$NoteIndexEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $NoteIndexEntriesTable> {
+  $$NoteIndexEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get dateCreated => $composableBuilder(
+      column: $table.dateCreated, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get dateModified => $composableBuilder(
+      column: $table.dateModified, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get keywords => $composableBuilder(
+      column: $table.keywords, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get groupId => $composableBuilder(
+      column: $table.groupId, builder: (column) => ColumnFilters(column));
+}
+
+class $$NoteIndexEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NoteIndexEntriesTable> {
+  $$NoteIndexEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get dateCreated => $composableBuilder(
+      column: $table.dateCreated, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get dateModified => $composableBuilder(
+      column: $table.dateModified,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get keywords => $composableBuilder(
+      column: $table.keywords, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get groupId => $composableBuilder(
+      column: $table.groupId, builder: (column) => ColumnOrderings(column));
+}
+
+class $$NoteIndexEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NoteIndexEntriesTable> {
+  $$NoteIndexEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dateCreated => $composableBuilder(
+      column: $table.dateCreated, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dateModified => $composableBuilder(
+      column: $table.dateModified, builder: (column) => column);
+
+  GeneratedColumn<String> get keywords =>
+      $composableBuilder(column: $table.keywords, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+      column: $table.categoryId, builder: (column) => column);
+
+  GeneratedColumn<String> get groupId =>
+      $composableBuilder(column: $table.groupId, builder: (column) => column);
+}
+
+class $$NoteIndexEntriesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $NoteIndexEntriesTable,
+    NoteIndexEntry,
+    $$NoteIndexEntriesTableFilterComposer,
+    $$NoteIndexEntriesTableOrderingComposer,
+    $$NoteIndexEntriesTableAnnotationComposer,
+    $$NoteIndexEntriesTableCreateCompanionBuilder,
+    $$NoteIndexEntriesTableUpdateCompanionBuilder,
+    (
+      NoteIndexEntry,
+      BaseReferences<_$AppDatabase, $NoteIndexEntriesTable, NoteIndexEntry>
+    ),
+    NoteIndexEntry,
+    PrefetchHooks Function()> {
+  $$NoteIndexEntriesTableTableManager(
+      _$AppDatabase db, $NoteIndexEntriesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NoteIndexEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NoteIndexEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NoteIndexEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<DateTime> dateCreated = const Value.absent(),
+            Value<DateTime> dateModified = const Value.absent(),
+            Value<String?> keywords = const Value.absent(),
+            Value<String?> categoryId = const Value.absent(),
+            Value<String> groupId = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              NoteIndexEntriesCompanion(
+            id: id,
+            name: name,
+            dateCreated: dateCreated,
+            dateModified: dateModified,
+            keywords: keywords,
+            categoryId: categoryId,
+            groupId: groupId,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            required DateTime dateCreated,
+            required DateTime dateModified,
+            Value<String?> keywords = const Value.absent(),
+            Value<String?> categoryId = const Value.absent(),
+            required String groupId,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              NoteIndexEntriesCompanion.insert(
+            id: id,
+            name: name,
+            dateCreated: dateCreated,
+            dateModified: dateModified,
+            keywords: keywords,
+            categoryId: categoryId,
+            groupId: groupId,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$NoteIndexEntriesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $NoteIndexEntriesTable,
+    NoteIndexEntry,
+    $$NoteIndexEntriesTableFilterComposer,
+    $$NoteIndexEntriesTableOrderingComposer,
+    $$NoteIndexEntriesTableAnnotationComposer,
+    $$NoteIndexEntriesTableCreateCompanionBuilder,
+    $$NoteIndexEntriesTableUpdateCompanionBuilder,
+    (
+      NoteIndexEntry,
+      BaseReferences<_$AppDatabase, $NoteIndexEntriesTable, NoteIndexEntry>
+    ),
+    NoteIndexEntry,
+    PrefetchHooks Function()>;
 typedef $$HydrationCursorsTableCreateCompanionBuilder
     = HydrationCursorsCompanion Function({
   required String resourceType,
@@ -1803,6 +2420,8 @@ class $AppDatabaseManager {
       $$CategoriesTableTableManager(_db, _db.categories);
   $$NotesTableTableManager get notes =>
       $$NotesTableTableManager(_db, _db.notes);
+  $$NoteIndexEntriesTableTableManager get noteIndexEntries =>
+      $$NoteIndexEntriesTableTableManager(_db, _db.noteIndexEntries);
   $$HydrationCursorsTableTableManager get hydrationCursors =>
       $$HydrationCursorsTableTableManager(_db, _db.hydrationCursors);
 }
@@ -1813,6 +2432,10 @@ mixin _$CategoryDaoMixin on DatabaseAccessor<AppDatabase> {
 mixin _$NoteDaoMixin on DatabaseAccessor<AppDatabase> {
   $CategoriesTable get categories => attachedDatabase.categories;
   $NotesTable get notes => attachedDatabase.notes;
+}
+mixin _$NoteIndexEntryDaoMixin on DatabaseAccessor<AppDatabase> {
+  $NoteIndexEntriesTable get noteIndexEntries =>
+      attachedDatabase.noteIndexEntries;
 }
 mixin _$CursorDaoMixin on DatabaseAccessor<AppDatabase> {
   $HydrationCursorsTable get hydrationCursors =>

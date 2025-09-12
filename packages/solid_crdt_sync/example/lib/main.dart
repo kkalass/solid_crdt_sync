@@ -61,7 +61,6 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
             GroupIndex(Note,
                 defaultIndexPath: '/index/notes',
                 // TODO: How/where to configure the actual groups to sync? And do they need their own fetch policy?
-                itemFetchPolicy: ItemFetchPolicy.onRequest,
                 item: IndexItem(NoteIndexEntry, [
                   SchemaNoteDigitalDocument.name,
                   SchemaNoteDigitalDocument.dateCreated,
@@ -176,8 +175,8 @@ class _AppInitializerState extends State<AppInitializer>
       // Initialize repositories with database DAOs, cursor DAO, and sync system, hydrating existing data
       final categoryRepo = await CategoryRepository.create(
           appDb.categoryDao, appDb.cursorDao, syncSys);
-      final noteRepo =
-          await NoteRepository.create(appDb.noteDao, appDb.cursorDao, syncSys);
+      final noteRepo = await NoteRepository.create(
+          appDb.noteDao, appDb.noteIndexEntryDao, appDb.cursorDao, syncSys);
 
       // Initialize services with repositories
       final notesSvc = NotesService(noteRepo);

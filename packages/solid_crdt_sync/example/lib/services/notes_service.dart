@@ -3,6 +3,7 @@ library;
 
 import 'dart:math';
 import '../models/note.dart';
+import '../models/note_index_entry.dart';
 import '../storage/repositories.dart';
 
 /// Service for managing notes with local-first CRDT synchronization.
@@ -20,6 +21,21 @@ class NotesService {
   Future<List<Note>> getAllNotes() async {
     // Repository handles queries and returns sorted results
     return await _noteRepository.getAllNotes();
+  }
+
+  /// Get all note index entries for lightweight browsing
+  Future<List<NoteIndexEntry>> getAllNoteIndexEntries() async {
+    return await _noteRepository.getAllNoteIndexEntries();
+  }
+
+  /// Get note index entries by category for browsing
+  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategory(String categoryId) async {
+    return await _noteRepository.getNoteIndexEntriesByCategory(categoryId);
+  }
+
+  /// Get note index entries by group for browsing
+  Future<List<NoteIndexEntry>> getNoteIndexEntriesByGroup(String groupId) async {
+    return await _noteRepository.getNoteIndexEntriesByGroup(groupId);
   }
 
   /// Get a specific note by ID
@@ -114,6 +130,53 @@ class NotesService {
       final updatedNote = note.copyWith(categoryId: categoryId);
       await saveNote(updatedNote);
     }
+  }
+
+  /// Load note index entries for a specific group (category-based grouping)
+  /// This is used when navigating to a category that might not be indexed yet
+  Future<void> ensureGroupIndexLoaded(String groupId) async {
+    // TODO: Call sync system to ensure the group's index is loaded
+    // For now, this is a placeholder for the SolidCrdtSync API we discussed
+    // In the final implementation, this would call something like:
+    // await syncSystem.loadGroupIndex<NoteIndexEntry>(groupId);
+    
+    // Placeholder: just log the request for now
+    print('Ensuring group index is loaded for group: $groupId');
+  }
+
+  /// Load full data for a group (prefetch strategy)
+  /// This is used when the app determines a group will be heavily accessed
+  Future<void> prefetchGroupData(String groupId) async {
+    // TODO: Call sync system to prefetch all notes in the group
+    // For now, this is a placeholder for the SolidCrdtSync API we discussed
+    // In the final implementation, this would call something like:
+    // await syncSystem.loadGroupData<Note>(groupId);
+    
+    // Placeholder: just log the request for now
+    print('Prefetching full data for group: $groupId');
+  }
+
+  /// Smart navigation helper: ensures a category's notes are available for browsing
+  /// Returns true if index entries are available, false if group needs loading
+  Future<bool> ensureCategoryAvailable(String categoryId) async {
+    // First, ensure the group index is loaded
+    await ensureGroupIndexLoaded(categoryId);
+    
+    // Check if we have index entries for this category
+    final indexEntries = await getNoteIndexEntriesByCategory(categoryId);
+    
+    // Return whether we found any entries (true means ready for browsing)
+    return indexEntries.isNotEmpty;
+  }
+
+  /// Get notes by category with automatic group loading
+  /// This method ensures the category group is available before returning results
+  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategoryWithLoading(String categoryId) async {
+    // Ensure the category group is loaded
+    await ensureCategoryAvailable(categoryId);
+    
+    // Return the index entries (may be empty if the category truly has no notes)
+    return await getNoteIndexEntriesByCategory(categoryId);
   }
 
   /// Generate a unique ID for new notes
