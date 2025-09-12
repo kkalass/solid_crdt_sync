@@ -49,6 +49,38 @@ These topics must be completed for v1 release. They represent essential function
 
 ---
 
+## 3. Permanent IRI Strategy
+
+**Priority**: Critical for v1 Release  
+**Current Issue**: Framework uses temporary GitHub Pages IRIs (`https://kkalass.github.io/solid_crdt_sync/vocab/` and `https://kkalass.github.io/solid_crdt_sync/mappings/`) which are not suitable for production use due to maintenance and permanence concerns.
+
+**Key Decision Points**:
+
+**Domain Registration Option**:
+- **Pros**: Full control over namespace, immediate availability, standard practice
+- **Cons**: Long-term maintenance commitment, domain renewal costs, single point of failure
+
+**W3C Standards Track Option**: 
+- **Pros**: Maximum permanence and legitimacy, W3C maintenance backing
+- **Cons**: Lengthy standards process, requires community consensus, may not be accepted
+
+**W3ID.org Permanent Identifier Service Option**:
+- **Pros**: Designed specifically for permanent identifiers, no maintenance burden, academic backing
+- **Cons**: External dependency, less direct control over redirects
+- **Proposed IRIs**: `w3id.org/solid-crdt-sync/vocab/` and `w3id.org/solid-crdt-sync/mappings/`
+
+**v1 Requirements**:
+- **Vocabulary IRIs**: Permanent identifiers for `crdt:`, `algo:`, `sync:`, `idx:`, and `mc:` vocabularies
+- **Mapping IRIs**: Stable base for merge contract mappings (`core-v1.ttl`, etc.)
+- **Migration Strategy**: Clear upgrade path from current GitHub Pages IRIs
+- **Documentation**: Updated examples and specifications with final IRI decisions
+
+**Implementation Strategy**: This decision affects all RDF files, examples, and generated code. Should be resolved early in v1 development to minimize migration overhead.
+
+**Related**: All vocabulary files in `vocabularies/` directory and mapping files in `mappings/` directory depend on this decision.
+
+---
+
 # Version 2+ (Future Research and Enhancements)
 
 These topics represent interesting research directions and framework improvements to explore after v1 is completed. Priority and timeline will be determined based on practical needs and research outcomes.
@@ -279,19 +311,20 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 ## Implementation Priority Overview
 
-**v1 Critical Requirements (2 topics)**:
+**v1 Critical Requirements (3 topics)**:
 1. Extended CRDT Algorithm and RDF Structure Support
 2. Framework Version Compatibility Strategy
+3. Permanent IRI Strategy
 
 **v2+ Future Research (7 topics)**:
 
-3. Multi-Pod Application Integration
-4. Custom Tombstone Format Optimization
-5. Provenance and Audit Trail Support
-6. Legacy Data Import
-7. Proactive Access Control Integration
-8. Data Validation Integration
-9. Private Type Index Support
+4. Multi-Pod Application Integration
+5. Custom Tombstone Format Optimization
+6. Provenance and Audit Trail Support
+7. Legacy Data Import
+8. Proactive Access Control Integration
+9. Data Validation Integration
+10. Private Type Index Support
 
 ---
 
