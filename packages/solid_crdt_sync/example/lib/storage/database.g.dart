@@ -769,18 +769,264 @@ class NotesCompanion extends UpdateCompanion<Note> {
   }
 }
 
+class $HydrationCursorsTable extends HydrationCursors
+    with TableInfo<$HydrationCursorsTable, HydrationCursor> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HydrationCursorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _resourceTypeMeta =
+      const VerificationMeta('resourceType');
+  @override
+  late final GeneratedColumn<String> resourceType = GeneratedColumn<String>(
+      'resource_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _cursorMeta = const VerificationMeta('cursor');
+  @override
+  late final GeneratedColumn<String> cursor = GeneratedColumn<String>(
+      'cursor', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [resourceType, cursor, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'hydration_cursors';
+  @override
+  VerificationContext validateIntegrity(Insertable<HydrationCursor> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('resource_type')) {
+      context.handle(
+          _resourceTypeMeta,
+          resourceType.isAcceptableOrUnknown(
+              data['resource_type']!, _resourceTypeMeta));
+    } else if (isInserting) {
+      context.missing(_resourceTypeMeta);
+    }
+    if (data.containsKey('cursor')) {
+      context.handle(_cursorMeta,
+          cursor.isAcceptableOrUnknown(data['cursor']!, _cursorMeta));
+    } else if (isInserting) {
+      context.missing(_cursorMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {resourceType};
+  @override
+  HydrationCursor map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HydrationCursor(
+      resourceType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}resource_type'])!,
+      cursor: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cursor'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $HydrationCursorsTable createAlias(String alias) {
+    return $HydrationCursorsTable(attachedDatabase, alias);
+  }
+}
+
+class HydrationCursor extends DataClass implements Insertable<HydrationCursor> {
+  /// Resource type (e.g., 'category', 'note')
+  final String resourceType;
+
+  /// Last processed cursor value
+  final String cursor;
+
+  /// Last update timestamp
+  final DateTime updatedAt;
+  const HydrationCursor(
+      {required this.resourceType,
+      required this.cursor,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['resource_type'] = Variable<String>(resourceType);
+    map['cursor'] = Variable<String>(cursor);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  HydrationCursorsCompanion toCompanion(bool nullToAbsent) {
+    return HydrationCursorsCompanion(
+      resourceType: Value(resourceType),
+      cursor: Value(cursor),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory HydrationCursor.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HydrationCursor(
+      resourceType: serializer.fromJson<String>(json['resourceType']),
+      cursor: serializer.fromJson<String>(json['cursor']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'resourceType': serializer.toJson<String>(resourceType),
+      'cursor': serializer.toJson<String>(cursor),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  HydrationCursor copyWith(
+          {String? resourceType, String? cursor, DateTime? updatedAt}) =>
+      HydrationCursor(
+        resourceType: resourceType ?? this.resourceType,
+        cursor: cursor ?? this.cursor,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  HydrationCursor copyWithCompanion(HydrationCursorsCompanion data) {
+    return HydrationCursor(
+      resourceType: data.resourceType.present
+          ? data.resourceType.value
+          : this.resourceType,
+      cursor: data.cursor.present ? data.cursor.value : this.cursor,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HydrationCursor(')
+          ..write('resourceType: $resourceType, ')
+          ..write('cursor: $cursor, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(resourceType, cursor, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HydrationCursor &&
+          other.resourceType == this.resourceType &&
+          other.cursor == this.cursor &&
+          other.updatedAt == this.updatedAt);
+}
+
+class HydrationCursorsCompanion extends UpdateCompanion<HydrationCursor> {
+  final Value<String> resourceType;
+  final Value<String> cursor;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const HydrationCursorsCompanion({
+    this.resourceType = const Value.absent(),
+    this.cursor = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HydrationCursorsCompanion.insert({
+    required String resourceType,
+    required String cursor,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : resourceType = Value(resourceType),
+        cursor = Value(cursor),
+        updatedAt = Value(updatedAt);
+  static Insertable<HydrationCursor> custom({
+    Expression<String>? resourceType,
+    Expression<String>? cursor,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (resourceType != null) 'resource_type': resourceType,
+      if (cursor != null) 'cursor': cursor,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HydrationCursorsCompanion copyWith(
+      {Value<String>? resourceType,
+      Value<String>? cursor,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return HydrationCursorsCompanion(
+      resourceType: resourceType ?? this.resourceType,
+      cursor: cursor ?? this.cursor,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (resourceType.present) {
+      map['resource_type'] = Variable<String>(resourceType.value);
+    }
+    if (cursor.present) {
+      map['cursor'] = Variable<String>(cursor.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HydrationCursorsCompanion(')
+          ..write('resourceType: $resourceType, ')
+          ..write('cursor: $cursor, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $NotesTable notes = $NotesTable(this);
+  late final $HydrationCursorsTable hydrationCursors =
+      $HydrationCursorsTable(this);
   late final CategoryDao categoryDao = CategoryDao(this as AppDatabase);
   late final NoteDao noteDao = NoteDao(this as AppDatabase);
+  late final CursorDao cursorDao = CursorDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [categories, notes];
+  List<DatabaseSchemaEntity> get allSchemaEntities =>
+      [categories, notes, hydrationCursors];
 }
 
 typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
@@ -1349,6 +1595,151 @@ typedef $$NotesTableProcessedTableManager = ProcessedTableManager<
     (Note, $$NotesTableReferences),
     Note,
     PrefetchHooks Function({bool categoryId})>;
+typedef $$HydrationCursorsTableCreateCompanionBuilder
+    = HydrationCursorsCompanion Function({
+  required String resourceType,
+  required String cursor,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$HydrationCursorsTableUpdateCompanionBuilder
+    = HydrationCursorsCompanion Function({
+  Value<String> resourceType,
+  Value<String> cursor,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$HydrationCursorsTableFilterComposer
+    extends Composer<_$AppDatabase, $HydrationCursorsTable> {
+  $$HydrationCursorsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get resourceType => $composableBuilder(
+      column: $table.resourceType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cursor => $composableBuilder(
+      column: $table.cursor, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$HydrationCursorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $HydrationCursorsTable> {
+  $$HydrationCursorsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get resourceType => $composableBuilder(
+      column: $table.resourceType,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cursor => $composableBuilder(
+      column: $table.cursor, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$HydrationCursorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HydrationCursorsTable> {
+  $$HydrationCursorsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get resourceType => $composableBuilder(
+      column: $table.resourceType, builder: (column) => column);
+
+  GeneratedColumn<String> get cursor =>
+      $composableBuilder(column: $table.cursor, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$HydrationCursorsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $HydrationCursorsTable,
+    HydrationCursor,
+    $$HydrationCursorsTableFilterComposer,
+    $$HydrationCursorsTableOrderingComposer,
+    $$HydrationCursorsTableAnnotationComposer,
+    $$HydrationCursorsTableCreateCompanionBuilder,
+    $$HydrationCursorsTableUpdateCompanionBuilder,
+    (
+      HydrationCursor,
+      BaseReferences<_$AppDatabase, $HydrationCursorsTable, HydrationCursor>
+    ),
+    HydrationCursor,
+    PrefetchHooks Function()> {
+  $$HydrationCursorsTableTableManager(
+      _$AppDatabase db, $HydrationCursorsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HydrationCursorsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HydrationCursorsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$HydrationCursorsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> resourceType = const Value.absent(),
+            Value<String> cursor = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              HydrationCursorsCompanion(
+            resourceType: resourceType,
+            cursor: cursor,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String resourceType,
+            required String cursor,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              HydrationCursorsCompanion.insert(
+            resourceType: resourceType,
+            cursor: cursor,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$HydrationCursorsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $HydrationCursorsTable,
+    HydrationCursor,
+    $$HydrationCursorsTableFilterComposer,
+    $$HydrationCursorsTableOrderingComposer,
+    $$HydrationCursorsTableAnnotationComposer,
+    $$HydrationCursorsTableCreateCompanionBuilder,
+    $$HydrationCursorsTableUpdateCompanionBuilder,
+    (
+      HydrationCursor,
+      BaseReferences<_$AppDatabase, $HydrationCursorsTable, HydrationCursor>
+    ),
+    HydrationCursor,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1357,6 +1748,8 @@ class $AppDatabaseManager {
       $$CategoriesTableTableManager(_db, _db.categories);
   $$NotesTableTableManager get notes =>
       $$NotesTableTableManager(_db, _db.notes);
+  $$HydrationCursorsTableTableManager get hydrationCursors =>
+      $$HydrationCursorsTableTableManager(_db, _db.hydrationCursors);
 }
 
 mixin _$CategoryDaoMixin on DatabaseAccessor<AppDatabase> {
@@ -1365,4 +1758,8 @@ mixin _$CategoryDaoMixin on DatabaseAccessor<AppDatabase> {
 mixin _$NoteDaoMixin on DatabaseAccessor<AppDatabase> {
   $CategoriesTable get categories => attachedDatabase.categories;
   $NotesTable get notes => attachedDatabase.notes;
+}
+mixin _$CursorDaoMixin on DatabaseAccessor<AppDatabase> {
+  $HydrationCursorsTable get hydrationCursors =>
+      attachedDatabase.hydrationCursors;
 }

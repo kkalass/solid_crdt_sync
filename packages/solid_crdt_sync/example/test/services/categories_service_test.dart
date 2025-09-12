@@ -48,6 +48,11 @@ class MockCategoryRepository implements CategoryRepository {
   }
   
   @override
+  Future<void> initialize() async {
+    // Mock implementation - no-op for tests
+  }
+  
+  @override
   void dispose() {}
 }
 
@@ -91,6 +96,11 @@ class MockNoteRepository implements NoteRepository {
   @override
   Future<void> clear() async {
     storedNotes.clear();
+  }
+  
+  @override
+  Future<void> initialize() async {
+    // Mock implementation - no-op for tests
   }
   
   @override

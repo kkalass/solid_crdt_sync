@@ -135,14 +135,19 @@ class _AppInitializerState extends State<AppInitializer>
     _initializeApp();
   }
 
+  /// Clean up all app resources
+  Future<void> _cleanupResources() async {
+    categoryRepository?.dispose();
+    noteRepository?.dispose();
+    await appDatabase?.close();
+    await syncSystem?.close();
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     // Clean up resources when the widget is disposed
-    categoryRepository?.dispose();
-    noteRepository?.dispose();
-    appDatabase?.close();
-    syncSystem?.close();
+    _cleanupResources();
     super.dispose();
   }
 
@@ -151,10 +156,7 @@ class _AppInitializerState extends State<AppInitializer>
     super.didChangeAppLifecycleState(state);
     // Close resources when the app is being terminated
     if (state == AppLifecycleState.detached) {
-      categoryRepository?.dispose();
-      noteRepository?.dispose();
-      appDatabase?.close();
-      syncSystem?.close();
+      _cleanupResources();
     }
   }
 
@@ -171,9 +173,9 @@ class _AppInitializerState extends State<AppInitializer>
       // Initialize app database (Drift)
       final appDb = AppDatabase(web: webOptions);
 
-      // Initialize repositories with database DAOs and sync system
-      final categoryRepo = CategoryRepository(appDb.categoryDao, syncSys);
-      final noteRepo = NoteRepository(appDb.noteDao, syncSys);
+      // Initialize repositories with database DAOs, cursor DAO, and sync system
+      final categoryRepo = CategoryRepository(appDb.categoryDao, appDb.cursorDao, syncSys);
+      final noteRepo = NoteRepository(appDb.noteDao, appDb.cursorDao, syncSys);
 
       // Initialize services with repositories
       final notesSvc = NotesService(noteRepo);

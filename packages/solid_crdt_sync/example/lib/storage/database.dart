@@ -58,14 +58,29 @@ class Notes extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Hydration cursors table for tracking sync storage state
+class HydrationCursors extends Table {
+  /// Resource type (e.g., 'category', 'note')
+  TextColumn get resourceType => text()();
+
+  /// Last processed cursor value
+  TextColumn get cursor => text()();
+
+  /// Last update timestamp
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {resourceType};
+}
+
 /// Main app database class (schema only)
-@DriftDatabase(tables: [Categories, Notes], daos: [CategoryDao, NoteDao])
+@DriftDatabase(tables: [Categories, Notes, HydrationCursors], daos: [CategoryDao, NoteDao, CursorDao])
 class AppDatabase extends _$AppDatabase {
   AppDatabase({DriftWebOptions? web, DriftNativeOptions? native})
       : super(_openConnection(web: web, native: native));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +102,12 @@ class AppDatabase extends _$AppDatabase {
         CREATE INDEX IF NOT EXISTS idx_categories_name 
         ON categories(name);
       ''');
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        // Add HydrationCursors table in version 2
+        await m.createTable(hydrationCursors);
+      }
     },
   );
 }
@@ -182,6 +203,42 @@ class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
   /// Clear all notes (for testing)
   Future<void> clearAllNotes() {
     return delete(notes).go();
+  }
+}
+
+/// Data Access Object for Hydration Cursors
+@DriftAccessor(tables: [HydrationCursors])
+class CursorDao extends DatabaseAccessor<AppDatabase> with _$CursorDaoMixin {
+  CursorDao(super.db);
+
+  /// Get cursor for a specific resource type
+  Future<String?> getCursor(String resourceType) async {
+    final cursor = await (select(hydrationCursors)
+      ..where((c) => c.resourceType.equals(resourceType)))
+      .getSingleOrNull();
+    return cursor?.cursor;
+  }
+
+  /// Store cursor for a specific resource type
+  Future<void> storeCursor(String resourceType, String cursor) {
+    return into(hydrationCursors).insertOnConflictUpdate(
+      HydrationCursorsCompanion(
+        resourceType: Value(resourceType),
+        cursor: Value(cursor),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Clear cursor for a specific resource type
+  Future<void> clearCursor(String resourceType) {
+    return (delete(hydrationCursors)
+      ..where((c) => c.resourceType.equals(resourceType))).go();
+  }
+
+  /// Clear all cursors (for testing)
+  Future<void> clearAllCursors() {
+    return delete(hydrationCursors).go();
   }
 }
 

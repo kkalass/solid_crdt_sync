@@ -52,6 +52,11 @@ class MockNoteRepository implements NoteRepository {
   }
   
   @override
+  Future<void> initialize() async {
+    // Mock implementation - no-op for tests
+  }
+  
+  @override
   void dispose() {}
 }
 

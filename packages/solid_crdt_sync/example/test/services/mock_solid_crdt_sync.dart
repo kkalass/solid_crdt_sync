@@ -1,10 +1,8 @@
-/// Tests for the CategoriesService class.
+/// Mock SolidCrdtSync implementation for testing.
 library;
 
-import 'package:flutter_test/flutter_test.dart';
+import 'dart:async';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
-import 'package:personal_notes_app/models/category.dart';
-import 'package:personal_notes_app/services/categories_service.dart';
 
 /// Simple mock implementation for testing
 class MockSolidCrdtSync implements SolidCrdtSync {
@@ -25,15 +23,46 @@ class MockSolidCrdtSync implements SolidCrdtSync {
   Stream<T> indexUpdatesStream<T>([String localName = '']) => Stream.empty();
 
   @override
-  Stream<T> remoteUpdates<T>() {
-    // TODO: implement remoteUpdates
-    throw UnimplementedError();
+  Future<void> saveWithCallback<T>(T object,
+      {required void Function(T processedObject) onLocalUpdate}) async {
+    savedObjects.add(object);
+    onLocalUpdate(object);
   }
 
   @override
-  Future<void> saveWithCallback<T>(T object,
-      {required void Function(T processedObject) onLocalUpdate}) {
-    // TODO: implement saveWithCallback
-    throw UnimplementedError();
+  Stream<HydrationResult<T>> hydrationUpdates<T>() => Stream.empty();
+
+  @override
+  Future<HydrationResult<T>> loadChangesSince<T>(String? cursor, {int limit = 100}) async {
+    return HydrationResult<T>(
+      items: [],
+      deletedItems: [],
+      originalCursor: cursor,
+      nextCursor: null,
+      hasMore: false,
+    );
+  }
+
+  @override
+  Future<void> hydrateOnce<T>({
+    required String? lastCursor,
+    required Future<void> Function(T item) onUpdate,
+    required Future<void> Function(T item) onDelete,
+    required Future<void> Function(String cursor) onCursorUpdate,
+    int limit = 100,
+  }) async {
+    // Mock implementation - no-op
+  }
+
+  @override
+  Future<StreamSubscription<HydrationResult<T>>> hydrateStreaming<T>({
+    required Future<String?> Function() getCurrentCursor,
+    required Future<void> Function(T item) onUpdate,
+    required Future<void> Function(T item) onDelete,
+    required Future<void> Function(String cursor) onCursorUpdate,
+    int limit = 100,
+  }) async {
+    // Mock implementation - return empty subscription
+    return Stream<HydrationResult<T>>.empty().listen(null);
   }
 }

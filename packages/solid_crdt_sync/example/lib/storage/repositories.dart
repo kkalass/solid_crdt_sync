@@ -15,22 +15,47 @@ import 'database.dart';
 /// Repository becomes "sync-aware storage" following add-on architecture.
 class CategoryRepository {
   final CategoryDao _categoryDao;
+  final CursorDao _cursorDao;
   final SolidCrdtSync _syncSystem;
-  late final StreamSubscription _remoteUpdatesSubscription;
+  StreamSubscription? _hydrationSubscription;
+  
+  static const String _resourceType = 'category';
 
-  CategoryRepository(this._categoryDao, this._syncSystem) {
-    // Subscribe to remote updates from the sync system
-    _remoteUpdatesSubscription = _syncSystem.remoteUpdates<models.Category>().listen(
-      (category) async {
-        // Remote changes are automatically applied to local storage
-        final companion = _categoryToDriftCompanion(category);
-        await _categoryDao.insertOrUpdateCategory(companion);
-      },
-      onError: (error) {
-        // TODO: Handle remote update errors (logging, user notification, etc.)
-        print('Error processing remote category update: $error');
-      },
+  CategoryRepository(this._categoryDao, this._cursorDao, this._syncSystem);
+
+  /// Initialize the repository with hydration from sync storage.
+  ///
+  /// This should be called once during app startup to:
+  /// 1. Catch up on any missed changes since last shutdown
+  /// 2. Set up live hydration for ongoing updates
+  Future<void> initialize() async {
+    _hydrationSubscription = await _syncSystem.hydrateStreaming<models.Category>(
+      getCurrentCursor: () => _getStoredCursor(),
+      onUpdate: (category) => _handleCategoryUpdate(category),
+      onDelete: (category) => _handleCategoryDelete(category),
+      onCursorUpdate: (cursor) => _storeCursor(cursor),
     );
+  }
+
+  /// Handle category update from sync storage
+  Future<void> _handleCategoryUpdate(models.Category category) async {
+    final companion = _categoryToDriftCompanion(category);
+    await _categoryDao.insertOrUpdateCategory(companion);
+  }
+
+  /// Handle category deletion from sync storage
+  Future<void> _handleCategoryDelete(models.Category category) async {
+    await _categoryDao.deleteCategoryById(category.id);
+  }
+
+  /// Get stored hydration cursor
+  Future<String?> _getStoredCursor() async {
+    return await _cursorDao.getCursor(_resourceType);
+  }
+
+  /// Store hydration cursor
+  Future<void> _storeCursor(String cursor) async {
+    await _cursorDao.storeCursor(_resourceType, cursor);
   }
 
   /// Get all categories ordered by name
@@ -77,7 +102,7 @@ class CategoryRepository {
 
   /// Dispose resources when repository is no longer needed
   void dispose() {
-    _remoteUpdatesSubscription.cancel();
+    _hydrationSubscription?.cancel();
   }
 
   /// Convert Drift Category to app Category model
@@ -114,22 +139,47 @@ class CategoryRepository {
 /// Repository becomes "sync-aware storage" following add-on architecture.
 class NoteRepository {
   final NoteDao _noteDao;
+  final CursorDao _cursorDao;
   final SolidCrdtSync _syncSystem;
-  late final StreamSubscription _remoteUpdatesSubscription;
+  StreamSubscription? _hydrationSubscription;
+  
+  static const String _resourceType = 'note';
 
-  NoteRepository(this._noteDao, this._syncSystem) {
-    // Subscribe to remote updates from the sync system
-    _remoteUpdatesSubscription = _syncSystem.remoteUpdates<models.Note>().listen(
-      (note) async {
-        // Remote changes are automatically applied to local storage
-        final companion = _noteToDriftCompanion(note);
-        await _noteDao.insertOrUpdateNote(companion);
-      },
-      onError: (error) {
-        // TODO: Handle remote update errors (logging, user notification, etc.)
-        print('Error processing remote note update: $error');
-      },
+  NoteRepository(this._noteDao, this._cursorDao, this._syncSystem);
+
+  /// Initialize the repository with hydration from sync storage.
+  ///
+  /// This should be called once during app startup to:
+  /// 1. Catch up on any missed changes since last shutdown
+  /// 2. Set up live hydration for ongoing updates
+  Future<void> initialize() async {
+    _hydrationSubscription = await _syncSystem.hydrateStreaming<models.Note>(
+      getCurrentCursor: () => _getStoredCursor(),
+      onUpdate: (note) => _handleNoteUpdate(note),
+      onDelete: (note) => _handleNoteDelete(note),
+      onCursorUpdate: (cursor) => _storeCursor(cursor),
     );
+  }
+
+  /// Handle note update from sync storage
+  Future<void> _handleNoteUpdate(models.Note note) async {
+    final companion = _noteToDriftCompanion(note);
+    await _noteDao.insertOrUpdateNote(companion);
+  }
+
+  /// Handle note deletion from sync storage
+  Future<void> _handleNoteDelete(models.Note note) async {
+    await _noteDao.deleteNoteById(note.id);
+  }
+
+  /// Get stored hydration cursor
+  Future<String?> _getStoredCursor() async {
+    return await _cursorDao.getCursor(_resourceType);
+  }
+
+  /// Store hydration cursor
+  Future<void> _storeCursor(String cursor) async {
+    await _cursorDao.storeCursor(_resourceType, cursor);
   }
 
   /// Get all notes ordered by modification date (newest first)
@@ -183,7 +233,7 @@ class NoteRepository {
 
   /// Dispose resources when repository is no longer needed
   void dispose() {
-    _remoteUpdatesSubscription.cancel();
+    _hydrationSubscription?.cancel();
   }
 
   /// Convert Drift Note to app Note model
