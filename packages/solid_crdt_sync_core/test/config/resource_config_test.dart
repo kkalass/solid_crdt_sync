@@ -16,7 +16,8 @@ void main() {
 
       expect(config.type, equals(TestDocument));
       expect(config.defaultResourcePath, equals('/data/documents'));
-      expect(config.crdtMapping.toString(), equals('https://example.com/document.ttl'));
+      expect(config.crdtMapping.toString(),
+          equals('https://example.com/document.ttl'));
       expect(config.indices, isEmpty);
     });
 
@@ -26,7 +27,7 @@ void main() {
         GroupIndex(
           TestDocument,
           localName: 'documents-by-category',
-          item: IndexItem(TestDocument, []),
+          item: IndexItem(TestDocument, {}),
           groupingProperties: [
             GroupingProperty(
               IriTerm.prevalidated('https://schema.org/category'),
@@ -59,9 +60,11 @@ void main() {
       expect(config.indices, isEmpty);
     });
 
-    test('should create ResourceConfig with single index using named constructor', () {
+    test(
+        'should create ResourceConfig with single index using named constructor',
+        () {
       final index = FullIndex(TestDocument, localName: 'documents');
-      
+
       final config = ResourceConfig.withSingleIndex(
         type: TestDocument,
         defaultResourcePath: '/data/documents',

@@ -30,7 +30,8 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isTrue);
         expect(result.errors, isEmpty);
       });
@@ -51,7 +52,8 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
         expect(
@@ -75,11 +77,11 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
-        expect(
-            result.errors.first.message, contains('RDF type IRI collision'));
+        expect(result.errors.first.message, contains('RDF type IRI collision'));
         expect(result.errors.first.message, contains('ConflictingTypeA'));
         expect(result.errors.first.message, contains('ConflictingTypeB'));
       });
@@ -95,11 +97,11 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
-        expect(
-            result.errors.first.message, contains('No RDF type IRI found'));
+        expect(result.errors.first.message, contains('No RDF type IRI found'));
         expect(result.errors.first.message, contains('UnmappedType'));
         expect(result.errors.first.message, contains('@PodResource'));
       });
@@ -117,7 +119,8 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(
             result.errors
@@ -136,11 +139,11 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(
-            result.errors
-                .any((e) => e.message.contains('must start with "/"')),
+            result.errors.any((e) => e.message.contains('must start with "/"')),
             isTrue);
       });
 
@@ -160,7 +163,8 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isTrue);
         expect(result.warnings, hasLength(1));
         expect(result.warnings.first.message,
@@ -180,10 +184,10 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
-        expect(
-            result.errors.any((e) => e.message.contains('must be absolute')),
+        expect(result.errors.any((e) => e.message.contains('must be absolute')),
             isTrue);
       });
 
@@ -199,12 +203,12 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isTrue);
         expect(result.warnings, isNotEmpty);
         expect(
-            result.warnings
-                .any((e) => e.message.contains('should use HTTPS')),
+            result.warnings.any((e) => e.message.contains('should use HTTPS')),
             isTrue);
       });
     });
@@ -224,7 +228,8 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(
             result.errors
@@ -234,7 +239,7 @@ void main() {
 
       test('should fail with duplicate local names for same index item type',
           () {
-        final testIndexItem = IndexItem(TestDocument, []);
+        final testIndexItem = IndexItem(TestDocument, {});
 
         final config = SyncConfig(
           resources: [
@@ -260,7 +265,8 @@ void main() {
           ],
         );
 
-        final result = config.validate(mockMapper);
+        final result =
+            config.validate(config.buildResourceTypeCache(mockMapper));
         expect(result.isValid, isFalse);
         expect(
             result.errors
@@ -273,7 +279,7 @@ void main() {
         expect(
           () => GroupIndex(
             TestDocument,
-            item: IndexItem(TestDocument, []),
+            item: IndexItem(TestDocument, {}),
             groupingProperties: [], // Empty!
           ),
           throwsA(isA<AssertionError>()),

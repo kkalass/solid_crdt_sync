@@ -71,11 +71,35 @@ class SyncConfig {
         );
   }
 
+  Map<Type, IriTerm> buildResourceTypeCache(RdfMapper _mapper) {
+    final resourceTypeCache = <Type, IriTerm>{};
+    for (final resource in resources) {
+      if (!resourceTypeCache.containsKey(resource.type)) {
+        final typeIri = _getTypeIri(_mapper, resource);
+        if (typeIri != null) {
+          resourceTypeCache[resource.type] = typeIri;
+        }
+      }
+    }
+    return resourceTypeCache;
+  }
+
+  static IriTerm? _getTypeIri(RdfMapper mapper, ResourceConfig resource) {
+    final registry = mapper.registry;
+    try {
+      return registry.getResourceSerializerByType(resource.type).typeIri;
+    } on SerializerNotFoundException {
+      return null;
+    }
+  }
+
   /// Validate this configuration for consistency and correctness.
-  ValidationResult validate(RdfMapper mapper) {
+  ValidationResult validate(
+    Map<Type, IriTerm> resourceTypeCache,
+  ) {
     final result = ValidationResult();
 
-    _validateResourceUniqueness(result, mapper);
+    _validateResourceUniqueness(result, resourceTypeCache);
     _validateDefaultPaths(result);
     _validateCrdtMappings(result);
     _validateIndexConfigurations(result);
@@ -83,7 +107,8 @@ class SyncConfig {
     return result;
   }
 
-  void _validateResourceUniqueness(ValidationResult result, RdfMapper mapper) {
+  void _validateResourceUniqueness(
+      ValidationResult result, Map<Type, IriTerm> resourceTypeCache) {
     // Check for duplicate Dart types
     final dartTypes = <Type>{};
     final rdfTypeIris = <String, Type>{};
@@ -100,7 +125,7 @@ class SyncConfig {
 
       // Check for RDF type IRI collisions
       try {
-        final rdfTypeIri = _getTypeIri(mapper, resource);
+        final rdfTypeIri = resourceTypeCache[resource.type];
         if (rdfTypeIri != null) {
           final rdfTypeIriString = rdfTypeIri.iri;
           if (rdfTypeIris.containsKey(rdfTypeIriString)) {
@@ -259,14 +284,5 @@ class SyncConfig {
         }
       });
     });
-  }
-}
-
-IriTerm? _getTypeIri(RdfMapper mapper, ResourceConfig resource) {
-  final registry = mapper.registry;
-  try {
-    return registry.getResourceSerializerByType(resource.type).typeIri;
-  } on SerializerNotFoundException {
-    return null;
   }
 }

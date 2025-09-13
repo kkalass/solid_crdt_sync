@@ -27,6 +27,7 @@ class MockSolidCrdtSync implements SolidCrdtSync {
     required Future<void> Function(T item) onUpdate,
     required Future<void> Function(T item) onDelete,
     required Future<void> Function(String cursor) onCursorUpdate,
+    String? localName,
     int limit = 100,
   }) async {
     // Mock implementation - return empty subscription

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 import '../models/note_index_entry.dart';
+import '../models/category.dart' as models;
 import '../services/notes_service.dart';
 import '../services/categories_service.dart';
 import 'categories_screen.dart';
@@ -28,6 +29,7 @@ class NotesListScreen extends StatefulWidget {
 
 class _NotesListScreenState extends State<NotesListScreen> {
   List<NoteIndexEntry> _noteEntries = [];
+  List<models.Category> _categories = [];
   bool _loading = true;
   bool _isConnected = false;
   String? _selectedCategoryFilter;
@@ -36,7 +38,20 @@ class _NotesListScreenState extends State<NotesListScreen> {
   void initState() {
     super.initState();
     _loadNotes();
+    _loadCategories();
     _checkConnectionStatus();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await widget.categoriesService.getAllCategories();
+      setState(() {
+        _categories = categories;
+      });
+    } catch (error) {
+      // Categories loading failed - continue without them
+      print('Error loading categories: $error');
+    }
   }
 
   Future<void> _loadNotes() async {
@@ -98,18 +113,24 @@ class _NotesListScreenState extends State<NotesListScreen> {
     // This demonstrates how the application can decide between different loading strategies
     // based on user behavior, category type, or other factors
     
-    if (categoryId == 'work') {
-      // Work notes: User likely to browse multiple items - prefetch full data
+    // Find the category to determine strategy
+    final category = _categories.cast<models.Category?>().firstWhere(
+      (cat) => cat?.id == categoryId,
+      orElse: () => null,
+    );
+    
+    if (category?.icon == 'work') {
+      // Work category: User likely to browse multiple items - prefetch full data
       await widget.notesService.prefetchGroupData(categoryId);
-      print('Strategy: Prefetching full data for work notes (heavy usage expected)');
-    } else if (categoryId == 'archive') {
-      // Archive notes: User likely just browsing - load index only
+      print('Strategy: Prefetching full data for work category (heavy usage expected)');
+    } else if (category?.icon == 'archive') {
+      // Archive category: User likely just browsing - load index only
       await widget.notesService.ensureGroupIndexLoaded(categoryId);
-      print('Strategy: Index-only for archived notes (light browsing expected)');
+      print('Strategy: Index-only for archived category (light browsing expected)');
     } else {
-      // Personal notes: Balanced approach - ensure index, prefetch on demand
+      // Other categories: Balanced approach - ensure index, prefetch on demand
       await widget.notesService.ensureGroupIndexLoaded(categoryId);
-      print('Strategy: Index-first for $categoryId notes (balanced approach)');
+      print('Strategy: Index-first for ${category?.name ?? categoryId} category (balanced approach)');
     }
   }
 
@@ -260,38 +281,18 @@ class _NotesListScreenState extends State<NotesListScreen> {
                   ],
                 ),
               ),
-              const PopupMenuDivider(),
-              // Demo categories to show group loading behavior
-              const PopupMenuItem<String>(
-                value: 'work',
+              if (_categories.isNotEmpty) const PopupMenuDivider(),
+              // Dynamic categories from the categories service
+              ..._categories.map((category) => PopupMenuItem<String>(
+                value: category.id,
                 child: Row(
                   children: [
-                    Icon(Icons.work),
-                    SizedBox(width: 8),
-                    Text('Work Notes'),
+                    Icon(_getCategoryIcon(category.icon)),
+                    const SizedBox(width: 8),
+                    Text(category.name),
                   ],
                 ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'personal',
-                child: Row(
-                  children: [
-                    Icon(Icons.person),
-                    SizedBox(width: 8),
-                    Text('Personal Notes'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'archive',
-                child: Row(
-                  children: [
-                    Icon(Icons.archive),
-                    SizedBox(width: 8),
-                    Text('Archived Notes'),
-                  ],
-                ),
-              ),
+              )),
             ],
           ),
           // Categories button
@@ -435,6 +436,21 @@ class _NotesListScreenState extends State<NotesListScreen> {
         );
       },
     );
+  }
+
+  IconData _getCategoryIcon(String? iconName) {
+    switch (iconName) {
+      case 'work':
+        return Icons.work;
+      case 'personal':
+        return Icons.person;
+      case 'archive':
+        return Icons.archive;
+      case 'folder':
+        return Icons.folder;
+      default:
+        return Icons.category;
+    }
   }
 
   String _formatDate(DateTime date) {

@@ -10,6 +10,8 @@ class TestVocab {
   static const testDocument = IriTerm.prevalidated('${baseIri}TestDocument');
   static const testCategory = IriTerm.prevalidated('${baseIri}TestCategory');
   static const testNote = IriTerm.prevalidated('${baseIri}TestNote');
+  static const note = IriTerm.prevalidated('${baseIri}Note');
+  static const noteIndex = IriTerm.prevalidated('${baseIri}NoteIndex');
   static const sameTypeIri = IriTerm.prevalidated('${baseIri}SameType');
 }
 
@@ -37,6 +39,34 @@ class TestNote {
   TestNote({required this.id, required this.content});
 }
 
+/// Note model for testing IndexConverter
+class Note {
+  final String id;
+  final String title;
+  final String content;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  Note({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+}
+
+/// Note index item for testing IndexConverter
+class NoteIndex {
+  final String title;
+  final DateTime createdAt;
+
+  NoteIndex({
+    required this.title,
+    required this.createdAt,
+  });
+}
+
 /// Two classes that would have the same RDF type IRI (for collision testing)
 class ConflictingTypeA {
   final String id;
@@ -62,6 +92,8 @@ RdfMapper createTestMapper() {
       ..registerMapper(MockResourceMapper<TestDocument>(TestVocab.testDocument))
       ..registerMapper(MockResourceMapper<TestCategory>(TestVocab.testCategory))
       ..registerMapper(MockResourceMapper<TestNote>(TestVocab.testNote))
+      ..registerMapper(MockResourceMapper<Note>(TestVocab.note))
+      ..registerMapper(MockResourceMapper<NoteIndex>(TestVocab.noteIndex))
       ..registerMapper(
           MockResourceMapper<ConflictingTypeA>(TestVocab.sameTypeIri))
       ..registerMapper(

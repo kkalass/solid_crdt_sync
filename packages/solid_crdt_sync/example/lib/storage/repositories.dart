@@ -74,7 +74,8 @@ class CategoryRepository {
 
   /// Get all categories including archived ones, ordered by name
   Future<List<models.Category>> getAllCategoriesIncludingArchived() async {
-    final driftCategories = await _categoryDao.getAllCategoriesIncludingArchived();
+    final driftCategories =
+        await _categoryDao.getAllCategoriesIncludingArchived();
     return driftCategories.map(_categoryFromDrift).toList();
   }
 
@@ -91,9 +92,9 @@ class CategoryRepository {
   }
 
   /// Archive a category (soft delete) - sets archived flag to true
-  /// 
+  ///
   /// Soft delete - marks category as archived but keeps it referenceable.
-  /// This is the recommended approach for categories since they may be 
+  /// This is the recommended approach for categories since they may be
   /// referenced by external applications.
   Future<void> archiveCategory(String id) async {
     final category = await getCategory(id);
@@ -151,7 +152,7 @@ class CategoryRepository {
 /// This layer handles business logic, model conversion between
 /// Drift entities and application models, AND sync coordination.
 /// Repository becomes "sync-aware storage" following add-on architecture.
-/// 
+///
 /// Handles both full Note resources and lightweight NoteIndexEntry resources.
 class NoteRepository {
   final NoteDao _noteDao;
@@ -199,8 +200,10 @@ class NoteRepository {
         // Index hydration for NoteIndexEntry resources
         await syncSystem.hydrateStreaming<models.NoteIndexEntry>(
           getCurrentCursor: () => cursorDao.getCursor(_indexResourceType),
-          onUpdate: (noteEntry) => _handleNoteIndexEntryUpdate(noteIndexDao, noteEntry),
-          onDelete: (noteEntry) => _handleNoteIndexEntryDelete(noteIndexDao, noteEntry),
+          onUpdate: (noteEntry) =>
+              _handleNoteIndexEntryUpdate(noteIndexDao, noteEntry),
+          onDelete: (noteEntry) =>
+              _handleNoteIndexEntryDelete(noteIndexDao, noteEntry),
           onCursorUpdate: (cursor) =>
               cursorDao.storeCursor(_indexResourceType, cursor),
         ));
@@ -313,7 +316,8 @@ class NoteRepository {
       name: drift.name,
       dateCreated: drift.dateCreated,
       dateModified: drift.dateModified,
-      keywords: Set<String>.from((drift.keywords ?? '').split(',').where((s) => s.isNotEmpty)),
+      keywords: Set<String>.from(
+          (drift.keywords ?? '').split(',').where((s) => s.isNotEmpty)),
       categoryId: drift.categoryId,
     );
   }
@@ -339,14 +343,18 @@ class NoteRepository {
   }
 
   /// Get note index entries by category
-  Future<List<models.NoteIndexEntry>> getNoteIndexEntriesByCategory(String categoryId) async {
-    final driftEntries = await _noteIndexDao.getNoteIndexEntriesByCategory(categoryId);
+  Future<List<models.NoteIndexEntry>> getNoteIndexEntriesByCategory(
+      String categoryId) async {
+    final driftEntries =
+        await _noteIndexDao.getNoteIndexEntriesByCategory(categoryId);
     return driftEntries.map(_noteIndexEntryFromDrift).toList();
   }
 
   /// Get note index entries by group
-  Future<List<models.NoteIndexEntry>> getNoteIndexEntriesByGroup(String groupId) async {
-    final driftEntries = await _noteIndexDao.getNoteIndexEntriesByGroup(groupId);
+  Future<List<models.NoteIndexEntry>> getNoteIndexEntriesByGroup(
+      String groupId) async {
+    final driftEntries =
+        await _noteIndexDao.getNoteIndexEntriesByGroup(groupId);
     return driftEntries.map(_noteIndexEntryFromDrift).toList();
   }
 

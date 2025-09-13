@@ -61,13 +61,13 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
             GroupIndex(Note,
                 defaultIndexPath: '/index/notes',
                 // TODO: How/where to configure the actual groups to sync? And do they need their own fetch policy?
-                item: IndexItem(NoteIndexEntry, [
+                item: IndexItem(NoteIndexEntry, {
                   SchemaNoteDigitalDocument.name,
                   SchemaNoteDigitalDocument.dateCreated,
                   SchemaNoteDigitalDocument.dateModified,
                   SchemaNoteDigitalDocument.keywords,
                   PersonalNotesVocab.belongsToCategory
-                ]),
+                }),
                 groupingProperties: [
                   GroupingProperty(PersonalNotesVocab.belongsToCategory,
                       format: 'value', // Use category ID directly as group

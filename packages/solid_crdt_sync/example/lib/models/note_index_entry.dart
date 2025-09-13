@@ -6,12 +6,12 @@
 library;
 
 import 'package:personal_notes_app/models/note.dart';
-import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
+import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
+
 import '../vocabulary/personal_notes_vocab.dart';
-import 'package:rdf_vocabularies_core/dc.dart';
 
 /// Lightweight index entry for Note resources.
 ///
@@ -23,14 +23,8 @@ import 'package:rdf_vocabularies_core/dc.dart';
 /// No CRDT annotations needed - the framework handles conflict resolution.
 @RdfLocalResource()
 class NoteIndexEntry {
-  // FIXME: This is actually the resource reference in the index shard entry,
-  // but I guess this should work and is probably also quite understandable.
-  // TODO: provide generated sync vocabulary?
   /// Note ID - same as the full Note resource
-  @RdfProperty(
-      IriTerm.prevalidated(
-          'https://w3id.org/solid-crdt-sync/vocab/idx#resource'),
-      iri: PodResourceRef(Note))
+  @RdfProperty(IdxVocab.resource, iri: PodResourceRef(Note))
   final String id;
 
   /// Note title for display in lists

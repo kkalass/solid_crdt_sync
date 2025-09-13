@@ -29,7 +29,7 @@ class IndexItem {
   final Type itemType;
 
   /// RDF properties to include in index items
-  final List<IriTerm> properties;
+  final Set<IriTerm> properties;
 
   const IndexItem(this.itemType, this.properties);
 }
