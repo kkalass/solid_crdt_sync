@@ -285,4 +285,29 @@ class SyncConfig {
       });
     });
   }
+
+  /// Find the resource and index configuration for a given type and local name.
+  ///
+  /// Searches through all resources and their indices to find a matching
+  /// configuration where the index item type matches T and localName matches.
+  /// Returns the resource configuration and index configuration as a record,
+  /// or null if no match is found.
+  ///
+  /// This is used during hydration setup to determine how to convert
+  /// resources to index items for a specific stream.
+  (ResourceConfig, CrdtIndexConfig)? findIndexConfigForType<T>(String localName) {
+    // Search through all resources and their indices
+    for (final resourceConfig in resources) {
+      for (final index in resourceConfig.indices) {
+        // Check if this index matches our type T and localName
+        if (index.item != null &&
+            index.item!.itemType == T &&
+            index.localName == localName) {
+          // Found matching index
+          return (resourceConfig, index);
+        }
+      }
+    }
+    return null;
+  }
 }

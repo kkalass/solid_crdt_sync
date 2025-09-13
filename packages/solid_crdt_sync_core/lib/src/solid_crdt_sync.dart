@@ -9,7 +9,13 @@ import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
 import 'package:solid_crdt_sync_core/src/index/index_converter.dart';
+import 'package:solid_crdt_sync_core/src/index/index_item_converter.dart';
 import 'config/resource_config.dart';
+import 'hydration_result.dart';
+import 'hydration/hydration_emitter.dart';
+import 'hydration/hydration_stream_manager.dart';
+import 'hydration/index_item_converter_registry.dart';
+import 'hydration/type_local_name_key.dart';
 
 /// Type alias for mapper initializer functions.
 ///
@@ -17,24 +23,6 @@ import 'config/resource_config.dart';
 /// and return a fully configured RdfMapper.
 typedef MapperInitializerFunction = RdfMapper Function(
     SolidMappingContext context);
-
-/// Result of hydrating app storage from sync storage.
-class HydrationResult<T> {
-  final List<T> items; // New/updated items
-  final List<T> deletedItems; // Deleted items (last known state)
-  final String?
-      originalCursor; // Expected current cursor (for consistency check)
-  final String? nextCursor; // New cursor after hydration
-  final bool hasMore; // Whether more data is available
-
-  const HydrationResult({
-    required this.items,
-    required this.deletedItems,
-    required this.originalCursor,
-    required this.nextCursor,
-    required this.hasMore,
-  });
-}
 
 /// Main facade for the solid_crdt_sync system.
 ///
@@ -48,9 +36,9 @@ class SolidCrdtSync {
   final SyncConfig _config;
   final Map<Type, IriTerm> _resourceTypeCache;
   late final IndexConverter _indexConverter;
-
-  // Stream controllers for hydration updates keyed by (Type, localName)
-  final Map<_StreamKey, StreamController> _hydrationControllers = {};
+  late final HydrationStreamManager _streamManager;
+  late final IndexItemConverterRegistry _converterRegistry;
+  late final HydrationEmitter _emitter;
   SolidCrdtSync._({
     required Storage storage,
     required RdfMapper mapper,
@@ -63,6 +51,12 @@ class SolidCrdtSync {
         _config = config,
         _resourceTypeCache = resourceTypeCache {
     _indexConverter = IndexConverter(_mapper);
+    _streamManager = HydrationStreamManager();
+    _converterRegistry = IndexItemConverterRegistry();
+    _emitter = HydrationEmitter(
+      streamManager: _streamManager,
+      converterRegistry: _converterRegistry,
+    );
   }
 
   /// Set up the CRDT sync system with resource-focused configuration.
@@ -114,11 +108,16 @@ class SolidCrdtSync {
 
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Emit to main resource stream
-    _emitUpdateByKey(_StreamKey(T, defaultIndexLocalName), object, timestamp);
-
-    // Find resource config and emit to associated index streams
-    await _emitToAssociatedIndices(object, resourceConfig, timestamp);
+    // Emit data change
+    _emitter.emit(
+        HydrationResult<T>(
+          items: [object],
+          deletedItems: [],
+          originalCursor: null,
+          nextCursor: timestamp,
+          hasMore: false,
+        ),
+        resourceConfig);
   }
 
   /// Delete a document with CRDT processing.
@@ -141,90 +140,29 @@ class SolidCrdtSync {
 
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Emit to main resource stream
-    _emitDeletionByKey(_StreamKey(T, defaultIndexLocalName), object, timestamp);
-
-    // Find resource config and emit to associated index streams
-    await _emitDeletionsToAssociatedIndices(object, resourceConfig, timestamp);
+    // Emit data change
+    _emitter.emit(
+        HydrationResult<T>(
+          items: [],
+          deletedItems: [object],
+          originalCursor: null,
+          nextCursor: timestamp,
+          hasMore: false,
+        ),
+        resourceConfig);
   }
 
-  /// Emit updates to associated index streams
-  Future<void> _emitToAssociatedIndices<T>(
-      T object, ResourceConfig resourceConfig, String timestamp) async {
-    for (final index in resourceConfig.indices) {
-      if (index.item != null) {
-        final indexItem = await _indexConverter.convertToIndexItem(
-            _resourceTypeCache[resourceConfig.type]!, object, index.item!);
-        _emitUpdateByKey(_StreamKey(index.item!.itemType, index.localName),
-            indexItem, timestamp);
-      }
-    }
-  }
-
-  /// Emit deletions to associated index streams
-  Future<void> _emitDeletionsToAssociatedIndices<T>(
-      T object, ResourceConfig resourceConfig, String timestamp) async {
-    for (final index in resourceConfig.indices) {
-      if (index.item != null) {
-        final indexItem = await _indexConverter.convertToIndexItem(
-            _resourceTypeCache[resourceConfig.type]!, object, index.item!);
-        _emitDeletionByKey(_StreamKey(index.item!.itemType, index.localName),
-            indexItem, timestamp);
-      }
-    }
-  }
-
-  /// Get stream controller for a specific type and local name
-  StreamController<HydrationResult<T>> _getOrCreateController<T>(
-      String localName) {
-    final key = _StreamKey(T, localName);
-    if (!_hydrationControllers.containsKey(key)) {
-      _hydrationControllers[key] =
-          StreamController<HydrationResult<T>>.broadcast();
-    }
-    return _hydrationControllers[key]! as StreamController<HydrationResult<T>>;
-  }
-
-  /// Emit update to stream by key
-  void _emitUpdateByKey<T>(_StreamKey key, T object, String timestamp) {
-    final controller = _hydrationControllers[key];
-    if (controller != null) {
-      final result = HydrationResult<T>(
-        items: [object],
-        deletedItems: [],
-        originalCursor: null,
-        nextCursor: timestamp,
-        hasMore: false,
-      );
-      Future.microtask(() => controller.add(result));
-    }
-  }
-
-  /// Emit deletion to stream by key
-  void _emitDeletionByKey<T>(_StreamKey key, T object, String timestamp) {
-    final controller = _hydrationControllers[key];
-    if (controller != null) {
-      final result = HydrationResult<T>(
-        items: [],
-        deletedItems: [object],
-        originalCursor: null,
-        nextCursor: timestamp,
-        hasMore: false,
-      );
-      Future.microtask(() => controller.add(result));
-    }
-  }
-
-  /// Stream of hydration updates for objects that changed in sync storage.
-  ///
-  /// Emits HydrationResult batches when objects are updated in sync storage.
-  /// Each result includes originalCursor for consistency checking.
-  ///
-  /// The [localName] parameter is used to distinguish between different indices
-  /// that might use the same Dart class (e.g., different GroupIndex configurations).
-  Stream<HydrationResult<T>> _hydrationUpdates<T>(String localName) {
-    return _getOrCreateController<T>(localName).stream;
-  }
+  /// Create an IndexItemConverter if T matches an index item type
+  IndexItemConverter<T>? _createIndexItemConverter<T>(
+          SyncConfig config, String localName) =>
+      switch (config.findIndexConfigForType<T>(localName)) {
+        (final resourceConfig, final index) => IndexItemConverter<T>(
+            converter: _indexConverter,
+            indexItem: index.item!,
+            resourceType: _resourceTypeCache[resourceConfig.type]!,
+          ),
+        null => null,
+      };
 
   /// Load changes from sync storage since the given cursor.
   ///
@@ -318,18 +256,24 @@ class SolidCrdtSync {
     String localName = defaultIndexLocalName,
     int limit = 100,
   }) async {
-    // 1. Initial catch-up hydration
-    final initialCursor = await getCurrentCursor();
-    await _hydrateOnce<T>(
-      lastCursor: initialCursor,
-      onUpdate: onUpdate,
-      onDelete: onDelete,
-      onCursorUpdate: onCursorUpdate,
-      limit: limit,
-    );
+    // Check if T is a registered resource type
+    final resourceConfig = _config.getResourceConfig(T);
+    if (resourceConfig == null) {
+      // T is not a resource type, check if it's an index item type
+      final converter = _createIndexItemConverter<T>(_config, localName);
+      if (converter == null) {
+        throw Exception(
+            'Type $T is not a registered resource or index item type.');
+      }
+      final key = TypeLocalNameKey(T, localName);
+      _converterRegistry.registerConverter(key, converter);
+    }
 
-    // 2. Set up live hydration updates
-    return _hydrationUpdates<T>(localName).listen((result) async {
+    // 1. Set up live hydration updates
+    final subscription = _streamManager
+        .getOrCreateController<T>(localName)
+        .stream
+        .listen((result) async {
       final currentCursor = await getCurrentCursor();
 
       if (result.originalCursor == currentCursor) {
@@ -354,38 +298,22 @@ class SolidCrdtSync {
         );
       }
     });
+
+    // 2. Initial catch-up hydration
+    final initialCursor = await getCurrentCursor();
+    await _hydrateOnce<T>(
+      lastCursor: initialCursor,
+      onUpdate: onUpdate,
+      onDelete: onDelete,
+      onCursorUpdate: onCursorUpdate,
+      limit: limit,
+    );
+    return subscription;
   }
 
   /// Close the sync system and free resources.
   Future<void> close() async {
-    // Close all stream controllers
-    for (final controller in _hydrationControllers.values) {
-      await controller.close();
-    }
-    _hydrationControllers.clear();
-
+    await _streamManager.close();
     await _storage.close();
   }
-}
-
-/// Key for stream controllers combining type and local name
-class _StreamKey {
-  final Type type;
-  final String localName;
-
-  const _StreamKey(this.type, this.localName);
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is _StreamKey &&
-        other.type == type &&
-        other.localName == localName;
-  }
-
-  @override
-  int get hashCode => Object.hash(type, localName);
-
-  @override
-  String toString() => 'StreamKey($type, $localName)';
 }

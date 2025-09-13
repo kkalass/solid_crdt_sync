@@ -5,6 +5,7 @@ import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:rdf_vocabularies_core/rdf.dart';
 
+import '../hydration_result.dart';
 import '../vocabulary/idx_vocab.dart';
 import 'index_config.dart';
 
@@ -38,8 +39,8 @@ class IndexConverter {
   /// 3. Filter triples to only those with predicates in indexItem.properties
   /// 4. Create new RDF graph with filtered triples plus idx:resource type
   /// 5. Decode the filtered RDF back to the index item type
-  Future<I> convertToIndexItem<T, I>(
-      IriTerm resourceType, T resource, IndexItem indexItem) async {
+  I convertToIndexItem<T, I>(
+      IriTerm resourceType, T resource, IndexItem indexItem) {
     // Convert resource to RDF
     final rdfResource = _mapper.graph.encodeObject(resource);
 
@@ -64,7 +65,24 @@ class IndexConverter {
       ..add(Triple(indexItemSubject, IdxVocab.resource, subject));
 
     // Convert filtered RDF back to index item type
+    
     return _mapper.graph
         .decodeObject<I>(RdfGraph.fromTriples(indexItemTriples));
+  }
+
+  HydrationResult<I> convertHydrationResult<T, I>(
+      IriTerm resourceType, HydrationResult<T> r, IndexItem indexItem) {
+    final items = r.items.map((item) {
+      return convertToIndexItem<T, I>(resourceType, item, indexItem);
+    }).toList();
+    final deletedItems = r.deletedItems.map((item) {
+      return convertToIndexItem<T, I>(resourceType, item, indexItem);
+    }).toList();
+    return HydrationResult<I>(
+        items: items,
+        deletedItems: deletedItems,
+        originalCursor: r.originalCursor,
+        nextCursor: r.nextCursor,
+        hasMore: r.hasMore);
   }
 }

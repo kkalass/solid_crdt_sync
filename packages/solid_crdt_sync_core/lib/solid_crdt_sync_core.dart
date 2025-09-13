@@ -12,6 +12,7 @@ library solid_crdt_sync_core;
 
 // Main API facade
 export 'src/solid_crdt_sync.dart';
+export 'src/hydration_result.dart';
 
 // Core interfaces
 export 'src/auth/auth_interface.dart';
