@@ -274,28 +274,22 @@ class SolidCrdtSync {
         .getOrCreateController<T>(localName)
         .stream
         .listen((result) async {
-      final currentCursor = await getCurrentCursor();
-
-      if (result.originalCursor == currentCursor) {
-        // Cursor matches - safe to apply changes
-        for (final item in result.items) {
-          await onUpdate(item);
-        }
-        for (final item in result.deletedItems) {
-          await onDelete(item);
-        }
-        if (result.nextCursor != null) {
-          await onCursorUpdate(result.nextCursor!);
-        }
-      } else {
-        // Cursor mismatch - trigger catch-up hydration using existing callbacks
-        await _hydrateOnce<T>(
-          lastCursor: currentCursor,
-          onUpdate: onUpdate,
-          onDelete: onDelete,
-          onCursorUpdate: onCursorUpdate,
-          limit: limit,
-        );
+      // TODO: Implement proper cursor consistency checking
+      // The current originalCursor check is too strict and prevents local changes
+      // from being applied immediately. Need to design a better approach that:
+      // 1. Allows immediate application of local changes (save/delete operations)
+      // 2. Provides proper consistency checking for remote sync updates
+      // 3. Handles cursor mismatches gracefully without blocking updates
+      
+      // Apply changes directly without cursor consistency check for now
+      for (final item in result.items) {
+        await onUpdate(item);
+      }
+      for (final item in result.deletedItems) {
+        await onDelete(item);
+      }
+      if (result.nextCursor != null) {
+        await onCursorUpdate(result.nextCursor!);
       }
     });
 
