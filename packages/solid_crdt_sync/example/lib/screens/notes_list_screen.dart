@@ -34,6 +34,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
   bool _isConnected = false;
   String? _selectedCategoryFilter;
 
+  Stream<List<models.Category>> get _categoriesStream =>
+      widget.categoriesService.getAllCategories();
+
   @override
   void initState() {
     super.initState();
@@ -265,36 +268,42 @@ class _NotesListScreenState extends State<NotesListScreen> {
         elevation: 0,
         actions: [
           // Category filter dropdown - demonstrates group loading
-          PopupMenuButton<String?>(
-            icon: Icon(_selectedCategoryFilter != null 
-                ? Icons.filter_alt 
-                : Icons.filter_alt_outlined),
-            tooltip: 'Filter by Category',
-            onSelected: _filterByCategory,
-            itemBuilder: (context) => [
-              const PopupMenuItem<String?>(
-                value: null,
-                child: Row(
-                  children: [
-                    Icon(Icons.clear_all),
-                    SizedBox(width: 8),
-                    Text('All Notes'),
-                  ],
-                ),
-              ),
-              if (_categories.isNotEmpty) const PopupMenuDivider(),
-              // Dynamic categories from the categories service
-              ..._categories.map((category) => PopupMenuItem<String>(
-                value: category.id,
-                child: Row(
-                  children: [
-                    Icon(_getCategoryIcon(category.icon)),
-                    const SizedBox(width: 8),
-                    Text(category.name),
-                  ],
-                ),
-              )),
-            ],
+          StreamBuilder<List<models.Category>>(
+            stream: _categoriesStream,
+            builder: (context, snapshot) {
+              final categories = snapshot.data ?? [];
+              return PopupMenuButton<String?>(
+                icon: Icon(_selectedCategoryFilter != null 
+                    ? Icons.filter_alt 
+                    : Icons.filter_alt_outlined),
+                tooltip: 'Filter by Category',
+                onSelected: _filterByCategory,
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String?>(
+                    value: null,
+                    child: Row(
+                      children: [
+                        Icon(Icons.clear_all),
+                        SizedBox(width: 8),
+                        Text('All Notes'),
+                      ],
+                    ),
+                  ),
+                  if (categories.isNotEmpty) const PopupMenuDivider(),
+                  // Dynamic categories from the reactive categories service
+                  ...categories.map((category) => PopupMenuItem<String>(
+                    value: category.id,
+                    child: Row(
+                      children: [
+                        Icon(_getCategoryIcon(category.icon)),
+                        const SizedBox(width: 8),
+                        Text(category.name),
+                      ],
+                    ),
+                  )),
+                ],
+              );
+            },
           ),
           // Categories button
           IconButton(
