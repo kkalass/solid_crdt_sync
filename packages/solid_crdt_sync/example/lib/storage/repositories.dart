@@ -245,10 +245,10 @@ class NoteRepository {
     return noteEntry.categoryId ?? 'uncategorized';
   }
 
-  /// Get all notes ordered by modification date (newest first)
-  Future<List<models.Note>> getAllNotes() async {
-    final driftNotes = await _noteDao.getAllNotes();
-    return driftNotes.map(_noteFromDrift).toList();
+  /// Watch all notes ordered by modification date (newest first)
+  Stream<List<models.Note>> getAllNotes() {
+    return _noteDao.getAllNotes()
+        .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
   /// Get a specific note by ID
@@ -272,16 +272,16 @@ class NoteRepository {
     }
   }
 
-  /// Get notes by category
-  Future<List<models.Note>> getNotesByCategory(String categoryId) async {
-    final driftNotes = await _noteDao.getNotesByCategory(categoryId);
-    return driftNotes.map(_noteFromDrift).toList();
+  /// Watch notes by category
+  Stream<List<models.Note>> getNotesByCategory(String categoryId) {
+    return _noteDao.getNotesByCategory(categoryId)
+        .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
-  /// Get notes without a category
-  Future<List<models.Note>> getUncategorizedNotes() async {
-    final driftNotes = await _noteDao.getUncategorizedNotes();
-    return driftNotes.map(_noteFromDrift).toList();
+  /// Watch notes without a category
+  Stream<List<models.Note>> getUncategorizedNotes() {
+    return _noteDao.getUncategorizedNotes()
+        .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
   /// Convert Drift Note to app Note model

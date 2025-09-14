@@ -17,10 +17,10 @@ class NotesService {
 
   NotesService(this._noteRepository);
 
-  /// Get all notes sorted by modification date (newest first)
-  Future<List<Note>> getAllNotes() async {
+  /// Watch all notes sorted by modification date (newest first)
+  Stream<List<Note>> getAllNotes() {
     // Repository handles queries and returns sorted results
-    return await _noteRepository.getAllNotes();
+    return _noteRepository.getAllNotes();
   }
 
   /// Get all note index entries for lightweight browsing
@@ -91,36 +91,37 @@ class NotesService {
     }
   }
 
-  /// Get all unique tags across all notes
-  Future<Set<String>> getAllTags() async {
-    final notes = await getAllNotes();
-    final allTags = <String>{};
-    for (final note in notes) {
-      allTags.addAll(note.tags);
-    }
-    return allTags;
+  /// Watch all unique tags across all notes
+  Stream<Set<String>> getAllTags() {
+    return getAllNotes().map((notes) {
+      final allTags = <String>{};
+      for (final note in notes) {
+        allTags.addAll(note.tags);
+      }
+      return allTags;
+    });
   }
 
-  /// Search notes by title or content
-  Future<List<Note>> searchNotes(String query) async {
-    final notes = await getAllNotes();
+  /// Watch search results for notes by title or content
+  Stream<List<Note>> searchNotes(String query) {
     final lowercaseQuery = query.toLowerCase();
-
-    return notes.where((note) {
-      return note.title.toLowerCase().contains(lowercaseQuery) ||
-          note.content.toLowerCase().contains(lowercaseQuery) ||
-          note.tags.any((tag) => tag.toLowerCase().contains(lowercaseQuery));
-    }).toList();
+    return getAllNotes().map((notes) {
+      return notes.where((note) {
+        return note.title.toLowerCase().contains(lowercaseQuery) ||
+            note.content.toLowerCase().contains(lowercaseQuery) ||
+            note.tags.any((tag) => tag.toLowerCase().contains(lowercaseQuery));
+      }).toList();
+    });
   }
 
-  /// Get notes by category
-  Future<List<Note>> getNotesByCategory(String categoryId) async {
-    return await _noteRepository.getNotesByCategory(categoryId);
+  /// Watch notes by category
+  Stream<List<Note>> getNotesByCategory(String categoryId) {
+    return _noteRepository.getNotesByCategory(categoryId);
   }
 
-  /// Get notes without a category (uncategorized)
-  Future<List<Note>> getUncategorizedNotes() async {
-    return await _noteRepository.getUncategorizedNotes();
+  /// Watch notes without a category (uncategorized)
+  Stream<List<Note>> getUncategorizedNotes() {
+    return _noteRepository.getUncategorizedNotes();
   }
 
   /// Assign a note to a category

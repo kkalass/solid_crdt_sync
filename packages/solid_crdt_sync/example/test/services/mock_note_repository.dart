@@ -23,7 +23,7 @@ class MockNoteRepository implements NoteRepository {
   }
   
   @override
-  Future<List<Note>> getAllNotes() async => List.from(storedNotes);
+  Stream<List<Note>> getAllNotes() => Stream.value(List.from(storedNotes));
   
   @override
   Future<Note?> getNote(String id) async {
@@ -41,13 +41,13 @@ class MockNoteRepository implements NoteRepository {
   }
   
   @override
-  Future<List<Note>> getNotesByCategory(String categoryId) async {
-    return storedNotes.where((n) => n.categoryId == categoryId).toList();
+  Stream<List<Note>> getNotesByCategory(String categoryId) {
+    return Stream.value(storedNotes.where((n) => n.categoryId == categoryId).toList());
   }
   
   @override
-  Future<List<Note>> getUncategorizedNotes() async {
-    return storedNotes.where((n) => n.categoryId == null).toList();
+  Stream<List<Note>> getUncategorizedNotes() {
+    return Stream.value(storedNotes.where((n) => n.categoryId == null).toList());
   }
 
   // New NoteIndexEntry methods

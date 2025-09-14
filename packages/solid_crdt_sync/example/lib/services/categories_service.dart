@@ -70,28 +70,27 @@ class CategoriesService {
     );
   }
 
-  /// Get all notes that belong to a specific category
+  /// Watch all notes that belong to a specific category
   ///
   /// This method queries notes by category from repository.
   /// In the future, this could be optimized using GroupIndex.
-  Future<List<Note>> getNotesInCategory(String categoryId) async {
-    return await _noteRepository.getNotesByCategory(categoryId);
+  Stream<List<Note>> getNotesInCategory(String categoryId) {
+    return _noteRepository.getNotesByCategory(categoryId);
   }
 
-  /// Get count of notes in each category
+  /// Watch count of notes in each category
   ///
-  /// Returns a map of category ID to note count.
-  Future<Map<String, int>> getCategoryNoteCounts() async {
-    final notes = await _noteRepository.getAllNotes();
-    final counts = <String, int>{};
-
-    for (final note in notes) {
-      if (note.categoryId != null) {
-        counts[note.categoryId!] = (counts[note.categoryId!] ?? 0) + 1;
+  /// Returns a stream of map of category ID to note count.
+  Stream<Map<String, int>> getCategoryNoteCounts() {
+    return _noteRepository.getAllNotes().map((notes) {
+      final counts = <String, int>{};
+      for (final note in notes) {
+        if (note.categoryId != null) {
+          counts[note.categoryId!] = (counts[note.categoryId!] ?? 0) + 1;
+        }
       }
-    }
-
-    return counts;
+      return counts;
+    });
   }
 
   /// Check if a category exists

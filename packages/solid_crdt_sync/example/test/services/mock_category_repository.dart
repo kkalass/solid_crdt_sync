@@ -16,12 +16,12 @@ class MockCategoryRepository implements CategoryRepository {
   }
 
   @override
-  Future<List<Category>> getAllCategories() async =>
-      storedCategories.where((c) => !c.archived).toList();
+  Stream<List<Category>> getAllCategories() =>
+      Stream.value(storedCategories.where((c) => !c.archived).toList());
 
   @override
-  Future<List<Category>> getAllCategoriesIncludingArchived() async =>
-      List.from(storedCategories);
+  Stream<List<Category>> getAllCategoriesIncludingArchived() =>
+      Stream.value(List.from(storedCategories));
 
   @override
   Future<Category?> getCategory(String id) async {

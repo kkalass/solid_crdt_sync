@@ -44,7 +44,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await widget.categoriesService.getAllCategories();
+      // Convert stream to list for now to maintain existing behavior
+      final categories = await widget.categoriesService.getAllCategories().first;
       setState(() {
         _categories = categories;
       });

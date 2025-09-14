@@ -224,14 +224,14 @@ class CategoryDao extends DatabaseAccessor<AppDatabase>
 class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
   NoteDao(super.db);
 
-  /// Get all notes ordered by modification date (newest first)
-  Future<List<Note>> getAllNotes() {
+  /// Watch all notes ordered by modification date (newest first)
+  Stream<List<Note>> getAllNotes() {
     return (select(notes)
           ..orderBy([
             (n) =>
                 OrderingTerm(expression: n.modifiedAt, mode: OrderingMode.desc)
           ]))
-        .get();
+        .watch();
   }
 
   /// Get a specific note by ID
@@ -249,26 +249,26 @@ class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
     return (delete(notes)..where((n) => n.id.equals(id))).go();
   }
 
-  /// Get notes by category
-  Future<List<Note>> getNotesByCategory(String categoryId) {
+  /// Watch notes by category
+  Stream<List<Note>> getNotesByCategory(String categoryId) {
     return (select(notes)
           ..where((n) => n.categoryId.equals(categoryId))
           ..orderBy([
             (n) =>
                 OrderingTerm(expression: n.modifiedAt, mode: OrderingMode.desc)
           ]))
-        .get();
+        .watch();
   }
 
-  /// Get notes without a category
-  Future<List<Note>> getUncategorizedNotes() {
+  /// Watch notes without a category
+  Stream<List<Note>> getUncategorizedNotes() {
     return (select(notes)
           ..where((n) => n.categoryId.isNull())
           ..orderBy([
             (n) =>
                 OrderingTerm(expression: n.modifiedAt, mode: OrderingMode.desc)
           ]))
-        .get();
+        .watch();
   }
 }
 
