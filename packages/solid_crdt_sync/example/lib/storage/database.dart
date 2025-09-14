@@ -177,19 +177,19 @@ class CategoryDao extends DatabaseAccessor<AppDatabase>
     with _$CategoryDaoMixin {
   CategoryDao(super.db);
 
-  /// Get all categories ordered by name (non-archived only)
-  Future<List<Category>> getAllCategories() {
+  /// Watch all categories ordered by name (non-archived only)
+  Stream<List<Category>> getAllCategories() {
     return (select(categories)
           ..where((c) => c.archived.equals(false))
           ..orderBy([(c) => OrderingTerm(expression: c.name)]))
-        .get();
+        .watch();
   }
 
-  /// Get all categories including archived ones, ordered by name
-  Future<List<Category>> getAllCategoriesIncludingArchived() {
+  /// Watch all categories including archived ones, ordered by name
+  Stream<List<Category>> getAllCategoriesIncludingArchived() {
     return (select(categories)
           ..orderBy([(c) => OrderingTerm(expression: c.name)]))
-        .get();
+        .watch();
   }
 
   /// Get a specific category by ID

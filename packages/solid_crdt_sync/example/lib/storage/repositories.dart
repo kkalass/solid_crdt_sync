@@ -66,17 +66,16 @@ class CategoryRepository {
     await categoryDao.deleteCategoryById(category.id);
   }
 
-  /// Get all categories ordered by name (non-archived only)
-  Future<List<models.Category>> getAllCategories() async {
-    final driftCategories = await _categoryDao.getAllCategories();
-    return driftCategories.map(_categoryFromDrift).toList();
+  /// Watch all categories ordered by name (non-archived only)
+  Stream<List<models.Category>> getAllCategories() {
+    return _categoryDao.getAllCategories()
+        .map((driftCategories) => driftCategories.map(_categoryFromDrift).toList());
   }
 
-  /// Get all categories including archived ones, ordered by name
-  Future<List<models.Category>> getAllCategoriesIncludingArchived() async {
-    final driftCategories =
-        await _categoryDao.getAllCategoriesIncludingArchived();
-    return driftCategories.map(_categoryFromDrift).toList();
+  /// Watch all categories including archived ones, ordered by name
+  Stream<List<models.Category>> getAllCategoriesIncludingArchived() {
+    return _categoryDao.getAllCategoriesIncludingArchived()
+        .map((driftCategories) => driftCategories.map(_categoryFromDrift).toList());
   }
 
   /// Get a specific category by ID

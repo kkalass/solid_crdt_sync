@@ -24,39 +24,11 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  List<Category>? categories;
-  String? errorMessage;
-  bool isLoading = true;
   bool showArchived = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    try {
-      setState(() {
-        isLoading = true;
-        errorMessage = null;
-      });
-
-      final loadedCategories = showArchived
-          ? await widget.categoriesService.getAllCategoriesIncludingArchived()
-          : await widget.categoriesService.getAllCategories();
-
-      setState(() {
-        categories = loadedCategories;
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        errorMessage = 'Failed to load categories: $e';
-        isLoading = false;
-      });
-    }
-  }
+  Stream<List<Category>> get _categoriesStream => showArchived
+      ? widget.categoriesService.getAllCategoriesIncludingArchived()
+      : widget.categoriesService.getAllCategories();
 
   Future<void> _showCategoryDialog({Category? category}) async {
     final isEditing = category != null;
@@ -66,7 +38,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final colorController = TextEditingController(text: category?.color ?? '');
     final iconController = TextEditingController(text: category?.icon ?? '');
 
-    final result = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(isEditing ? 'Edit Category' : 'New Category'),
@@ -169,9 +141,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
     );
 
-    if (result == true) {
-      _loadCategories();
-    }
+    // No need to manually reload - StreamBuilder will automatically update
   }
 
   Future<void> _archiveCategory(Category category) async {
@@ -199,7 +169,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     if (confirmed == true) {
       try {
         await widget.categoriesService.archiveCategory(category.id);
-        _loadCategories();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Archived category "${category.name}"')),
@@ -232,77 +201,79 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   setState(() {
                     showArchived = value;
                   });
-                  _loadCategories();
                 },
               ),
             ],
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (errorMessage != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.red.shade100,
-                border: Border.all(color: Colors.red.shade300),
-                borderRadius: BorderRadius.circular(8),
+      body: StreamBuilder<List<Category>>(
+        stream: _categoriesStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  border: Border.all(color: Colors.red.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Error',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Failed to load categories: ${snapshot.error}'),
+                  ],
+                ),
               ),
+            );
+          }
+          
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final categories = snapshot.data!;
+          if (categories.isEmpty) {
+            return Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Error',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Icon(
+                    Icons.category_outlined,
+                    size: 64,
+                    color: Colors.grey.shade400,
                   ),
-                  const SizedBox(height: 4),
-                  Text(errorMessage!),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No categories yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _loadCategories,
-                    child: const Text('Retry'),
+                  Text(
+                    'Create your first category to organize your notes',
+                    style: TextStyle(color: Colors.grey.shade500),
                   ),
                 ],
               ),
-            ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : categories!.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.category_outlined,
-                              size: 64,
-                              color: Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No categories yet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Create your first category to organize your notes',
-                              style: TextStyle(color: Colors.grey.shade500),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadCategories,
-                        child: ListView.builder(
-                          itemCount: categories!.length,
-                          itemBuilder: (context, index) {
-                            final category = categories![index];
+            );
+          }
+
+          return ListView.builder(
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              final category = categories[index];
                             return Card(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -382,12 +353,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                   ],
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ],
+              );
+            },
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCategoryDialog(),

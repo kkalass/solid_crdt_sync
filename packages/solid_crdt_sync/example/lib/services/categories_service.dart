@@ -22,15 +22,15 @@ class CategoriesService {
 
   CategoriesService(this._categoryRepository, this._noteRepository);
 
-  /// Get all categories sorted by name (non-archived only)
-  Future<List<Category>> getAllCategories() async {
+  /// Watch all categories sorted by name (non-archived only)
+  Stream<List<Category>> getAllCategories() {
     // Query from repository - fast and flexible
-    return await _categoryRepository.getAllCategories();
+    return _categoryRepository.getAllCategories();
   }
 
-  /// Get all categories including archived ones, sorted by name
-  Future<List<Category>> getAllCategoriesIncludingArchived() async {
-    return await _categoryRepository.getAllCategoriesIncludingArchived();
+  /// Watch all categories including archived ones, sorted by name
+  Stream<List<Category>> getAllCategoriesIncludingArchived() {
+    return _categoryRepository.getAllCategoriesIncludingArchived();
   }
 
   /// Get a specific category by ID
