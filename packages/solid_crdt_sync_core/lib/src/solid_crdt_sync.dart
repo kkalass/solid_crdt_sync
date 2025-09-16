@@ -5,13 +5,14 @@ import 'dart:async';
 import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:solid_crdt_sync_core/src/mapping/solid_mapping_context.dart';
-import 'package:solid_crdt_sync_core/src/mapping/resource_iri_service.dart';
+import 'package:solid_crdt_sync_core/src/mapping/local_resource_iri_service.dart';
 import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
 import 'package:solid_crdt_sync_core/src/index/index_converter.dart';
 import 'package:solid_crdt_sync_core/src/index/index_item_converter.dart';
 import 'config/resource_config.dart';
+import 'config/validation.dart';
 import 'hydration_result.dart';
 import 'hydration/hydration_emitter.dart';
 import 'hydration/hydration_stream_manager.dart';
@@ -76,7 +77,7 @@ class SolidCrdtSync {
     required MapperInitializerFunction mapperInitializer,
     required SyncConfig config,
   }) async {
-    final iriService = ResourceIriService();
+    final iriService = LocalResourceIriService();
     final mappingContext = SolidMappingContext(
       resourceIriFactory: iriService.createResourceIriMapper,
       resourceRefFactory: iriService.createResourceRefMapper,
@@ -84,12 +85,20 @@ class SolidCrdtSync {
     final mapper = mapperInitializer(mappingContext);
 
     final resourceTypeCache = config.buildResourceTypeCache(mapper);
-    // Validate configuration before proceeding
-    final validationResult = config.validate(resourceTypeCache);
-    validationResult.throwIfInvalid();
 
-    // Important: finish the setup and validate the pod IRI mappings
-    iriService.finishSetupAndValidate(resourceTypeCache);
+    // Validate configuration before proceeding
+    final configValidationResult = config.validate(resourceTypeCache);
+
+    // Validate IRI service setup and finish setup if valid
+    final iriServiceValidationResult =
+        iriService.finishSetupAndValidate(resourceTypeCache);
+
+    // Combine validation results
+    final combinedValidationResult = ValidationResult.merge(
+        [configValidationResult, iriServiceValidationResult]);
+
+    // Throw if any validation failed
+    combinedValidationResult.throwIfInvalid();
 
     // Initialize storage
     await storage.initialize();
