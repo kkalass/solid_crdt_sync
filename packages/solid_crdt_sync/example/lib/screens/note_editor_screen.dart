@@ -41,9 +41,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _tagController = TextEditingController();
     _tags = Set.from(widget.note?.tags ?? <String>{});
     _selectedCategoryId = widget.note?.categoryId;
-
-    // Debug print to see if tags are being loaded correctly
-    print('Initializing note editor with ${_tags.length} tags: $_tags');
   }
 
   @override

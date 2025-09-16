@@ -55,7 +55,6 @@ class NotesService {
 
   /// Set category filter (null means show all notes)
   void setCategoryFilter(String? categoryId) {
-    print("!!!Setting category filter: $categoryId");
     _categoryFilterController.add(categoryId);
   }
 
