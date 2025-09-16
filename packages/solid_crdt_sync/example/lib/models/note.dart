@@ -5,6 +5,7 @@ import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
 import '../vocabulary/personal_notes_vocab.dart';
+import '../utils/optional.dart';
 import 'category.dart';
 
 /// A personal note with title, content, and tags.
@@ -71,7 +72,7 @@ class Note {
     String? title,
     String? content,
     Set<String>? tags,
-    String? categoryId,
+    Optional<String>? categoryId,
     DateTime? createdAt,
     DateTime? modifiedAt,
   }) {
@@ -80,7 +81,7 @@ class Note {
       title: title ?? this.title,
       content: content ?? this.content,
       tags: tags ?? Set.from(this.tags),
-      categoryId: categoryId ?? this.categoryId,
+      categoryId: categoryId != null ? categoryId.value : this.categoryId,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? DateTime.now(),
     );

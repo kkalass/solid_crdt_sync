@@ -5,7 +5,9 @@
 /// like Hybrid Logical Clock hashes for change detection.
 library;
 
+import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
+
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
@@ -44,7 +46,8 @@ class NoteIndexEntry {
   final Set<String> keywords;
 
   /// Category ID for grouping
-  @RdfProperty(PersonalNotesVocab.belongsToCategory)
+  @RdfProperty(PersonalNotesVocab.belongsToCategory,
+      iri: PodResourceRef(Category))
   final String? categoryId;
 
   const NoteIndexEntry({

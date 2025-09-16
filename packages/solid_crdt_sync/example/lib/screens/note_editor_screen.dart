@@ -3,15 +3,20 @@ library;
 
 import 'package:flutter/material.dart';
 import '../models/note.dart';
+import '../models/category.dart' as models;
 import '../services/notes_service.dart';
+import '../services/categories_service.dart';
+import '../utils/optional.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   final NotesService notesService;
+  final CategoriesService categoriesService;
   final Note? note;
 
   const NoteEditorScreen({
     super.key,
     required this.notesService,
+    required this.categoriesService,
     this.note,
   });
 
@@ -24,6 +29,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   late final TextEditingController _contentController;
   late final TextEditingController _tagController;
   late Set<String> _tags;
+  late String? _selectedCategoryId;
   bool _saving = false;
 
   @override
@@ -34,6 +40,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         TextEditingController(text: widget.note?.content ?? '');
     _tagController = TextEditingController();
     _tags = Set.from(widget.note?.tags ?? <String>{});
+    _selectedCategoryId = widget.note?.categoryId;
+
+    // Debug print to see if tags are being loaded correctly
+    print('Initializing note editor with ${_tags.length} tags: $_tags');
   }
 
   @override
@@ -54,12 +64,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             title: _titleController.text,
             content: _contentController.text,
             tags: _tags,
+            categoryId: Optional(_selectedCategoryId),
           ) ??
-          widget.notesService.createNote(
-            title: _titleController.text,
-            content: _contentController.text,
-            tags: _tags,
-          );
+          widget.notesService
+              .createNote(
+                title: _titleController.text,
+                content: _contentController.text,
+                tags: _tags,
+              )
+              .copyWith(categoryId: Optional(_selectedCategoryId));
 
       await widget.notesService.saveNote(note);
 
@@ -146,6 +159,47 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
             const SizedBox(height: 16),
 
+            // Category selection
+            StreamBuilder<List<models.Category>>(
+              stream: widget.categoriesService.getAllCategories(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircularProgressIndicator();
+                }
+                final categories = snapshot.data ?? [];
+                return DropdownButtonFormField<String?>(
+                  value: _selectedCategoryId,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No Category'),
+                    ),
+                    ...categories.map((category) => DropdownMenuItem<String>(
+                          value: category.id,
+                          child: Row(
+                            children: [
+                              Icon(_getCategoryIcon(category.icon)),
+                              const SizedBox(width: 8),
+                              Text(category.name),
+                            ],
+                          ),
+                        )),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategoryId = value;
+                    });
+                  },
+                );
+              },
+            ),
+
+            const SizedBox(height: 16),
+
             // Tags section
             const Text(
               'Tags',
@@ -224,5 +278,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ),
       ),
     );
+  }
+
+  IconData _getCategoryIcon(String? iconName) {
+    switch (iconName) {
+      case 'work':
+        return Icons.work;
+      case 'personal':
+        return Icons.person;
+      case 'archive':
+        return Icons.archive;
+      case 'folder':
+        return Icons.folder;
+      default:
+        return Icons.category;
+    }
   }
 }

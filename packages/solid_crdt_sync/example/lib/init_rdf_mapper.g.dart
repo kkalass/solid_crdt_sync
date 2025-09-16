@@ -49,6 +49,7 @@ RdfMapper initRdfMapper({
   );
   registry.registerMapper<nie.NoteIndexEntry>(
     niermg.NoteIndexEntryMapper(
+      categoryIdMapper: $resourceRefFactory<String?>(category.Category),
       idMapper: $resourceRefFactory<String>(note.Note),
     ),
   );

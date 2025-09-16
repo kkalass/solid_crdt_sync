@@ -6,6 +6,7 @@ import 'package:rxdart/rxdart.dart';
 import '../models/note.dart';
 import '../models/note_index_entry.dart';
 import '../storage/repositories.dart';
+import '../utils/optional.dart';
 
 /// Service for managing notes with local-first CRDT synchronization.
 ///
@@ -151,7 +152,7 @@ class NotesService {
   Future<void> assignNoteToCategory(String noteId, String? categoryId) async {
     final note = await getNote(noteId);
     if (note != null) {
-      final updatedNote = note.copyWith(categoryId: categoryId);
+      final updatedNote = note.copyWith(categoryId: Optional(categoryId));
       await saveNote(updatedNote);
     }
   }

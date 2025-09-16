@@ -16,6 +16,7 @@ import 'package:personal_notes_app/models/note_index_entry.dart' as nie;
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
+import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
 
 /// Generated mapper for [nie.NoteIndexEntry] global resources.
@@ -23,11 +24,15 @@ import 'package:personal_notes_app/models/note.dart';
 /// This mapper handles serialization and deserialization between Dart objects
 /// and RDF triples for resources of type `nie.NoteIndexEntry`.
 class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
+  final IriTermMapper<String> _categoryIdMapper;
   final IriTermMapper<String> _idMapper;
 
   /// Constructor
-  const NoteIndexEntryMapper({required IriTermMapper<String> idMapper})
-    : _idMapper = idMapper;
+  const NoteIndexEntryMapper({
+    required IriTermMapper<String> categoryIdMapper,
+    required IriTermMapper<String> idMapper,
+  }) : _categoryIdMapper = categoryIdMapper,
+       _idMapper = idMapper;
 
   @override
   IriTerm? get typeIri => null;
@@ -56,6 +61,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
     );
     final String? categoryId = reader.optional(
       PersonalNotesVocab.belongsToCategory,
+      deserializer: _categoryIdMapper,
     );
 
     return nie.NoteIndexEntry(
@@ -92,6 +98,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
           (b) => b.addValue(
             PersonalNotesVocab.belongsToCategory,
             resource.categoryId,
+            serializer: _categoryIdMapper,
           ),
         )
         .build();

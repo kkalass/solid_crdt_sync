@@ -152,6 +152,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       MaterialPageRoute(
         builder: (context) => NoteEditorScreen(
           notesService: widget.notesService,
+          categoriesService: widget.categoriesService,
           // Notes will update automatically via reactive streams
         ),
       ),
@@ -176,6 +177,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
         MaterialPageRoute(
           builder: (context) => NoteEditorScreen(
             notesService: widget.notesService,
+            categoriesService: widget.categoriesService,
             note: note,
             // Notes will update automatically via reactive streams
           ),
