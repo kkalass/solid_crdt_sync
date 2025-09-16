@@ -281,6 +281,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  solid_crdt_sync_core:
+    dependency: "direct main"
+    description:
+      path: "../solid_crdt_sync_core"
+      relative: true
+    source: path
+    version: "0.9.15-dev"
   source_map_stack_trace:
     dependency: transitive
     description:

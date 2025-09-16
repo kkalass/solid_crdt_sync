@@ -11,6 +11,7 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 
 import 'package:personal_notes_app/models/category.dart' as category;
 import 'package:personal_notes_app/models/category.rdf_mapper.g.dart' as crmg;
+import 'package:solid_crdt_sync_core/src/mapping/pod_iri_config.dart' as pic;
 import 'package:personal_notes_app/models/note.dart' as note;
 import 'package:personal_notes_app/models/note.rdf_mapper.g.dart' as nrmg;
 import 'package:personal_notes_app/models/note_index_entry.dart' as nie;
@@ -24,7 +25,8 @@ import 'package:personal_notes_app/models/note_index_entry.rdf_mapper.g.dart'
 /// * [$resourceRefFactory]
 RdfMapper initRdfMapper({
   RdfMapper? rdfMapper,
-  required IriTermMapper<(String id,)> Function<T>() $resourceIriFactory,
+  required IriTermMapper<(String id,)> Function<T>(pic.PodIriConfig)
+  $resourceIriFactory,
   required IriTermMapper<String> Function<T>(Type) $resourceRefFactory,
 }) {
   if (rdfMapper == null) {
@@ -33,12 +35,16 @@ RdfMapper initRdfMapper({
   var registry = rdfMapper.registry;
 
   registry.registerMapper<category.Category>(
-    crmg.CategoryMapper(iriMapper: $resourceIriFactory<category.Category>()),
+    crmg.CategoryMapper(
+      iriMapper: $resourceIriFactory<category.Category>(
+        const pic.PodIriConfig(),
+      ),
+    ),
   );
   registry.registerMapper<note.Note>(
     nrmg.NoteMapper(
       categoryIdMapper: $resourceRefFactory<String?>(category.Category),
-      iriMapper: $resourceIriFactory<note.Note>(),
+      iriMapper: $resourceIriFactory<note.Note>(const pic.PodIriConfig()),
     ),
   );
   registry.registerMapper<nie.NoteIndexEntry>(

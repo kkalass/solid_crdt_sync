@@ -5,7 +5,6 @@ import 'package:solid_crdt_sync_core/src/index/index_config.dart';
 
 import '../config/resource_config.dart';
 import '../hydration_result.dart';
-import '../solid_crdt_sync.dart' show defaultIndexLocalName;
 import 'hydration_stream_manager.dart';
 import 'index_item_converter_registry.dart';
 import 'type_local_name_key.dart';

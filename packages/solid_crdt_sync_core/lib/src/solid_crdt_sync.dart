@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:solid_crdt_sync_core/src/mapping/solid_mapping_context.dart';
+import 'package:solid_crdt_sync_core/src/mapping/resource_iri_service.dart';
 import 'auth/auth_interface.dart';
 import 'storage/storage_interface.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
@@ -32,7 +33,8 @@ typedef MapperInitializerFunction = RdfMapper Function(
 class SolidCrdtSync {
   final Storage _storage;
   final RdfMapper _mapper;
-  final Auth? _authProvider;
+  // ignore: unused_field
+  final Auth? _authProvider; // TODO: Use for Pod synchronization
   final SyncConfig _config;
   final Map<Type, IriTerm> _resourceTypeCache;
   late final IndexConverter _indexConverter;
@@ -74,11 +76,20 @@ class SolidCrdtSync {
     required MapperInitializerFunction mapperInitializer,
     required SyncConfig config,
   }) async {
-    final mapper = mapperInitializer(SolidMappingContext());
+    final iriService = ResourceIriService();
+    final mappingContext = SolidMappingContext(
+      resourceIriFactory: iriService.createResourceIriMapper,
+      resourceRefFactory: iriService.createResourceRefMapper,
+    );
+    final mapper = mapperInitializer(mappingContext);
+
     final resourceTypeCache = config.buildResourceTypeCache(mapper);
     // Validate configuration before proceeding
     final validationResult = config.validate(resourceTypeCache);
     validationResult.throwIfInvalid();
+
+    // Important: finish the setup and validate the pod IRI mappings
+    iriService.finishSetupAndValidate(resourceTypeCache);
 
     // Initialize storage
     await storage.initialize();
@@ -280,7 +291,7 @@ class SolidCrdtSync {
       // 1. Allows immediate application of local changes (save/delete operations)
       // 2. Provides proper consistency checking for remote sync updates
       // 3. Handles cursor mismatches gracefully without blocking updates
-      
+
       // Apply changes directly without cursor consistency check for now
       for (final item in result.items) {
         await onUpdate(item);

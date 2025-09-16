@@ -35,6 +35,7 @@ export 'src/index/index_config.dart';
 // Resource-focused configuration
 export 'src/config/resource_config.dart';
 export 'src/config/validation.dart';
+export 'src/mapping/pod_iri_config.dart';
 
 // Vocabularies
 export 'src/vocabulary/idx_vocab.dart';
