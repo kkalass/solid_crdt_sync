@@ -68,14 +68,14 @@ class CategoryRepository {
 
   /// Watch all categories ordered by name (non-archived only)
   Stream<List<models.Category>> getAllCategories() {
-    return _categoryDao.getAllCategories()
-        .map((driftCategories) => driftCategories.map(_categoryFromDrift).toList());
+    return _categoryDao.getAllCategories().map(
+        (driftCategories) => driftCategories.map(_categoryFromDrift).toList());
   }
 
   /// Watch all categories including archived ones, ordered by name
   Stream<List<models.Category>> getAllCategoriesIncludingArchived() {
-    return _categoryDao.getAllCategoriesIncludingArchived()
-        .map((driftCategories) => driftCategories.map(_categoryFromDrift).toList());
+    return _categoryDao.getAllCategoriesIncludingArchived().map(
+        (driftCategories) => driftCategories.map(_categoryFromDrift).toList());
   }
 
   /// Get a specific category by ID
@@ -247,7 +247,8 @@ class NoteRepository {
 
   /// Watch all notes ordered by modification date (newest first)
   Stream<List<models.Note>> getAllNotes() {
-    return _noteDao.getAllNotes()
+    return _noteDao
+        .getAllNotes()
         .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
@@ -274,13 +275,15 @@ class NoteRepository {
 
   /// Watch notes by category
   Stream<List<models.Note>> getNotesByCategory(String categoryId) {
-    return _noteDao.getNotesByCategory(categoryId)
+    return _noteDao
+        .getNotesByCategory(categoryId)
         .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
   /// Watch notes without a category
   Stream<List<models.Note>> getUncategorizedNotes() {
-    return _noteDao.getUncategorizedNotes()
+    return _noteDao
+        .getUncategorizedNotes()
         .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
@@ -290,6 +293,7 @@ class NoteRepository {
       id: drift.id,
       title: drift.title,
       content: drift.content,
+      tags: drift.tags, // Now properly handled by StringSetConverter
       categoryId: drift.categoryId,
       createdAt: drift.createdAt,
       modifiedAt: drift.modifiedAt,
@@ -302,6 +306,7 @@ class NoteRepository {
       id: Value(note.id),
       title: Value(note.title),
       content: Value(note.content),
+      tags: Value(note.tags), // Now properly handled by StringSetConverter
       categoryId: Value(note.categoryId),
       createdAt: Value(note.createdAt),
       modifiedAt: Value(note.modifiedAt),
@@ -315,8 +320,7 @@ class NoteRepository {
       name: drift.name,
       dateCreated: drift.dateCreated,
       dateModified: drift.dateModified,
-      keywords: Set<String>.from(
-          (drift.keywords ?? '').split(',').where((s) => s.isNotEmpty)),
+      keywords: drift.keywords ?? <String>{}, // Handle null with empty set
       categoryId: drift.categoryId,
     );
   }
@@ -329,7 +333,8 @@ class NoteRepository {
       name: Value(noteEntry.name),
       dateCreated: Value(noteEntry.dateCreated),
       dateModified: Value(noteEntry.dateModified),
-      keywords: Value(noteEntry.keywords.join(',')),
+      keywords: Value(
+          noteEntry.keywords), // Now properly handled by StringSetConverter
       categoryId: Value(noteEntry.categoryId),
       groupId: Value(groupId),
     );
@@ -337,16 +342,16 @@ class NoteRepository {
 
   /// Watch all note index entries reactively
   Stream<List<models.NoteIndexEntry>> watchAllNoteIndexEntries() {
-    return _noteIndexDao.watchAllNoteIndexEntries()
-        .map((driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
+    return _noteIndexDao.watchAllNoteIndexEntries().map(
+        (driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
   }
 
   /// Watch note index entries by category reactively
-  Stream<List<models.NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
-    return _noteIndexDao.watchNoteIndexEntriesByCategory(categoryId)
-        .map((driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
+  Stream<List<models.NoteIndexEntry>> watchNoteIndexEntriesByCategory(
+      String categoryId) {
+    return _noteIndexDao.watchNoteIndexEntriesByCategory(categoryId).map(
+        (driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
   }
-
 
   /// Dispose resources when repository is no longer needed
   void dispose() {

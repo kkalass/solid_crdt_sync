@@ -393,7 +393,6 @@ class _NotesListScreenState extends State<NotesListScreen> {
                   Wrap(
                     spacing: 4,
                     children: noteEntry.keywords
-                        .take(3)
                         .map((keyword) => Chip(
                               label: Text(keyword,
                                   style: const TextStyle(fontSize: 11)),

@@ -464,6 +464,13 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
   late final GeneratedColumn<String> content = GeneratedColumn<String>(
       'content', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  late final GeneratedColumnWithTypeConverter<Set<String>, String> tags =
+      GeneratedColumn<String>('tags', aliasedName, false,
+              type: DriftSqlType.string,
+              requiredDuringInsert: false,
+              defaultValue: const Constant('[]'))
+          .withConverter<Set<String>>($NotesTable.$convertertags);
   static const VerificationMeta _categoryIdMeta =
       const VerificationMeta('categoryId');
   @override
@@ -487,7 +494,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, title, content, categoryId, createdAt, modifiedAt];
+      [id, title, content, tags, categoryId, createdAt, modifiedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -550,6 +557,8 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
           .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
       content: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}content'])!,
+      tags: $NotesTable.$convertertags.fromSql(attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tags'])!),
       categoryId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
       createdAt: attachedDatabase.typeMapping
@@ -563,6 +572,9 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, Note> {
   $NotesTable createAlias(String alias) {
     return $NotesTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<Set<String>, String> $convertertags =
+      const StringSetConverter();
 }
 
 class Note extends DataClass implements Insertable<Note> {
@@ -574,6 +586,9 @@ class Note extends DataClass implements Insertable<Note> {
 
   /// Note content
   final String content;
+
+  /// Tags that can be added/removed independently
+  final Set<String> tags;
 
   /// Category ID (foreign key)
   final String? categoryId;
@@ -587,6 +602,7 @@ class Note extends DataClass implements Insertable<Note> {
       {required this.id,
       required this.title,
       required this.content,
+      required this.tags,
       this.categoryId,
       required this.createdAt,
       required this.modifiedAt});
@@ -596,6 +612,9 @@ class Note extends DataClass implements Insertable<Note> {
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
     map['content'] = Variable<String>(content);
+    {
+      map['tags'] = Variable<String>($NotesTable.$convertertags.toSql(tags));
+    }
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<String>(categoryId);
     }
@@ -609,6 +628,7 @@ class Note extends DataClass implements Insertable<Note> {
       id: Value(id),
       title: Value(title),
       content: Value(content),
+      tags: Value(tags),
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
@@ -624,6 +644,7 @@ class Note extends DataClass implements Insertable<Note> {
       id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
       content: serializer.fromJson<String>(json['content']),
+      tags: serializer.fromJson<Set<String>>(json['tags']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       modifiedAt: serializer.fromJson<DateTime>(json['modifiedAt']),
@@ -636,6 +657,7 @@ class Note extends DataClass implements Insertable<Note> {
       'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
       'content': serializer.toJson<String>(content),
+      'tags': serializer.toJson<Set<String>>(tags),
       'categoryId': serializer.toJson<String?>(categoryId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'modifiedAt': serializer.toJson<DateTime>(modifiedAt),
@@ -646,6 +668,7 @@ class Note extends DataClass implements Insertable<Note> {
           {String? id,
           String? title,
           String? content,
+          Set<String>? tags,
           Value<String?> categoryId = const Value.absent(),
           DateTime? createdAt,
           DateTime? modifiedAt}) =>
@@ -653,6 +676,7 @@ class Note extends DataClass implements Insertable<Note> {
         id: id ?? this.id,
         title: title ?? this.title,
         content: content ?? this.content,
+        tags: tags ?? this.tags,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
         createdAt: createdAt ?? this.createdAt,
         modifiedAt: modifiedAt ?? this.modifiedAt,
@@ -662,6 +686,7 @@ class Note extends DataClass implements Insertable<Note> {
       id: data.id.present ? data.id.value : this.id,
       title: data.title.present ? data.title.value : this.title,
       content: data.content.present ? data.content.value : this.content,
+      tags: data.tags.present ? data.tags.value : this.tags,
       categoryId:
           data.categoryId.present ? data.categoryId.value : this.categoryId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -676,6 +701,7 @@ class Note extends DataClass implements Insertable<Note> {
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('content: $content, ')
+          ..write('tags: $tags, ')
           ..write('categoryId: $categoryId, ')
           ..write('createdAt: $createdAt, ')
           ..write('modifiedAt: $modifiedAt')
@@ -685,7 +711,7 @@ class Note extends DataClass implements Insertable<Note> {
 
   @override
   int get hashCode =>
-      Object.hash(id, title, content, categoryId, createdAt, modifiedAt);
+      Object.hash(id, title, content, tags, categoryId, createdAt, modifiedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -693,6 +719,7 @@ class Note extends DataClass implements Insertable<Note> {
           other.id == this.id &&
           other.title == this.title &&
           other.content == this.content &&
+          other.tags == this.tags &&
           other.categoryId == this.categoryId &&
           other.createdAt == this.createdAt &&
           other.modifiedAt == this.modifiedAt);
@@ -702,6 +729,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
   final Value<String> id;
   final Value<String> title;
   final Value<String> content;
+  final Value<Set<String>> tags;
   final Value<String?> categoryId;
   final Value<DateTime> createdAt;
   final Value<DateTime> modifiedAt;
@@ -710,6 +738,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.content = const Value.absent(),
+    this.tags = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.modifiedAt = const Value.absent(),
@@ -719,6 +748,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     required String id,
     required String title,
     required String content,
+    this.tags = const Value.absent(),
     this.categoryId = const Value.absent(),
     required DateTime createdAt,
     required DateTime modifiedAt,
@@ -732,6 +762,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
     Expression<String>? id,
     Expression<String>? title,
     Expression<String>? content,
+    Expression<String>? tags,
     Expression<String>? categoryId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? modifiedAt,
@@ -741,6 +772,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       if (id != null) 'id': id,
       if (title != null) 'title': title,
       if (content != null) 'content': content,
+      if (tags != null) 'tags': tags,
       if (categoryId != null) 'category_id': categoryId,
       if (createdAt != null) 'created_at': createdAt,
       if (modifiedAt != null) 'modified_at': modifiedAt,
@@ -752,6 +784,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       {Value<String>? id,
       Value<String>? title,
       Value<String>? content,
+      Value<Set<String>>? tags,
       Value<String?>? categoryId,
       Value<DateTime>? createdAt,
       Value<DateTime>? modifiedAt,
@@ -760,6 +793,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
       id: id ?? this.id,
       title: title ?? this.title,
       content: content ?? this.content,
+      tags: tags ?? this.tags,
       categoryId: categoryId ?? this.categoryId,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
@@ -778,6 +812,10 @@ class NotesCompanion extends UpdateCompanion<Note> {
     }
     if (content.present) {
       map['content'] = Variable<String>(content.value);
+    }
+    if (tags.present) {
+      map['tags'] =
+          Variable<String>($NotesTable.$convertertags.toSql(tags.value));
     }
     if (categoryId.present) {
       map['category_id'] = Variable<String>(categoryId.value);
@@ -800,6 +838,7 @@ class NotesCompanion extends UpdateCompanion<Note> {
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('content: $content, ')
+          ..write('tags: $tags, ')
           ..write('categoryId: $categoryId, ')
           ..write('createdAt: $createdAt, ')
           ..write('modifiedAt: $modifiedAt, ')
@@ -837,12 +876,12 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
   late final GeneratedColumn<DateTime> dateModified = GeneratedColumn<DateTime>(
       'date_modified', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
-  static const VerificationMeta _keywordsMeta =
-      const VerificationMeta('keywords');
   @override
-  late final GeneratedColumn<String> keywords = GeneratedColumn<String>(
-      'keywords', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
+  late final GeneratedColumnWithTypeConverter<Set<String>?, String> keywords =
+      GeneratedColumn<String>('keywords', aliasedName, true,
+              type: DriftSqlType.string, requiredDuringInsert: false)
+          .withConverter<Set<String>?>(
+              $NoteIndexEntriesTable.$converterkeywordsn);
   static const VerificationMeta _categoryIdMeta =
       const VerificationMeta('categoryId');
   @override
@@ -895,10 +934,6 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
     } else if (isInserting) {
       context.missing(_dateModifiedMeta);
     }
-    if (data.containsKey('keywords')) {
-      context.handle(_keywordsMeta,
-          keywords.isAcceptableOrUnknown(data['keywords']!, _keywordsMeta));
-    }
     if (data.containsKey('category_id')) {
       context.handle(
           _categoryIdMeta,
@@ -928,8 +963,9 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date_created'])!,
       dateModified: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}date_modified'])!,
-      keywords: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}keywords']),
+      keywords: $NoteIndexEntriesTable.$converterkeywordsn.fromSql(
+          attachedDatabase.typeMapping
+              .read(DriftSqlType.string, data['${effectivePrefix}keywords'])),
       categoryId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
       groupId: attachedDatabase.typeMapping
@@ -941,6 +977,11 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
   $NoteIndexEntriesTable createAlias(String alias) {
     return $NoteIndexEntriesTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<Set<String>, String> $converterkeywords =
+      const StringSetConverter();
+  static TypeConverter<Set<String>?, String?> $converterkeywordsn =
+      NullAwareTypeConverter.wrap($converterkeywords);
 }
 
 class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
@@ -957,7 +998,7 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
   final DateTime dateModified;
 
   /// Keywords (from indexed properties)
-  final String? keywords;
+  final Set<String>? keywords;
 
   /// Category ID (from indexed properties)
   final String? categoryId;
@@ -980,7 +1021,8 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
     map['date_created'] = Variable<DateTime>(dateCreated);
     map['date_modified'] = Variable<DateTime>(dateModified);
     if (!nullToAbsent || keywords != null) {
-      map['keywords'] = Variable<String>(keywords);
+      map['keywords'] = Variable<String>(
+          $NoteIndexEntriesTable.$converterkeywordsn.toSql(keywords));
     }
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<String>(categoryId);
@@ -1013,7 +1055,7 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
       name: serializer.fromJson<String>(json['name']),
       dateCreated: serializer.fromJson<DateTime>(json['dateCreated']),
       dateModified: serializer.fromJson<DateTime>(json['dateModified']),
-      keywords: serializer.fromJson<String?>(json['keywords']),
+      keywords: serializer.fromJson<Set<String>?>(json['keywords']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       groupId: serializer.fromJson<String>(json['groupId']),
     );
@@ -1026,7 +1068,7 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
       'name': serializer.toJson<String>(name),
       'dateCreated': serializer.toJson<DateTime>(dateCreated),
       'dateModified': serializer.toJson<DateTime>(dateModified),
-      'keywords': serializer.toJson<String?>(keywords),
+      'keywords': serializer.toJson<Set<String>?>(keywords),
       'categoryId': serializer.toJson<String?>(categoryId),
       'groupId': serializer.toJson<String>(groupId),
     };
@@ -1037,7 +1079,7 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
           String? name,
           DateTime? dateCreated,
           DateTime? dateModified,
-          Value<String?> keywords = const Value.absent(),
+          Value<Set<String>?> keywords = const Value.absent(),
           Value<String?> categoryId = const Value.absent(),
           String? groupId}) =>
       NoteIndexEntry(
@@ -1100,7 +1142,7 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
   final Value<String> name;
   final Value<DateTime> dateCreated;
   final Value<DateTime> dateModified;
-  final Value<String?> keywords;
+  final Value<Set<String>?> keywords;
   final Value<String?> categoryId;
   final Value<String> groupId;
   final Value<int> rowid;
@@ -1155,7 +1197,7 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
       Value<String>? name,
       Value<DateTime>? dateCreated,
       Value<DateTime>? dateModified,
-      Value<String?>? keywords,
+      Value<Set<String>?>? keywords,
       Value<String?>? categoryId,
       Value<String>? groupId,
       Value<int>? rowid}) {
@@ -1187,7 +1229,8 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
       map['date_modified'] = Variable<DateTime>(dateModified.value);
     }
     if (keywords.present) {
-      map['keywords'] = Variable<String>(keywords.value);
+      map['keywords'] = Variable<String>(
+          $NoteIndexEntriesTable.$converterkeywordsn.toSql(keywords.value));
     }
     if (categoryId.present) {
       map['category_id'] = Variable<String>(categoryId.value);
@@ -1782,6 +1825,7 @@ typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
   required String id,
   required String title,
   required String content,
+  Value<Set<String>> tags,
   Value<String?> categoryId,
   required DateTime createdAt,
   required DateTime modifiedAt,
@@ -1791,6 +1835,7 @@ typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<String> id,
   Value<String> title,
   Value<String> content,
+  Value<Set<String>> tags,
   Value<String?> categoryId,
   Value<DateTime> createdAt,
   Value<DateTime> modifiedAt,
@@ -1832,6 +1877,11 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
 
   ColumnFilters<String> get content => $composableBuilder(
       column: $table.content, builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<Set<String>, Set<String>, String> get tags =>
+      $composableBuilder(
+          column: $table.tags,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1878,6 +1928,9 @@ class $$NotesTableOrderingComposer
   ColumnOrderings<String> get content => $composableBuilder(
       column: $table.content, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get tags => $composableBuilder(
+      column: $table.tags, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -1922,6 +1975,9 @@ class $$NotesTableAnnotationComposer
 
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<Set<String>, String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1976,6 +2032,7 @@ class $$NotesTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             Value<String> title = const Value.absent(),
             Value<String> content = const Value.absent(),
+            Value<Set<String>> tags = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> modifiedAt = const Value.absent(),
@@ -1985,6 +2042,7 @@ class $$NotesTableTableManager extends RootTableManager<
             id: id,
             title: title,
             content: content,
+            tags: tags,
             categoryId: categoryId,
             createdAt: createdAt,
             modifiedAt: modifiedAt,
@@ -1994,6 +2052,7 @@ class $$NotesTableTableManager extends RootTableManager<
             required String id,
             required String title,
             required String content,
+            Value<Set<String>> tags = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             required DateTime createdAt,
             required DateTime modifiedAt,
@@ -2003,6 +2062,7 @@ class $$NotesTableTableManager extends RootTableManager<
             id: id,
             title: title,
             content: content,
+            tags: tags,
             categoryId: categoryId,
             createdAt: createdAt,
             modifiedAt: modifiedAt,
@@ -2068,7 +2128,7 @@ typedef $$NoteIndexEntriesTableCreateCompanionBuilder
   required String name,
   required DateTime dateCreated,
   required DateTime dateModified,
-  Value<String?> keywords,
+  Value<Set<String>?> keywords,
   Value<String?> categoryId,
   required String groupId,
   Value<int> rowid,
@@ -2079,7 +2139,7 @@ typedef $$NoteIndexEntriesTableUpdateCompanionBuilder
   Value<String> name,
   Value<DateTime> dateCreated,
   Value<DateTime> dateModified,
-  Value<String?> keywords,
+  Value<Set<String>?> keywords,
   Value<String?> categoryId,
   Value<String> groupId,
   Value<int> rowid,
@@ -2106,8 +2166,10 @@ class $$NoteIndexEntriesTableFilterComposer
   ColumnFilters<DateTime> get dateModified => $composableBuilder(
       column: $table.dateModified, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get keywords => $composableBuilder(
-      column: $table.keywords, builder: (column) => ColumnFilters(column));
+  ColumnWithTypeConverterFilters<Set<String>?, Set<String>, String>
+      get keywords => $composableBuilder(
+          column: $table.keywords,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnFilters<String> get categoryId => $composableBuilder(
       column: $table.categoryId, builder: (column) => ColumnFilters(column));
@@ -2169,7 +2231,7 @@ class $$NoteIndexEntriesTableAnnotationComposer
   GeneratedColumn<DateTime> get dateModified => $composableBuilder(
       column: $table.dateModified, builder: (column) => column);
 
-  GeneratedColumn<String> get keywords =>
+  GeneratedColumnWithTypeConverter<Set<String>?, String> get keywords =>
       $composableBuilder(column: $table.keywords, builder: (column) => column);
 
   GeneratedColumn<String> get categoryId => $composableBuilder(
@@ -2210,7 +2272,7 @@ class $$NoteIndexEntriesTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<DateTime> dateCreated = const Value.absent(),
             Value<DateTime> dateModified = const Value.absent(),
-            Value<String?> keywords = const Value.absent(),
+            Value<Set<String>?> keywords = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             Value<String> groupId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -2230,7 +2292,7 @@ class $$NoteIndexEntriesTableTableManager extends RootTableManager<
             required String name,
             required DateTime dateCreated,
             required DateTime dateModified,
-            Value<String?> keywords = const Value.absent(),
+            Value<Set<String>?> keywords = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
             required String groupId,
             Value<int> rowid = const Value.absent(),

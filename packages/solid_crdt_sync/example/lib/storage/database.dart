@@ -1,10 +1,33 @@
 /// Drift database schema for the example app's local storage.
 library;
 
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 part 'database.g.dart';
+
+/// Type converter for Set<String> to/from JSON
+class StringSetConverter extends TypeConverter<Set<String>, String> {
+  const StringSetConverter();
+
+  @override
+  Set<String> fromSql(String fromDb) {
+    if (fromDb.isEmpty) return <String>{};
+    try {
+      final List<dynamic> decoded = json.decode(fromDb);
+      return decoded.cast<String>().toSet();
+    } catch (e) {
+      // Fallback for comma-separated format
+      return fromDb.split(',').where((s) => s.isNotEmpty).toSet();
+    }
+  }
+
+  @override
+  String toSql(Set<String> value) {
+    return json.encode(value.toList());
+  }
+}
 
 /// Categories table
 class Categories extends Table {
@@ -47,6 +70,11 @@ class Notes extends Table {
   /// Note content
   TextColumn get content => text()();
 
+  /// Tags that can be added/removed independently
+  TextColumn get tags => text()
+      .map(const StringSetConverter())
+      .withDefault(const Constant('[]'))();
+
   /// Category ID (foreign key)
   TextColumn get categoryId => text().nullable().references(Categories, #id)();
 
@@ -71,11 +99,12 @@ class NoteIndexEntries extends Table {
   /// Creation timestamp (from indexed properties)
   DateTimeColumn get dateCreated => dateTime()();
 
-  /// Last modification timestamp (from indexed properties)  
+  /// Last modification timestamp (from indexed properties)
   DateTimeColumn get dateModified => dateTime()();
 
   /// Keywords (from indexed properties)
-  TextColumn get keywords => text().nullable()();
+  TextColumn get keywords =>
+      text().map(const StringSetConverter()).nullable()();
 
   /// Category ID (from indexed properties)
   TextColumn get categoryId => text().nullable()();
@@ -111,7 +140,7 @@ class AppDatabase extends _$AppDatabase {
       : super(_openConnection(web: web, native: native));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,7 +185,7 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             // Add NoteIndexEntries table in version 4
             await m.createTable(noteIndexEntries);
-            
+
             await m.database.customStatement('''
               CREATE INDEX IF NOT EXISTS idx_note_index_entries_group 
               ON note_index_entries(group_id);
@@ -165,6 +194,12 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement('''
               CREATE INDEX IF NOT EXISTS idx_note_index_entries_category 
               ON note_index_entries(category_id);
+            ''');
+          }
+          if (from < 5) {
+            // Add tags column to notes table in version 5
+            await m.database.customStatement('''
+              ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
             ''');
           }
         },
@@ -274,25 +309,29 @@ class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
 
 /// Data Access Object for Note Index Entries
 @DriftAccessor(tables: [NoteIndexEntries])
-class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase> with _$NoteIndexEntryDaoMixin {
+class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase>
+    with _$NoteIndexEntryDaoMixin {
   NoteIndexEntryDao(super.db);
 
   /// Watch all note index entries ordered by modification date (newest first)
   Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
     return (select(noteIndexEntries)
           ..orderBy([
-            (n) => OrderingTerm(expression: n.dateModified, mode: OrderingMode.desc)
+            (n) => OrderingTerm(
+                expression: n.dateModified, mode: OrderingMode.desc)
           ]))
         .watch();
   }
 
   /// Get a specific note index entry by ID
   Future<NoteIndexEntry?> getNoteIndexEntryById(String id) {
-    return (select(noteIndexEntries)..where((n) => n.id.equals(id))).getSingleOrNull();
+    return (select(noteIndexEntries)..where((n) => n.id.equals(id)))
+        .getSingleOrNull();
   }
 
   /// Insert or update a note index entry
-  Future<void> insertOrUpdateNoteIndexEntry(NoteIndexEntriesCompanion companion) {
+  Future<void> insertOrUpdateNoteIndexEntry(
+      NoteIndexEntriesCompanion companion) {
     return into(noteIndexEntries).insertOnConflictUpdate(companion);
   }
 
@@ -302,16 +341,16 @@ class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase> with _$NoteIndexEn
   }
 
   /// Watch note index entries by category
-  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
+  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(
+      String categoryId) {
     return (select(noteIndexEntries)
           ..where((n) => n.categoryId.equals(categoryId))
           ..orderBy([
-            (n) => OrderingTerm(expression: n.dateModified, mode: OrderingMode.desc)
+            (n) => OrderingTerm(
+                expression: n.dateModified, mode: OrderingMode.desc)
           ]))
         .watch();
   }
-
-
 
   /// Check if a note index entry exists
   Future<bool> noteIndexEntryExists(String id) async {
