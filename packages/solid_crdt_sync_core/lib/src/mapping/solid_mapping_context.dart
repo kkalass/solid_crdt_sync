@@ -5,14 +5,19 @@
 /// providers, and type index resolvers.
 library;
 
+import 'package:rdf_mapper/rdf_mapper.dart';
+
 /// Provides framework services to mapper initializer functions.
 ///
 /// When users provide a `mapperInitializer` function to `SolidCrdtSync.setup()`,
 /// it receives this context object containing all the framework-managed
 /// services needed to configure RDF mapping for Solid Pods.
 class SolidMappingContext {
-  // FIXME: We will need some way to handle IRI mapping
-  // Object get iriStrategy;
+  IriTermMapper<(String id,)> Function<T>() resourceIriFactory;
+  IriTermMapper<String> Function<T>(Type) resourceRefFactory;
 
-  SolidMappingContext();
+  SolidMappingContext({
+    required this.resourceIriFactory,
+    required this.resourceRefFactory,
+  });
 }

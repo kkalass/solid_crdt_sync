@@ -21,8 +21,11 @@ import 'package:rdf_vocabularies_schema/schema.dart';
 /// This mapper handles serialization and deserialization between Dart objects
 /// and RDF triples for resources of type `category.Category`.
 class CategoryMapper implements GlobalResourceMapper<category.Category> {
+  final IriTermMapper<(String id,)> _iriMapper;
+
   /// Constructor
-  const CategoryMapper();
+  const CategoryMapper({required IriTermMapper<(String id,)> iriMapper})
+    : _iriMapper = iriMapper;
 
   @override
   IriTerm? get typeIri => PersonalNotesVocab.NotesCategory;
@@ -34,7 +37,8 @@ class CategoryMapper implements GlobalResourceMapper<category.Category> {
   ) {
     final reader = context.reader(subject);
 
-    final id = subject.iri;
+    final (id,) = _iriMapper.fromRdfTerm(subject, context);
+
     final String name = reader.require(SchemaCreativeWork.name);
     final String? description = reader.optional(SchemaCreativeWork.description);
     final String? color = reader.optional(PersonalNotesVocab.categoryColor);
@@ -61,7 +65,7 @@ class CategoryMapper implements GlobalResourceMapper<category.Category> {
     SerializationContext context, {
     RdfSubject? parentSubject,
   }) {
-    final subject = IriTerm(resource.id);
+    final subject = _iriMapper.toRdfTerm((resource.id,), context);
 
     return context
         .resourceBuilder(subject)

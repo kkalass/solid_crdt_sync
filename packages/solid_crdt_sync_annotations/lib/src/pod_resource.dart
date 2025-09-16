@@ -5,6 +5,12 @@ import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_core/rdf_core.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
 
+const resourceIriFactoryKey = r'$resourceIriFactory';
+
+class PodIriStrategy extends IriStrategy {
+  const PodIriStrategy() : super.namedFactory(resourceIriFactoryKey);
+}
+
 /// Annotation for RDF classes that represent resources stored in Solid Pods.
 ///
 /// This annotation extends [RdfGlobalResource] to provide Solid-specific
@@ -90,5 +96,7 @@ class PodResource extends RdfGlobalResource {
   ///   late String title;
   /// }
   /// ```
-  const PodResource(IriTerm? classIri) : super(classIri, const IriStrategy());
+  const PodResource(IriTerm? classIri,
+      [PodIriStrategy iriStrategy = const PodIriStrategy()])
+      : super(classIri, iriStrategy);
 }

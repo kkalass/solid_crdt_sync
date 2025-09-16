@@ -34,7 +34,7 @@ dependencies:
   rdf_mapper: ^0.10.1
   rdf_vocabularies_schema: ^0.4.4
   rdf_vocabularies_core: ^0.4.4
-  rdf_mapper_annotations: ^0.10.1
+  rdf_mapper_annotations: ^0.10.2
   
   # UI
   flutter_chips_input: ^2.0.0
@@ -47,7 +47,7 @@ dev_dependencies:
   # Code generation
   build_runner: ^2.4.0
   drift_dev: ^2.19.0
-  rdf_mapper_generator: ^0.10.1
+  rdf_mapper_generator: ^0.10.2
 
 flutter:
   uses-material-design: true

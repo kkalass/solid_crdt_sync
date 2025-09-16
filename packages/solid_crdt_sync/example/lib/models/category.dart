@@ -15,9 +15,7 @@ import '../vocabulary/personal_notes_vocab.dart';
 /// - LWW-Register for name and description (last writer wins)
 /// - Immutable for creation date
 ///
-/// FIXME: implement and use PodResource
-//@PodResource(PersonalNotesVocab.NotesCategory)
-@RdfGlobalResource(PersonalNotesVocab.NotesCategory, IriStrategy())
+@PodResource(PersonalNotesVocab.NotesCategory)
 class Category {
   /// Unique identifier for this category
   @RdfIriPart()

@@ -16,9 +16,7 @@ import 'category.dart';
 /// - LWW-Register for title and content (last writer wins)
 /// - OR-Set for tags (additions and removals merge)
 ///
-/// FIXME: implement and use PodResource
-//@PodResource(PersonalNotesVocab.PersonalNote)
-@RdfGlobalResource(PersonalNotesVocab.PersonalNote, IriStrategy())
+@PodResource(PersonalNotesVocab.PersonalNote)
 class Note {
   /// Unique identifier for this note
   @RdfIriPart()

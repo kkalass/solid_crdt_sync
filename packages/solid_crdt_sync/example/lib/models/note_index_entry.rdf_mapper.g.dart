@@ -13,8 +13,10 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 
 // Other imports
 import 'package:personal_notes_app/models/note_index_entry.dart' as nie;
+import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
+import 'package:personal_notes_app/models/note.dart';
 
 /// Generated mapper for [nie.NoteIndexEntry] global resources.
 ///
@@ -24,9 +26,8 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
   final IriTermMapper<String> _idMapper;
 
   /// Constructor
-  const NoteIndexEntryMapper({
-    IriTermMapper<String> idMapper = const IriFullMapper(),
-  }) : _idMapper = idMapper;
+  const NoteIndexEntryMapper({required IriTermMapper<String> idMapper})
+    : _idMapper = idMapper;
 
   @override
   IriTerm? get typeIri => null;
@@ -39,9 +40,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
     final reader = context.reader(subject);
 
     final String id = reader.require(
-      const IriTerm.prevalidated(
-        'https://w3id.org/solid-crdt-sync/vocab/idx#resource',
-      ),
+      IdxVocab.resource,
       deserializer: _idMapper,
     );
     final String name = reader.require(SchemaNoteDigitalDocument.name);
@@ -79,13 +78,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
 
     return context
         .resourceBuilder(subject)
-        .addValue(
-          const IriTerm.prevalidated(
-            'https://w3id.org/solid-crdt-sync/vocab/idx#resource',
-          ),
-          resource.id,
-          serializer: _idMapper,
-        )
+        .addValue(IdxVocab.resource, resource.id, serializer: _idMapper)
         .addValue(SchemaNoteDigitalDocument.name, resource.name)
         .addValue(SchemaNoteDigitalDocument.dateCreated, resource.dateCreated)
         .addValue(SchemaNoteDigitalDocument.dateModified, resource.dateModified)

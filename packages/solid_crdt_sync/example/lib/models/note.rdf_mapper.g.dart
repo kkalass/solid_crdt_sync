@@ -15,6 +15,7 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:personal_notes_app/models/note.dart' as note;
 import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
+import 'package:personal_notes_app/models/category.dart';
 
 /// Generated mapper for [note.Note] global resources.
 ///
@@ -22,11 +23,14 @@ import 'package:rdf_vocabularies_schema/schema.dart';
 /// and RDF triples for resources of type `note.Note`.
 class NoteMapper implements GlobalResourceMapper<note.Note> {
   final IriTermMapper<String> _categoryIdMapper;
+  final IriTermMapper<(String id,)> _iriMapper;
 
   /// Constructor
   const NoteMapper({
-    IriTermMapper<String> categoryIdMapper = const IriFullMapper(),
-  }) : _categoryIdMapper = categoryIdMapper;
+    required IriTermMapper<String> categoryIdMapper,
+    required IriTermMapper<(String id,)> iriMapper,
+  }) : _categoryIdMapper = categoryIdMapper,
+       _iriMapper = iriMapper;
 
   @override
   IriTerm? get typeIri => PersonalNotesVocab.PersonalNote;
@@ -35,7 +39,8 @@ class NoteMapper implements GlobalResourceMapper<note.Note> {
   note.Note fromRdfResource(IriTerm subject, DeserializationContext context) {
     final reader = context.reader(subject);
 
-    final id = subject.iri;
+    final (id,) = _iriMapper.fromRdfTerm(subject, context);
+
     final String title = reader.require(SchemaNoteDigitalDocument.name);
     final String content = reader.require(SchemaNoteDigitalDocument.text);
     final Set<String> tags = reader.requireCollection<Set<String>, String>(
@@ -70,7 +75,7 @@ class NoteMapper implements GlobalResourceMapper<note.Note> {
     SerializationContext context, {
     RdfSubject? parentSubject,
   }) {
-    final subject = IriTerm(resource.id);
+    final subject = _iriMapper.toRdfTerm((resource.id,), context);
 
     return context
         .resourceBuilder(subject)

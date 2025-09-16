@@ -20,15 +20,32 @@ import 'package:personal_notes_app/models/note_index_entry.rdf_mapper.g.dart'
 /// Initializes and returns an RdfMapper with mappers registered.
 ///
 /// [rdfMapper] An optional RdfMapper instance to use. If not provided, a new one will be created.
-RdfMapper initRdfMapper({RdfMapper? rdfMapper}) {
+/// * [$resourceIriFactory]
+/// * [$resourceRefFactory]
+RdfMapper initRdfMapper({
+  RdfMapper? rdfMapper,
+  required IriTermMapper<(String id,)> Function<T>() $resourceIriFactory,
+  required IriTermMapper<String> Function<T>(Type) $resourceRefFactory,
+}) {
   if (rdfMapper == null) {
     rdfMapper = RdfMapper.withDefaultRegistry();
   }
   var registry = rdfMapper.registry;
 
-  registry.registerMapper<category.Category>(crmg.CategoryMapper());
-  registry.registerMapper<note.Note>(nrmg.NoteMapper());
-  registry.registerMapper<nie.NoteIndexEntry>(niermg.NoteIndexEntryMapper());
+  registry.registerMapper<category.Category>(
+    crmg.CategoryMapper(iriMapper: $resourceIriFactory<category.Category>()),
+  );
+  registry.registerMapper<note.Note>(
+    nrmg.NoteMapper(
+      categoryIdMapper: $resourceRefFactory<String?>(category.Category),
+      iriMapper: $resourceIriFactory<note.Note>(),
+    ),
+  );
+  registry.registerMapper<nie.NoteIndexEntry>(
+    niermg.NoteIndexEntryMapper(
+      idMapper: $resourceRefFactory<String>(note.Note),
+    ),
+  );
 
   return rdfMapper;
 }

@@ -47,7 +47,9 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
     /* control behaviour and system integration */
     storage: DriftStorage(web: driftWeb, native: driftNative),
     auth: SolidAuth(),
-    mapperInitializer: (_) => initRdfMapper(),
+    mapperInitializer: (context) => initRdfMapper(
+        $resourceIriFactory: context.resourceIriFactory,
+        $resourceRefFactory: context.resourceRefFactory),
 
     /* resource-focused configuration */
     config: SyncConfig(

@@ -28,7 +28,9 @@ class NotesListScreen extends StatefulWidget {
 }
 
 class _NotesListScreenState extends State<NotesListScreen> {
+  // FIXME storing the note index entries here is not ideal - should be reactive from the service
   List<NoteIndexEntry> _noteEntries = [];
+  // FIXME storing the categories here is wrong - should be reactive from the service
   List<models.Category> _categories = [];
   bool _loading = true;
   bool _isConnected = false;
@@ -48,7 +50,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
   Future<void> _loadCategories() async {
     try {
       // Convert stream to list for now to maintain existing behavior
-      final categories = await widget.categoriesService.getAllCategories().first;
+      final categories =
+          await widget.categoriesService.getAllCategories().first;
       setState(() {
         _categories = categories;
       });
@@ -62,7 +65,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     setState(() => _loading = true);
     try {
       List<NoteIndexEntry> noteEntries;
-      
+
       if (_selectedCategoryFilter != null) {
         // Demonstrate group loading: ensure category group is available before browsing
         noteEntries = await widget.notesService
@@ -71,7 +74,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
         // Load all note index entries for browsing
         noteEntries = await widget.notesService.getAllNoteIndexEntries();
       }
-      
+
       setState(() {
         _noteEntries = noteEntries;
         _loading = false;
@@ -91,50 +94,54 @@ class _NotesListScreenState extends State<NotesListScreen> {
     setState(() {
       _selectedCategoryFilter = categoryId;
     });
-    
+
     // Demonstrate smart loading strategy decisions
     if (categoryId != null) {
       await _applySmartLoadingStrategy(categoryId);
     }
-    
+
     // Reload notes with the new filter
     await _loadNotes();
-    
+
     // Show feedback about group loading (for demonstration)
     if (mounted && categoryId != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Loaded notes for category: $categoryId\n'
-                      'Group loading ensures index is available.'),
+              'Group loading ensures index is available.'),
           duration: const Duration(seconds: 2),
         ),
       );
     }
   }
 
+  // FIXME this method probably is intended well, but it seems to be wrong. Need to think about the group prefetching.
   /// Demonstrate application-level smart loading strategy decisions
   Future<void> _applySmartLoadingStrategy(String categoryId) async {
     // This demonstrates how the application can decide between different loading strategies
     // based on user behavior, category type, or other factors
-    
+
     // Find the category to determine strategy
     final category = _categories.cast<models.Category?>().firstWhere(
-      (cat) => cat?.id == categoryId,
-      orElse: () => null,
-    );
-    
+          (cat) => cat?.id == categoryId,
+          orElse: () => null,
+        );
+
     if (category?.icon == 'work') {
       // Work category: User likely to browse multiple items - prefetch full data
       await widget.notesService.prefetchGroupData(categoryId);
-      print('Strategy: Prefetching full data for work category (heavy usage expected)');
+      print(
+          'Strategy: Prefetching full data for work category (heavy usage expected)');
     } else if (category?.icon == 'archive') {
       // Archive category: User likely just browsing - load index only
       await widget.notesService.ensureGroupIndexLoaded(categoryId);
-      print('Strategy: Index-only for archived category (light browsing expected)');
+      print(
+          'Strategy: Index-only for archived category (light browsing expected)');
     } else {
       // Other categories: Balanced approach - ensure index, prefetch on demand
       await widget.notesService.ensureGroupIndexLoaded(categoryId);
-      print('Strategy: Index-first for ${category?.name ?? categoryId} category (balanced approach)');
+      print(
+          'Strategy: Index-first for ${category?.name ?? categoryId} category (balanced approach)');
     }
   }
 
@@ -273,8 +280,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
             builder: (context, snapshot) {
               final categories = snapshot.data ?? [];
               return PopupMenuButton<String?>(
-                icon: Icon(_selectedCategoryFilter != null 
-                    ? Icons.filter_alt 
+                icon: Icon(_selectedCategoryFilter != null
+                    ? Icons.filter_alt
                     : Icons.filter_alt_outlined),
                 tooltip: 'Filter by Category',
                 onSelected: _filterByCategory,
@@ -292,15 +299,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
                   if (categories.isNotEmpty) const PopupMenuDivider(),
                   // Dynamic categories from the reactive categories service
                   ...categories.map((category) => PopupMenuItem<String>(
-                    value: category.id,
-                    child: Row(
-                      children: [
-                        Icon(_getCategoryIcon(category.icon)),
-                        const SizedBox(width: 8),
-                        Text(category.name),
-                      ],
-                    ),
-                  )),
+                        value: category.id,
+                        child: Row(
+                          children: [
+                            Icon(_getCategoryIcon(category.icon)),
+                            const SizedBox(width: 8),
+                            Text(category.name),
+                          ],
+                        ),
+                      )),
                 ],
               );
             },

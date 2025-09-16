@@ -804,18 +804,18 @@ packages:
     dependency: "direct main"
     description:
       name: rdf_mapper_annotations
-      sha256: f6e5927fe50c181ef4290ee29287963178fd9a30095fe044cf77dd7a23d2219b
+      sha256: a2e60bf48aff774a658a4ae79300d0ffb515ed7f4c0b8093a45741ea1bc58fe2
       url: "https://pub.dev"
     source: hosted
-    version: "0.10.1"
+    version: "0.10.2"
   rdf_mapper_generator:
     dependency: "direct dev"
     description:
       name: rdf_mapper_generator
-      sha256: "32fbd5039cc07e2e5c67cbd3568b3540cb0ca14b9bcad9aba99e2b9ca948f955"
+      sha256: "577125a603eb12494c851ac58f07005e507e3da5f71043c9fba1b3f8850ee3f9"
       url: "https://pub.dev"
     source: hosted
-    version: "0.10.1"
+    version: "0.10.2"
   rdf_vocabularies_core:
     dependency: "direct main"
     description:
