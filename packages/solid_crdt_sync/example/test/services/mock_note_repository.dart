@@ -50,22 +50,17 @@ class MockNoteRepository implements NoteRepository {
     return Stream.value(storedNotes.where((n) => n.categoryId == null).toList());
   }
 
-  // New NoteIndexEntry methods
+  // Reactive NoteIndexEntry methods
   @override
-  Future<List<NoteIndexEntry>> getAllNoteIndexEntries() async {
-    return List.from(storedIndexEntries);
+  Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
+    return Stream.value(List.from(storedIndexEntries));
   }
 
   @override
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategory(String categoryId) async {
-    return storedIndexEntries.where((e) => e.categoryId == categoryId).toList();
+  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
+    return Stream.value(storedIndexEntries.where((e) => e.categoryId == categoryId).toList());
   }
 
-  @override
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByGroup(String groupId) async {
-    // In the mock, we simulate groupId as categoryId for simplicity
-    return storedIndexEntries.where((e) => e.categoryId == groupId).toList();
-  }
 
   @override
   void dispose() {}

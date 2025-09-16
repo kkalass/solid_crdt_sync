@@ -27,39 +27,26 @@ class NotesService {
     return _noteRepository.getAllNotes();
   }
 
-  /// Get all note index entries for lightweight browsing
-  Future<List<NoteIndexEntry>> getAllNoteIndexEntries() async {
-    return await _noteRepository.getAllNoteIndexEntries();
-  }
-
   /// Watch all note index entries reactively
   Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
-    // TODO: This should be a real stream from the repository
-    // For now, we'll use a placeholder that emits data periodically
-    return Stream.periodic(const Duration(milliseconds: 500))
-        .asyncMap((_) => _noteRepository.getAllNoteIndexEntries())
-        .distinct();
+    return _noteRepository.watchAllNoteIndexEntries();
   }
 
   /// Watch note index entries by category reactively
-  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
-    // TODO: This should be a real stream from the repository
-    // For now, we'll use a placeholder that emits data periodically
-    return Stream.periodic(const Duration(milliseconds: 500))
-        .asyncMap((_) => _noteRepository.getNoteIndexEntriesByCategory(categoryId))
-        .distinct();
+  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(
+      String categoryId) {
+    return _noteRepository.watchNoteIndexEntriesByCategory(categoryId);
   }
 
   /// Reactive stream of filtered note index entries based on current category filter
   Stream<List<NoteIndexEntry>> get filteredNoteIndexEntries {
-    return _categoryFilterController.stream
-        .switchMap((categoryId) {
-          if (categoryId == null) {
-            return watchAllNoteIndexEntries();
-          } else {
-            return watchNoteIndexEntriesByCategory(categoryId);
-          }
-        });
+    return _categoryFilterController.stream.switchMap((categoryId) {
+      if (categoryId == null) {
+        return watchAllNoteIndexEntries();
+      } else {
+        return watchNoteIndexEntriesByCategory(categoryId);
+      }
+    });
   }
 
   /// Get current category filter
@@ -67,21 +54,12 @@ class NotesService {
 
   /// Set category filter (null means show all notes)
   void setCategoryFilter(String? categoryId) {
+    print("!!!Setting category filter: $categoryId");
     _categoryFilterController.add(categoryId);
   }
 
   /// Stream of current category filter state
   Stream<String?> get categoryFilterStream => _categoryFilterController.stream;
-
-  /// Get note index entries by category for browsing
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategory(String categoryId) async {
-    return await _noteRepository.getNoteIndexEntriesByCategory(categoryId);
-  }
-
-  /// Get note index entries by group for browsing
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByGroup(String groupId) async {
-    return await _noteRepository.getNoteIndexEntriesByGroup(groupId);
-  }
 
   /// Get a specific note by ID
   Future<Note?> getNote(String id) async {
@@ -185,7 +163,7 @@ class NotesService {
     // For now, this is a placeholder for the SolidCrdtSync API we discussed
     // In the final implementation, this would call something like:
     // await syncSystem.loadGroupIndex<NoteIndexEntry>(groupId);
-    
+
     // Placeholder: just log the request for now
     print('Ensuring group index is loaded for group: $groupId');
   }
@@ -197,7 +175,7 @@ class NotesService {
     // For now, this is a placeholder for the SolidCrdtSync API we discussed
     // In the final implementation, this would call something like:
     // await syncSystem.loadGroupData<Note>(groupId);
-    
+
     // Placeholder: just log the request for now
     print('Prefetching full data for group: $groupId');
   }
@@ -207,22 +185,24 @@ class NotesService {
   Future<bool> ensureCategoryAvailable(String categoryId) async {
     // First, ensure the group index is loaded
     await ensureGroupIndexLoaded(categoryId);
-    
-    // Check if we have index entries for this category
-    final indexEntries = await getNoteIndexEntriesByCategory(categoryId);
-    
+
+    // Check if we have index entries for this category by taking the first value from the stream
+    final indexEntries =
+        await watchNoteIndexEntriesByCategory(categoryId).first;
+
     // Return whether we found any entries (true means ready for browsing)
     return indexEntries.isNotEmpty;
   }
 
   /// Get notes by category with automatic group loading
   /// This method ensures the category group is available before returning results
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategoryWithLoading(String categoryId) async {
+  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategoryWithLoading(
+      String categoryId) async {
     // Ensure the category group is loaded
     await ensureCategoryAvailable(categoryId);
-    
+
     // Return the index entries (may be empty if the category truly has no notes)
-    return await getNoteIndexEntriesByCategory(categoryId);
+    return await watchNoteIndexEntriesByCategory(categoryId).first;
   }
 
   /// Generate a unique ID for new notes

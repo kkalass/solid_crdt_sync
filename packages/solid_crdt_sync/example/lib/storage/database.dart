@@ -277,13 +277,13 @@ class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
 class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase> with _$NoteIndexEntryDaoMixin {
   NoteIndexEntryDao(super.db);
 
-  /// Get all note index entries ordered by modification date (newest first)
-  Future<List<NoteIndexEntry>> getAllNoteIndexEntries() {
+  /// Watch all note index entries ordered by modification date (newest first)
+  Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
     return (select(noteIndexEntries)
           ..orderBy([
             (n) => OrderingTerm(expression: n.dateModified, mode: OrderingMode.desc)
           ]))
-        .get();
+        .watch();
   }
 
   /// Get a specific note index entry by ID
@@ -301,35 +301,17 @@ class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase> with _$NoteIndexEn
     return (delete(noteIndexEntries)..where((n) => n.id.equals(id))).go();
   }
 
-  /// Get note index entries by category
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategory(String categoryId) {
+  /// Watch note index entries by category
+  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
     return (select(noteIndexEntries)
           ..where((n) => n.categoryId.equals(categoryId))
           ..orderBy([
             (n) => OrderingTerm(expression: n.dateModified, mode: OrderingMode.desc)
           ]))
-        .get();
+        .watch();
   }
 
-  /// Get note index entries without a category
-  Future<List<NoteIndexEntry>> getUncategorizedNoteIndexEntries() {
-    return (select(noteIndexEntries)
-          ..where((n) => n.categoryId.isNull())
-          ..orderBy([
-            (n) => OrderingTerm(expression: n.dateModified, mode: OrderingMode.desc)
-          ]))
-        .get();
-  }
 
-  /// Get note index entries by group
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByGroup(String groupId) {
-    return (select(noteIndexEntries)
-          ..where((n) => n.groupId.equals(groupId))
-          ..orderBy([
-            (n) => OrderingTerm(expression: n.dateModified, mode: OrderingMode.desc)
-          ]))
-        .get();
-  }
 
   /// Check if a note index entry exists
   Future<bool> noteIndexEntryExists(String id) async {

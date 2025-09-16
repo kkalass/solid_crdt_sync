@@ -335,27 +335,18 @@ class NoteRepository {
     );
   }
 
-  /// Get all note index entries ordered by modification date (newest first)
-  Future<List<models.NoteIndexEntry>> getAllNoteIndexEntries() async {
-    final driftEntries = await _noteIndexDao.getAllNoteIndexEntries();
-    return driftEntries.map(_noteIndexEntryFromDrift).toList();
+  /// Watch all note index entries reactively
+  Stream<List<models.NoteIndexEntry>> watchAllNoteIndexEntries() {
+    return _noteIndexDao.watchAllNoteIndexEntries()
+        .map((driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
   }
 
-  /// Get note index entries by category
-  Future<List<models.NoteIndexEntry>> getNoteIndexEntriesByCategory(
-      String categoryId) async {
-    final driftEntries =
-        await _noteIndexDao.getNoteIndexEntriesByCategory(categoryId);
-    return driftEntries.map(_noteIndexEntryFromDrift).toList();
+  /// Watch note index entries by category reactively
+  Stream<List<models.NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
+    return _noteIndexDao.watchNoteIndexEntriesByCategory(categoryId)
+        .map((driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
   }
 
-  /// Get note index entries by group
-  Future<List<models.NoteIndexEntry>> getNoteIndexEntriesByGroup(
-      String groupId) async {
-    final driftEntries =
-        await _noteIndexDao.getNoteIndexEntriesByGroup(groupId);
-    return driftEntries.map(_noteIndexEntryFromDrift).toList();
-  }
 
   /// Dispose resources when repository is no longer needed
   void dispose() {

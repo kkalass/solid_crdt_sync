@@ -38,6 +38,9 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   /// Filter notes by category using reactive streams
   void _filterByCategory(String? categoryId) {
+    if (categoryId == 'null') {
+      categoryId = null; // Clear filter
+    }
     // Update the service filter - this will automatically update the stream
     widget.notesService.setCategoryFilter(categoryId);
 
@@ -230,7 +233,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
                     onSelected: _filterByCategory,
                     itemBuilder: (context) => [
                       const PopupMenuItem<String?>(
-                        value: null,
+                        value: 'null',
                         child: Row(
                           children: [
                             Icon(Icons.clear_all),
