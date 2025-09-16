@@ -8,13 +8,11 @@ import '../services/notes_service.dart';
 class NoteEditorScreen extends StatefulWidget {
   final NotesService notesService;
   final Note? note;
-  final VoidCallback? onSaved;
-  
+
   const NoteEditorScreen({
     super.key,
     required this.notesService,
     this.note,
-    this.onSaved,
   });
 
   @override
@@ -27,16 +25,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   late final TextEditingController _tagController;
   late Set<String> _tags;
   bool _saving = false;
-  
+
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.note?.title ?? '');
-    _contentController = TextEditingController(text: widget.note?.content ?? '');
+    _contentController =
+        TextEditingController(text: widget.note?.content ?? '');
     _tagController = TextEditingController();
     _tags = Set.from(widget.note?.tags ?? <String>{});
   }
-  
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -44,26 +43,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _tagController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _saveNote() async {
     if (_saving) return;
-    
+
     setState(() => _saving = true);
-    
+
     try {
       final note = widget.note?.copyWith(
-        title: _titleController.text,
-        content: _contentController.text,
-        tags: _tags,
-      ) ?? widget.notesService.createNote(
-        title: _titleController.text,
-        content: _contentController.text,
-        tags: _tags,
-      );
-      
+            title: _titleController.text,
+            content: _contentController.text,
+            tags: _tags,
+          ) ??
+          widget.notesService.createNote(
+            title: _titleController.text,
+            content: _contentController.text,
+            tags: _tags,
+          );
+
       await widget.notesService.saveNote(note);
-      widget.onSaved?.call();
-      
+
       if (mounted) {
         Navigator.pop(context);
       }
@@ -76,7 +75,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       }
     }
   }
-  
+
   void _addTag() {
     final tag = _tagController.text.trim();
     if (tag.isNotEmpty && !_tags.contains(tag)) {
@@ -86,27 +85,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       });
     }
   }
-  
+
   void _removeTag(String tag) {
     setState(() {
       _tags.remove(tag);
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.note != null;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Note' : 'New Note'),
         actions: [
           TextButton(
             onPressed: _saving ? null : _saveNote,
-            child: _saving 
+            child: _saving
                 ? const SizedBox(
                     width: 16,
-                    height: 16, 
+                    height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Text('Save'),
@@ -127,9 +126,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Content field
             Expanded(
               child: TextField(
@@ -144,17 +143,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 textAlignVertical: TextAlignVertical.top,
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Tags section
             const Text(
               'Tags',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Tag input
             Row(
               children: [
@@ -175,19 +174,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Tags display
             if (_tags.isNotEmpty) ...[
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
-                children: _tags.map((tag) => Chip(
-                  label: Text(tag),
-                  deleteIcon: const Icon(Icons.close, size: 18),
-                  onDeleted: () => _removeTag(tag),
-                )).toList(),
+                children: _tags
+                    .map((tag) => Chip(
+                          label: Text(tag),
+                          deleteIcon: const Icon(Icons.close, size: 18),
+                          onDeleted: () => _removeTag(tag),
+                        ))
+                    .toList(),
               ),
             ] else ...[
               const Text(
@@ -195,9 +196,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 style: TextStyle(color: Colors.grey),
               ),
             ],
-            
+
             const SizedBox(height: 16),
-            
+
             // Local-first info
             Container(
               padding: const EdgeInsets.all(12),

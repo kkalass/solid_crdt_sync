@@ -2,6 +2,7 @@
 library;
 
 import 'dart:math';
+import 'package:rxdart/rxdart.dart';
 import '../models/note.dart';
 import '../models/note_index_entry.dart';
 import '../storage/repositories.dart';
@@ -15,6 +16,9 @@ import '../storage/repositories.dart';
 class NotesService {
   final NoteRepository _noteRepository;
 
+  // Reactive filter state
+  final _categoryFilterController = BehaviorSubject<String?>.seeded(null);
+
   NotesService(this._noteRepository);
 
   /// Watch all notes sorted by modification date (newest first)
@@ -27,6 +31,47 @@ class NotesService {
   Future<List<NoteIndexEntry>> getAllNoteIndexEntries() async {
     return await _noteRepository.getAllNoteIndexEntries();
   }
+
+  /// Watch all note index entries reactively
+  Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
+    // TODO: This should be a real stream from the repository
+    // For now, we'll use a placeholder that emits data periodically
+    return Stream.periodic(const Duration(milliseconds: 500))
+        .asyncMap((_) => _noteRepository.getAllNoteIndexEntries())
+        .distinct();
+  }
+
+  /// Watch note index entries by category reactively
+  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(String categoryId) {
+    // TODO: This should be a real stream from the repository
+    // For now, we'll use a placeholder that emits data periodically
+    return Stream.periodic(const Duration(milliseconds: 500))
+        .asyncMap((_) => _noteRepository.getNoteIndexEntriesByCategory(categoryId))
+        .distinct();
+  }
+
+  /// Reactive stream of filtered note index entries based on current category filter
+  Stream<List<NoteIndexEntry>> get filteredNoteIndexEntries {
+    return _categoryFilterController.stream
+        .switchMap((categoryId) {
+          if (categoryId == null) {
+            return watchAllNoteIndexEntries();
+          } else {
+            return watchNoteIndexEntriesByCategory(categoryId);
+          }
+        });
+  }
+
+  /// Get current category filter
+  String? get currentCategoryFilter => _categoryFilterController.valueOrNull;
+
+  /// Set category filter (null means show all notes)
+  void setCategoryFilter(String? categoryId) {
+    _categoryFilterController.add(categoryId);
+  }
+
+  /// Stream of current category filter state
+  Stream<String?> get categoryFilterStream => _categoryFilterController.stream;
 
   /// Get note index entries by category for browsing
   Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategory(String categoryId) async {
@@ -187,5 +232,8 @@ class NotesService {
     return 'note_${timestamp}_$random';
   }
 
-  // Note: No dispose method needed - repository handles its own cleanup
+  /// Dispose of resources and close streams
+  void dispose() {
+    _categoryFilterController.close();
+  }
 }

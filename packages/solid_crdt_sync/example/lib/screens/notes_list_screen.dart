@@ -28,80 +28,23 @@ class NotesListScreen extends StatefulWidget {
 }
 
 class _NotesListScreenState extends State<NotesListScreen> {
-  // FIXME storing the note index entries here is not ideal - should be reactive from the service
-  List<NoteIndexEntry> _noteEntries = [];
-  // FIXME storing the categories here is wrong - should be reactive from the service
-  List<models.Category> _categories = [];
-  bool _loading = true;
   bool _isConnected = false;
-  String? _selectedCategoryFilter;
-
-  Stream<List<models.Category>> get _categoriesStream =>
-      widget.categoriesService.getAllCategories();
 
   @override
   void initState() {
     super.initState();
-    _loadNotes();
-    _loadCategories();
     _checkConnectionStatus();
   }
 
-  Future<void> _loadCategories() async {
-    try {
-      // Convert stream to list for now to maintain existing behavior
-      final categories =
-          await widget.categoriesService.getAllCategories().first;
-      setState(() {
-        _categories = categories;
-      });
-    } catch (error) {
-      // Categories loading failed - continue without them
-      print('Error loading categories: $error');
-    }
-  }
-
-  Future<void> _loadNotes() async {
-    setState(() => _loading = true);
-    try {
-      List<NoteIndexEntry> noteEntries;
-
-      if (_selectedCategoryFilter != null) {
-        // Demonstrate group loading: ensure category group is available before browsing
-        noteEntries = await widget.notesService
-            .getNoteIndexEntriesByCategoryWithLoading(_selectedCategoryFilter!);
-      } else {
-        // Load all note index entries for browsing
-        noteEntries = await widget.notesService.getAllNoteIndexEntries();
-      }
-
-      setState(() {
-        _noteEntries = noteEntries;
-        _loading = false;
-      });
-    } catch (error) {
-      setState(() => _loading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading notes: $error')),
-        );
-      }
-    }
-  }
-
-  /// Filter notes by category - demonstrates group loading behavior
-  Future<void> _filterByCategory(String? categoryId) async {
-    setState(() {
-      _selectedCategoryFilter = categoryId;
-    });
+  /// Filter notes by category using reactive streams
+  void _filterByCategory(String? categoryId) {
+    // Update the service filter - this will automatically update the stream
+    widget.notesService.setCategoryFilter(categoryId);
 
     // Demonstrate smart loading strategy decisions
     if (categoryId != null) {
-      await _applySmartLoadingStrategy(categoryId);
+      _applySmartLoadingStrategy(categoryId);
     }
-
-    // Reload notes with the new filter
-    await _loadNotes();
 
     // Show feedback about group loading (for demonstration)
     if (mounted && categoryId != null) {
@@ -121,18 +64,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
     // This demonstrates how the application can decide between different loading strategies
     // based on user behavior, category type, or other factors
 
-    // Find the category to determine strategy
-    final category = _categories.cast<models.Category?>().firstWhere(
-          (cat) => cat?.id == categoryId,
-          orElse: () => null,
-        );
-
-    if (category?.icon == 'work') {
+    // For now, we'll use a simplified strategy based on categoryId
+    // TODO: Look up the actual category to determine the best strategy
+    if (categoryId.contains('work')) {
       // Work category: User likely to browse multiple items - prefetch full data
       await widget.notesService.prefetchGroupData(categoryId);
       print(
           'Strategy: Prefetching full data for work category (heavy usage expected)');
-    } else if (category?.icon == 'archive') {
+    } else if (categoryId.contains('archive')) {
       // Archive category: User likely just browsing - load index only
       await widget.notesService.ensureGroupIndexLoaded(categoryId);
       print(
@@ -141,7 +80,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       // Other categories: Balanced approach - ensure index, prefetch on demand
       await widget.notesService.ensureGroupIndexLoaded(categoryId);
       print(
-          'Strategy: Index-first for ${category?.name ?? categoryId} category (balanced approach)');
+          'Strategy: Index-first for $categoryId category (balanced approach)');
     }
   }
 
@@ -177,7 +116,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
     try {
       // TODO: Trigger manual sync
       // await widget.syncSystem.sync();
-      await _loadNotes(); // Reload notes after sync
+      // Notes will update automatically via reactive streams
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -210,7 +149,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
       MaterialPageRoute(
         builder: (context) => NoteEditorScreen(
           notesService: widget.notesService,
-          onSaved: _loadNotes,
+          // Notes will update automatically via reactive streams
         ),
       ),
     );
@@ -235,7 +174,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
           builder: (context) => NoteEditorScreen(
             notesService: widget.notesService,
             note: note,
-            onSaved: _loadNotes,
+            // Notes will update automatically via reactive streams
           ),
         ),
       );
@@ -263,7 +202,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
     if (confirmed == true) {
       await widget.notesService.deleteNote(noteEntry.id);
-      await _loadNotes();
+      // Notes will update automatically via reactive streams
     }
   }
 
@@ -275,40 +214,46 @@ class _NotesListScreenState extends State<NotesListScreen> {
         elevation: 0,
         actions: [
           // Category filter dropdown - demonstrates group loading
-          StreamBuilder<List<models.Category>>(
-            stream: _categoriesStream,
-            builder: (context, snapshot) {
-              final categories = snapshot.data ?? [];
-              return PopupMenuButton<String?>(
-                icon: Icon(_selectedCategoryFilter != null
-                    ? Icons.filter_alt
-                    : Icons.filter_alt_outlined),
-                tooltip: 'Filter by Category',
-                onSelected: _filterByCategory,
-                itemBuilder: (context) => [
-                  const PopupMenuItem<String?>(
-                    value: null,
-                    child: Row(
-                      children: [
-                        Icon(Icons.clear_all),
-                        SizedBox(width: 8),
-                        Text('All Notes'),
-                      ],
-                    ),
-                  ),
-                  if (categories.isNotEmpty) const PopupMenuDivider(),
-                  // Dynamic categories from the reactive categories service
-                  ...categories.map((category) => PopupMenuItem<String>(
-                        value: category.id,
+          StreamBuilder<String?>(
+            stream: widget.notesService.categoryFilterStream,
+            builder: (context, filterSnapshot) {
+              final selectedFilter = filterSnapshot.data;
+              return StreamBuilder<List<models.Category>>(
+                stream: widget.categoriesService.getAllCategories(),
+                builder: (context, categoriesSnapshot) {
+                  final categories = categoriesSnapshot.data ?? [];
+                  return PopupMenuButton<String?>(
+                    icon: Icon(selectedFilter != null
+                        ? Icons.filter_alt
+                        : Icons.filter_alt_outlined),
+                    tooltip: 'Filter by Category',
+                    onSelected: _filterByCategory,
+                    itemBuilder: (context) => [
+                      const PopupMenuItem<String?>(
+                        value: null,
                         child: Row(
                           children: [
-                            Icon(_getCategoryIcon(category.icon)),
-                            const SizedBox(width: 8),
-                            Text(category.name),
+                            Icon(Icons.clear_all),
+                            SizedBox(width: 8),
+                            Text('All Notes'),
                           ],
                         ),
-                      )),
-                ],
+                      ),
+                      if (categories.isNotEmpty) const PopupMenuDivider(),
+                      // Dynamic categories from the reactive categories service
+                      ...categories.map((category) => PopupMenuItem<String>(
+                            value: category.id,
+                            child: Row(
+                              children: [
+                                Icon(_getCategoryIcon(category.icon)),
+                                const SizedBox(width: 8),
+                                Text(category.name),
+                              ],
+                            ),
+                          )),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -335,11 +280,43 @@ class _NotesListScreenState extends State<NotesListScreen> {
             ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _noteEntries.isEmpty
+      body: StreamBuilder<List<NoteIndexEntry>>(
+        stream: widget.notesService.filteredNoteIndexEntries,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Error: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Force refresh by changing filter
+                      final currentFilter =
+                          widget.notesService.currentCategoryFilter;
+                      widget.notesService.setCategoryFilter(null);
+                      widget.notesService.setCategoryFilter(currentFilter);
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final noteEntries = snapshot.data ?? [];
+          return noteEntries.isEmpty
               ? _buildEmptyState()
-              : _buildNotesList(),
+              : _buildNotesList(noteEntries);
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNote,
         tooltip: 'Add Note',
@@ -377,11 +354,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
   }
 
-  Widget _buildNotesList() {
+  Widget _buildNotesList(List<NoteIndexEntry> noteEntries) {
     return ListView.builder(
-      itemCount: _noteEntries.length,
+      itemCount: noteEntries.length,
       itemBuilder: (context, index) {
-        final noteEntry = _noteEntries[index];
+        final noteEntry = noteEntries[index];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: ListTile(

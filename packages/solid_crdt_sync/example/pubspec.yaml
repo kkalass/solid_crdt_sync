@@ -38,6 +38,9 @@ dependencies:
   
   # UI
   flutter_chips_input: ^2.0.0
+
+  # Reactive streams
+  rxdart: ^0.28.0
   
 dev_dependencies:
   flutter_test:
