@@ -1204,7 +1204,7 @@ The `idx:` vocabulary provides the building blocks for both indexing approaches:
 * **`idx:GroupingRule`:** Class defining how resources are assigned to groups
 * **`idx:GroupingRuleProperty`:** Individual property specification within a GroupingRule
 * **`idx:sourceProperty`:** Property to extract grouping value from (in GroupingRuleProperty)
-* **`idx:transform`:** Optional regex transform for value normalization (in GroupingRuleProperty) - see [Regex Transform Specification](REGEX-TRANSFORMS.md)  
+* **`idx:transform`:** Optional regex transform for value normalization (in GroupingRuleProperty) - see [Group Indexing Specification](GROUP-INDEXING.md)  
 * **`idx:hierarchyLevel`:** Optional hierarchy level for multi-property grouping (in GroupingRuleProperty)
 * **`idx:missingValue`:** Default value when property is absent (in GroupingRuleProperty)
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
@@ -1212,6 +1212,8 @@ The `idx:` vocabulary provides the building blocks for both indexing approaches:
 #### 5.3.3. GroupingRule Specification
 
 GroupIndexTemplate uses a GroupingRule to determine which group(s) a resource belongs to. This system supports conditional indexing (resources only indexed when certain properties are present) and multi-dimensional grouping.
+
+For detailed information on regex transforms and group key formatting, see [Group Indexing Specification](GROUP-INDEXING.md).
 
 **GroupingRule Algorithm:**
 

@@ -1,12 +1,19 @@
-# Regex Transform Specification
+# Group Indexing Specification
 
 ## Overview
 
-The Solid CRDT Sync framework uses regular expressions for transforming RDF literal values during group index operations. This document specifies a **cross-platform compatible regex subset** that works identically across all major regex engines to ensure deterministic behavior across implementations.
+The Solid CRDT Sync framework uses group indices to organize resources into hierarchical structures for efficient querying and synchronization. This document specifies the complete group indexing system, including property transformations, group key generation, hierarchical organization, and filesystem mapping.
 
 ## Motivation
 
-Group indices require transforming property values (like dates, categories, identifiers) into normalized group keys. Regular expressions provide a flexible, declarative way to extract and reformat these values while maintaining RDF's language-agnostic nature.
+Group indices enable scalable data organization by:
+
+1. **Transforming property values** (dates, categories, identifiers) into normalized group keys
+2. **Creating hierarchical structures** that map to filesystem directories
+3. **Ensuring cross-platform compatibility** through standardized formats
+4. **Supporting efficient partial sync** by enabling selective group loading
+
+Regular expressions provide a flexible, declarative way to extract and reformat property values while maintaining RDF's language-agnostic nature.
 
 **Cross-Platform Compatibility:** Rather than choosing between incompatible regex standards (POSIX ERE vs ECMAScript), we define a compatible subset that produces identical results across all platforms, ensuring consistent group key generation in distributed sync scenarios.
 
@@ -122,6 +129,56 @@ idx:transform (
 3. If no patterns match, use the original value unchanged
 
 **CRDT Strategy:** Transform lists are immutable (part of grouping definition identity)
+
+## Group Key Structure
+
+### Hierarchical Format
+
+Group keys support hierarchical organization using forward slashes (`/`) as level separators. This enables filesystem-based storage where each hierarchy level creates a directory structure.
+
+**Hierarchy Levels:** Separated by `/` (forward slash)
+```
+level1/level2/level3
+```
+
+**Multiple Properties at Same Level:** Separated by `-` (hyphen)
+```
+property1-property2-property3
+```
+
+**Combined Example:**
+```
+work/2024-08/high-priority
+```
+
+This creates a filesystem structure:
+```
+work/
+  2024-08/
+    high-priority/
+```
+
+### Practical Examples
+
+**Single property per level:**
+- Group key: `personal/2024-01`
+- Filesystem: `personal/2024-01/`
+
+**Multiple properties at same level:**
+- Group key: `work-urgent/2024-08/project-alpha`
+- Filesystem: `work-urgent/2024-08/project-alpha/`
+
+**Complex hierarchy:**
+- Group key: `documents-archive/2023/Q4-reports/financial`
+- Filesystem: `documents-archive/2023/Q4-reports/financial/`
+
+### Format Rules
+
+1. **Level separators** are always `/` to enable filesystem directory creation
+2. **Same-level separators** are always `-` per ARCHITECTURE.md section 5.3.3 GroupingRule specification
+3. **Property values** are transformed first, then combined according to hierarchy
+4. **Missing properties** with `missingValue` are included in the normal combination logic
+5. **Same-level ordering** follows lexicographic IRI ordering for deterministic results
 
 ### Properties
 
