@@ -68,6 +68,8 @@ class GroupIndex extends CrdtIndexConfig {
   @override
   final Type dartType;
 
+  final Type groupKeyType;
+
   /// Local name for referencing this index within the app (not used in Pod structure)
   @override
   final String localName;
@@ -78,16 +80,17 @@ class GroupIndex extends CrdtIndexConfig {
 
   /// Configuration for index items (type and properties)
   @override
-  final IndexItem item;
+  final IndexItem? item;
 
-  /// Properties used for grouping resources
+  /// Properties used for grouping resources, must be in sync with the groupKeyType
   final List<GroupingProperty> groupingProperties;
 
   const GroupIndex(
-    this.dartType, {
+    this.dartType,
+    this.groupKeyType, {
     this.localName = defaultIndexLocalName,
     this.defaultIndexPath,
-    required this.item,
+    this.item,
     required this.groupingProperties,
   }) : assert(groupingProperties.length > 0,
             'GroupIndex requires at least one grouping property');
@@ -135,9 +138,12 @@ class GroupingProperty {
 
   final int hierarchyLevel;
 
-  /// Format pattern for extracting group values from the property
+  /// Optional format pattern for extracting group values from the property
   /// Example: 'yyyy-MM' extracts "2025-08" from date values
-  final String format;
+  ///
+  /// If not specified, the raw property value is converted to string via toString()
+  /// and used directly as the group identifier.
+  final String? format;
 
   /// Value to use when the source property is missing
   /// If null, resources missing the property are excluded from the index
@@ -146,7 +152,7 @@ class GroupingProperty {
 
   const GroupingProperty(
     this.predicate, {
-    required this.format,
+    this.format,
     this.hierarchyLevel = 1,
     this.missingValue,
   });

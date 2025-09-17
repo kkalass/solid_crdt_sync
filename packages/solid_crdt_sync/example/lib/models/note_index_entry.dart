@@ -5,15 +5,12 @@
 /// like Hybrid Logical Clock hashes for change detection.
 library;
 
-import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
 
 import 'package:rdf_mapper_annotations/rdf_mapper_annotations.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
 import 'package:solid_crdt_sync_annotations/solid_crdt_sync_annotations.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
-
-import '../vocabulary/personal_notes_vocab.dart';
 
 /// Lightweight index entry for Note resources.
 ///
@@ -46,8 +43,7 @@ class NoteIndexEntry {
   final Set<String> keywords;
 
   /// Category ID for grouping
-  @RdfProperty(PersonalNotesVocab.belongsToCategory,
-      iri: PodResourceRef(Category))
+  @NoteCategoryProperty()
   final String? categoryId;
 
   const NoteIndexEntry({
@@ -58,25 +54,6 @@ class NoteIndexEntry {
     this.keywords = const {},
     this.categoryId,
   });
-
-  /// Create a copy with updated fields
-  NoteIndexEntry copyWith({
-    String? id,
-    String? name,
-    DateTime? dateCreated,
-    DateTime? dateModified,
-    Set<String>? keywords,
-    String? categoryId,
-  }) {
-    return NoteIndexEntry(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      dateCreated: dateCreated ?? this.dateCreated,
-      dateModified: dateModified ?? this.dateModified,
-      keywords: keywords ?? this.keywords,
-      categoryId: categoryId ?? this.categoryId,
-    );
-  }
 
   @override
   String toString() =>

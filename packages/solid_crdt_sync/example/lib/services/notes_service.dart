@@ -2,11 +2,12 @@
 library;
 
 import 'dart:math';
+
 import 'package:rxdart/rxdart.dart';
+
 import '../models/note.dart';
 import '../models/note_index_entry.dart';
 import '../storage/repositories.dart';
-import '../utils/optional.dart';
 
 /// Service for managing notes with local-first CRDT synchronization.
 ///
@@ -145,15 +146,6 @@ class NotesService {
   /// Watch notes without a category (uncategorized)
   Stream<List<Note>> getUncategorizedNotes() {
     return _noteRepository.getUncategorizedNotes();
-  }
-
-  /// Assign a note to a category
-  Future<void> assignNoteToCategory(String noteId, String? categoryId) async {
-    final note = await getNote(noteId);
-    if (note != null) {
-      final updatedNote = note.copyWith(categoryId: Optional(categoryId));
-      await saveNote(updatedNote);
-    }
   }
 
   /// Load note index entries for a specific group (category-based grouping)

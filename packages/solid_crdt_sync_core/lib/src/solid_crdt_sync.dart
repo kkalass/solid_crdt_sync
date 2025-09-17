@@ -110,6 +110,10 @@ class SolidCrdtSync {
         resourceTypeCache: resourceTypeCache);
   }
 
+  Future<void> subscribeToGroupIndex<G>(
+      G groupKey, ItemFetchPolicy itemFetchPolicy,
+      {String localName = defaultIndexLocalName}) async {}
+
   /// Save an object with CRDT processing.
   ///
   /// Stores the object locally and triggers sync if connected to Solid Pod.

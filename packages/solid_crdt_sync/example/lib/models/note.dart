@@ -8,6 +8,12 @@ import '../vocabulary/personal_notes_vocab.dart';
 import '../utils/optional.dart';
 import 'category.dart';
 
+class NoteCategoryProperty extends RdfProperty {
+  const NoteCategoryProperty()
+      : super(PersonalNotesVocab.belongsToCategory,
+            iri: const PodResourceRef(Category));
+}
+
 /// A personal note with title, content, and tags.
 ///
 /// Uses our custom PersonalNote type that specializes schema:NoteDigitalDocument
@@ -39,8 +45,7 @@ class Note {
   Set<String> tags;
 
   /// Category this note belongs to - last writer wins on conflicts
-  @RdfProperty(PersonalNotesVocab.belongsToCategory,
-      iri: PodResourceRef(Category))
+  @NoteCategoryProperty()
   @CrdtLwwRegister()
   String? categoryId;
 
