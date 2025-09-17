@@ -74,8 +74,7 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
                   GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
                       transforms: [
                         RegexTransform(
-                            r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$',
-                            r'${1}-${2}')
+                            r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}-${2}')
                       ])
                 ]),
           ],
@@ -185,7 +184,7 @@ class _AppInitializerState extends State<AppInitializer>
 
       // Initialize services with repositories
       final notesSvc = NotesService(noteRepo);
-      final categoriesSvc = CategoriesService(categoryRepo, noteRepo);
+      final categoriesSvc = CategoriesService(categoryRepo);
 
       setState(() {
         syncSystem = syncSys;

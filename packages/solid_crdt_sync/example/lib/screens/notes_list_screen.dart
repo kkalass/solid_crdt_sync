@@ -31,44 +31,24 @@ class NotesListScreen extends StatefulWidget {
 class _NotesListScreenState extends State<NotesListScreen> {
   bool _isConnected = false;
   NoteGroupKey _selectedMonth = NoteGroupKey.currentMonth;
-  List<NoteGroupKey> _availableMonths = [];
 
   @override
   void initState() {
     super.initState();
     _checkConnectionStatus();
     _initializeMonthSubscriptions();
-    _loadAvailableMonths();
   }
 
   /// Initialize subscription to current and previous month
   Future<void> _initializeMonthSubscriptions() async {
     // Auto-subscribe to current and previous month with prefetch
     await widget.syncSystem.subscribeToGroupIndex(
-      NoteGroupKey.currentMonth,
-      ItemFetchPolicy.prefetch
-    );
+        NoteGroupKey.currentMonth, ItemFetchPolicy.prefetch);
     await widget.syncSystem.subscribeToGroupIndex(
-      NoteGroupKey.previousMonth,
-      ItemFetchPolicy.prefetch
-    );
+        NoteGroupKey.previousMonth, ItemFetchPolicy.prefetch);
 
     // Set initial month filter to current month
-    widget.notesService.setMonthFilter(NoteGroupKey.currentMonth.createdMonth);
-  }
-
-  /// Load available months from existing notes
-  Future<void> _loadAvailableMonths() async {
-    // For demo purposes, generate last 6 months
-    final months = <NoteGroupKey>[];
-    final now = DateTime.now();
-    for (int i = 0; i < 6; i++) {
-      final date = DateTime(now.year, now.month - i, 1);
-      months.add(NoteGroupKey.fromDate(date));
-    }
-    setState(() {
-      _availableMonths = months;
-    });
+    widget.notesService.setMonthFilter(NoteGroupKey.currentMonth);
   }
 
   /// Switch to a different month group
@@ -79,15 +59,13 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
     // Subscribe to the selected month if not already subscribed
     final isRecent = monthKey == NoteGroupKey.currentMonth ||
-                    monthKey == NoteGroupKey.previousMonth;
+        monthKey == NoteGroupKey.previousMonth;
 
-    await widget.syncSystem.subscribeToGroupIndex(
-      monthKey,
-      isRecent ? ItemFetchPolicy.prefetch : ItemFetchPolicy.onRequest
-    );
+    await widget.syncSystem.subscribeToGroupIndex(monthKey,
+        isRecent ? ItemFetchPolicy.prefetch : ItemFetchPolicy.onRequest);
 
     // Update the service to filter by selected month
-    widget.notesService.setMonthFilter(monthKey.createdMonth);
+    widget.notesService.setMonthFilter(monthKey);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,8 +89,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
   /// Navigate to previous month
   Future<void> _navigateToPreviousMonth() async {
-    final currentDate = DateTime.now();
-    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final selectedDate = _selectedMonth.createdMonth;
     final prevMonth = DateTime(selectedDate.year, selectedDate.month - 1, 1);
     await _selectMonth(NoteGroupKey.fromDate(prevMonth));
   }
@@ -120,11 +97,12 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Navigate to next month
   Future<void> _navigateToNextMonth() async {
     final currentDate = DateTime.now();
-    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final selectedDate = _selectedMonth.createdMonth;
     final nextMonth = DateTime(selectedDate.year, selectedDate.month + 1, 1);
 
     // Don't allow navigation to future months
-    if (nextMonth.isAfter(DateTime(currentDate.year, currentDate.month + 1, 0))) {
+    if (nextMonth
+        .isAfter(DateTime(currentDate.year, currentDate.month + 1, 0))) {
       return;
     }
 
@@ -134,7 +112,7 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Show date picker for quick month selection
   Future<void> _showDatePicker() async {
     final currentDate = DateTime.now();
-    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final selectedDate = _selectedMonth.createdMonth;
 
     final picked = await showDatePicker(
       context: context,
@@ -154,9 +132,8 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Check if current selected month is a recent month (gets full prefetch)
   bool _isRecentMonth() {
     return _selectedMonth == NoteGroupKey.currentMonth ||
-           _selectedMonth == NoteGroupKey.previousMonth;
+        _selectedMonth == NoteGroupKey.previousMonth;
   }
-
 
   Future<void> _checkConnectionStatus() async {
     // TODO: Check if connected to Solid Pod
@@ -285,9 +262,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
   /// Build compact month navigation for AppBar
   Widget _buildAppBarMonthNavigation() {
     final currentDate = DateTime.now();
-    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final selectedDate = _selectedMonth.createdMonth;
     final isCurrentMonth = _selectedMonth == NoteGroupKey.currentMonth;
-    final canGoNext = selectedDate.isBefore(DateTime(currentDate.year, currentDate.month, 1));
+    final canGoNext =
+        selectedDate.isBefore(DateTime(currentDate.year, currentDate.month, 1));
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -314,7 +292,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
               borderRadius: BorderRadius.circular(20),
               border: isCurrentMonth
                   ? Border.all(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.3),
                       width: 1,
                     )
                   : null,
@@ -333,18 +314,21 @@ class _NotesListScreenState extends State<NotesListScreen> {
                 Text(
                   _selectedMonth.displayName,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: isCurrentMonth
-                        ? Theme.of(context).colorScheme.onPrimaryContainer
-                        : Theme.of(context).colorScheme.onSurface,
-                  ),
+                        fontWeight: FontWeight.w600,
+                        color: isCurrentMonth
+                            ? Theme.of(context).colorScheme.onPrimaryContainer
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
                 ),
                 const SizedBox(width: 4),
                 Icon(
                   Icons.expand_more,
                   size: 14,
                   color: isCurrentMonth
-                      ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.7)
+                      ? Theme.of(context)
+                          .colorScheme
+                          .onPrimaryContainer
+                          .withValues(alpha: 0.7)
                       : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
@@ -367,26 +351,32 @@ class _NotesListScreenState extends State<NotesListScreen> {
           ),
           decoration: BoxDecoration(
             color: _isRecentMonth()
-                ? Colors.green.withOpacity(0.2)
-                : Colors.orange.withOpacity(0.2),
+                ? Colors.green.withValues(alpha: 0.2)
+                : Colors.orange.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _isRecentMonth() ? Icons.download_done : Icons.download_outlined,
+                _isRecentMonth()
+                    ? Icons.download_done
+                    : Icons.download_outlined,
                 size: 12,
-                color: _isRecentMonth() ? Colors.green.shade700 : Colors.orange.shade700,
+                color: _isRecentMonth()
+                    ? Colors.green.shade700
+                    : Colors.orange.shade700,
               ),
               const SizedBox(width: 4),
               Text(
                 _isRecentMonth() ? 'Full' : 'Lazy',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _isRecentMonth() ? Colors.green.shade700 : Colors.orange.shade700,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 11,
-                ),
+                      color: _isRecentMonth()
+                          ? Colors.green.shade700
+                          : Colors.orange.shade700,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11,
+                    ),
               ),
             ],
           ),

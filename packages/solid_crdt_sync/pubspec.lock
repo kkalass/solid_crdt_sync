@@ -756,10 +756,10 @@ packages:
     dependency: transitive
     description:
       name: rdf_mapper_annotations
-      sha256: f6e5927fe50c181ef4290ee29287963178fd9a30095fe044cf77dd7a23d2219b
+      sha256: a2e60bf48aff774a658a4ae79300d0ffb515ed7f4c0b8093a45741ea1bc58fe2
       url: "https://pub.dev"
     source: hosted
-    version: "0.10.1"
+    version: "0.10.2"
   rdf_vocabularies_core:
     dependency: transitive
     description:

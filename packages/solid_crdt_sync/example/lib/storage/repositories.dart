@@ -106,11 +106,6 @@ class CategoryRepository {
     }
   }
 
-  /// Check if a category exists
-  Future<bool> categoryExists(String id) async {
-    return await _categoryDao.categoryExists(id);
-  }
-
   /// Dispose resources when repository is no longer needed
   void dispose() {
     _hydrationSubscription.cancel();
@@ -226,9 +221,7 @@ class NoteRepository {
   /// Handle note index entry update from sync storage
   static Future<void> _handleNoteIndexEntryUpdate(
       NoteIndexEntryDao noteIndexDao, models.NoteIndexEntry noteEntry) async {
-    // Convert to database format with group ID determined from category or other logic
-    final groupId = _determineGroupId(noteEntry);
-    final companion = _noteIndexEntryToDriftCompanion(noteEntry, groupId);
+    final companion = _noteIndexEntryToDriftCompanion(noteEntry);
     await noteIndexDao.insertOrUpdateNoteIndexEntry(companion);
   }
 
@@ -236,20 +229,6 @@ class NoteRepository {
   static Future<void> _handleNoteIndexEntryDelete(
       NoteIndexEntryDao noteIndexDao, models.NoteIndexEntry noteEntry) async {
     await noteIndexDao.deleteNoteIndexEntryById(noteEntry.id);
-  }
-
-  /// Determine group ID for note index entry based on categoryId or other criteria
-  static String _determineGroupId(models.NoteIndexEntry noteEntry) {
-    // TODO: Implement proper group determination logic based on GroupIndex configuration
-    // For now, use categoryId as group, or "uncategorized" if no category
-    return noteEntry.categoryId ?? 'uncategorized';
-  }
-
-  /// Watch all notes ordered by modification date (newest first)
-  Stream<List<models.Note>> getAllNotes() {
-    return _noteDao
-        .getAllNotes()
-        .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
   /// Get a specific note by ID
@@ -271,20 +250,6 @@ class NoteRepository {
       // Use sync system - local storage will be updated via hydration stream
       await _syncSystem.deleteDocument<models.Note>(note);
     }
-  }
-
-  /// Watch notes by category
-  Stream<List<models.Note>> getNotesByCategory(String categoryId) {
-    return _noteDao
-        .getNotesByCategory(categoryId)
-        .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
-  }
-
-  /// Watch notes without a category
-  Stream<List<models.Note>> getUncategorizedNotes() {
-    return _noteDao
-        .getUncategorizedNotes()
-        .map((driftNotes) => driftNotes.map(_noteFromDrift).toList());
   }
 
   /// Convert Drift Note to app Note model
@@ -327,7 +292,7 @@ class NoteRepository {
 
   /// Convert app NoteIndexEntry model to Drift NoteIndexEntriesCompanion
   static NoteIndexEntriesCompanion _noteIndexEntryToDriftCompanion(
-      models.NoteIndexEntry noteEntry, String groupId) {
+      models.NoteIndexEntry noteEntry) {
     return NoteIndexEntriesCompanion(
       id: Value(noteEntry.id),
       name: Value(noteEntry.name),
@@ -336,20 +301,12 @@ class NoteRepository {
       keywords: Value(
           noteEntry.keywords), // Now properly handled by StringSetConverter
       categoryId: Value(noteEntry.categoryId),
-      groupId: Value(groupId),
     );
   }
 
   /// Watch all note index entries reactively
   Stream<List<models.NoteIndexEntry>> watchAllNoteIndexEntries() {
     return _noteIndexDao.watchAllNoteIndexEntries().map(
-        (driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
-  }
-
-  /// Watch note index entries by category reactively
-  Stream<List<models.NoteIndexEntry>> watchNoteIndexEntriesByCategory(
-      String categoryId) {
-    return _noteIndexDao.watchNoteIndexEntriesByCategory(categoryId).map(
         (driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
   }
 

@@ -11,9 +11,12 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 
 import 'package:personal_notes_app/models/category.dart' as category;
 import 'package:personal_notes_app/models/category.rdf_mapper.g.dart' as crmg;
-import 'package:solid_crdt_sync_core/src/mapping/pod_iri_config.dart' as pic;
+import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart' as scsc;
 import 'package:personal_notes_app/models/note.dart' as note;
 import 'package:personal_notes_app/models/note.rdf_mapper.g.dart' as nrmg;
+import 'package:personal_notes_app/models/note_group_key.dart' as ngk;
+import 'package:personal_notes_app/models/note_group_key.rdf_mapper.g.dart'
+    as ngkrmg;
 import 'package:personal_notes_app/models/note_index_entry.dart' as nie;
 import 'package:personal_notes_app/models/note_index_entry.rdf_mapper.g.dart'
     as niermg;
@@ -25,7 +28,7 @@ import 'package:personal_notes_app/models/note_index_entry.rdf_mapper.g.dart'
 /// * [$resourceRefFactory]
 RdfMapper initRdfMapper({
   RdfMapper? rdfMapper,
-  required IriTermMapper<(String id,)> Function<T>(pic.PodIriConfig)
+  required IriTermMapper<(String id,)> Function<T>(scsc.PodIriConfig)
   $resourceIriFactory,
   required IriTermMapper<String> Function<T>(Type) $resourceRefFactory,
 }) {
@@ -37,16 +40,17 @@ RdfMapper initRdfMapper({
   registry.registerMapper<category.Category>(
     crmg.CategoryMapper(
       iriMapper: $resourceIriFactory<category.Category>(
-        const pic.PodIriConfig(),
+        const scsc.PodIriConfig(),
       ),
     ),
   );
   registry.registerMapper<note.Note>(
     nrmg.NoteMapper(
       categoryIdMapper: $resourceRefFactory<String?>(category.Category),
-      iriMapper: $resourceIriFactory<note.Note>(const pic.PodIriConfig()),
+      iriMapper: $resourceIriFactory<note.Note>(const scsc.PodIriConfig()),
     ),
   );
+  registry.registerMapper<ngk.NoteGroupKey>(ngkrmg.NoteGroupKeyMapper());
   registry.registerMapper<nie.NoteIndexEntry>(
     niermg.NoteIndexEntryMapper(
       categoryIdMapper: $resourceRefFactory<String?>(category.Category),

@@ -15,8 +15,8 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart' as nie;
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
-import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
-import 'package:personal_notes_app/models/category.dart';
+import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart' as pnv;
+import 'package:personal_notes_app/models/category.dart' as category;
 import 'package:personal_notes_app/models/note.dart';
 
 /// Generated mapper for [nie.NoteIndexEntry] global resources.
@@ -60,7 +60,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
       UnorderedItemsSetMapper.new,
     );
     final String? categoryId = reader.optional(
-      PersonalNotesVocab.belongsToCategory,
+      pnv.PersonalNotesVocab.belongsToCategory,
       deserializer: _categoryIdMapper,
     );
 
@@ -96,7 +96,7 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
         .when(
           resource.categoryId != null,
           (b) => b.addValue(
-            PersonalNotesVocab.belongsToCategory,
+            pnv.PersonalNotesVocab.belongsToCategory,
             resource.categoryId,
             serializer: _categoryIdMapper,
           ),

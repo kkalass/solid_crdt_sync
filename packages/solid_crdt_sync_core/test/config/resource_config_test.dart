@@ -26,6 +26,7 @@ void main() {
         FullIndex(TestDocument, localName: 'documents'),
         GroupIndex(
           TestDocument,
+          TestDocumentGroupKey,
           localName: 'documents-by-category',
           item: IndexItem(TestDocument, {}),
           groupingProperties: [

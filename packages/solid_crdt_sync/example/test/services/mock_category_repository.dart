@@ -42,10 +42,5 @@ class MockCategoryRepository implements CategoryRepository {
   }
 
   @override
-  Future<bool> categoryExists(String id) async {
-    return storedCategories.any((c) => c.id == id);
-  }
-
-  @override
   void dispose() {}
 }

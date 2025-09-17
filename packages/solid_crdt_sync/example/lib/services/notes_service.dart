@@ -3,6 +3,7 @@ library;
 
 import 'dart:math';
 
+import 'package:personal_notes_app/models/note_group_key.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../models/note.dart';
@@ -20,30 +21,13 @@ class NotesService {
 
   // Reactive filter state
   final _categoryFilterController = BehaviorSubject<String?>.seeded(null);
-  final _monthFilterController = BehaviorSubject<String?>.seeded(null);
+  final _monthFilterController = BehaviorSubject<NoteGroupKey?>.seeded(null);
 
   NotesService(this._noteRepository);
 
-  /// Watch all notes sorted by modification date (newest first)
-  Stream<List<Note>> getAllNotes() {
-    // Repository handles queries and returns sorted results
-    return _noteRepository.getAllNotes();
-  }
-
-  /// Watch all note index entries reactively
-  Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
-    return _noteRepository.watchAllNoteIndexEntries();
-  }
-
-  /// Watch note index entries by category reactively
-  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(
-      String categoryId) {
-    return _noteRepository.watchNoteIndexEntriesByCategory(categoryId);
-  }
-
   /// Reactive stream of filtered note index entries based on current filters
   Stream<List<NoteIndexEntry>> get filteredNoteIndexEntries {
-    return Rx.combineLatest2<String?, String?, (String?, String?)>(
+    return Rx.combineLatest2<String?, NoteGroupKey?, (String?, NoteGroupKey?)>(
       _categoryFilterController.stream,
       _monthFilterController.stream,
       (categoryId, monthFilter) => (categoryId, monthFilter),
@@ -51,19 +35,23 @@ class NotesService {
       final (categoryId, monthFilter) = filters;
 
       // Apply both category and month filters
-      return watchAllNoteIndexEntries().map((entries) {
+      return _noteRepository.watchAllNoteIndexEntries().map((entries) {
         var filtered = entries;
 
         // Filter by category if specified
         if (categoryId != null) {
-          filtered = filtered.where((entry) => entry.categoryId == categoryId).toList();
+          filtered = filtered
+              .where((entry) => entry.categoryId == categoryId)
+              .toList();
         }
 
         // Filter by month if specified
         if (monthFilter != null) {
+          final year = monthFilter.createdMonth.year;
+          final month = monthFilter.createdMonth.month;
           filtered = filtered.where((entry) {
-            final entryMonth = '${entry.dateCreated.year}-${entry.dateCreated.month.toString().padLeft(2, '0')}';
-            return entryMonth == monthFilter;
+            return entry.dateCreated.year == year &&
+                entry.dateCreated.month == month;
           }).toList();
         }
 
@@ -83,16 +71,10 @@ class NotesService {
   /// Stream of current category filter state
   Stream<String?> get categoryFilterStream => _categoryFilterController.stream;
 
-  /// Get current month filter
-  String? get currentMonthFilter => _monthFilterController.valueOrNull;
-
   /// Set month filter (null means show all months)
-  void setMonthFilter(String? monthFilter) {
+  void setMonthFilter(NoteGroupKey? monthFilter) {
     _monthFilterController.add(monthFilter);
   }
-
-  /// Stream of current month filter state
-  Stream<String?> get monthFilterStream => _monthFilterController.stream;
 
   /// Get a specific note by ID
   Future<Note?> getNote(String id) async {
@@ -123,110 +105,6 @@ class NotesService {
       content: content,
       tags: tags ?? <String>{},
     );
-  }
-
-  /// Add a tag to a note
-  Future<void> addTag(String noteId, String tag) async {
-    final note = await getNote(noteId);
-    if (note != null) {
-      final updatedNote = note.copyWith(
-        tags: {...note.tags, tag},
-      );
-      await saveNote(updatedNote);
-    }
-  }
-
-  /// Remove a tag from a note
-  Future<void> removeTag(String noteId, String tag) async {
-    final note = await getNote(noteId);
-    if (note != null) {
-      final updatedTags = Set<String>.from(note.tags);
-      updatedTags.remove(tag);
-      final updatedNote = note.copyWith(tags: updatedTags);
-      await saveNote(updatedNote);
-    }
-  }
-
-  /// Watch all unique tags across all notes
-  Stream<Set<String>> getAllTags() {
-    return getAllNotes().map((notes) {
-      final allTags = <String>{};
-      for (final note in notes) {
-        allTags.addAll(note.tags);
-      }
-      return allTags;
-    });
-  }
-
-  /// Watch search results for notes by title or content
-  Stream<List<Note>> searchNotes(String query) {
-    final lowercaseQuery = query.toLowerCase();
-    return getAllNotes().map((notes) {
-      return notes.where((note) {
-        return note.title.toLowerCase().contains(lowercaseQuery) ||
-            note.content.toLowerCase().contains(lowercaseQuery) ||
-            note.tags.any((tag) => tag.toLowerCase().contains(lowercaseQuery));
-      }).toList();
-    });
-  }
-
-  /// Watch notes by category
-  Stream<List<Note>> getNotesByCategory(String categoryId) {
-    return _noteRepository.getNotesByCategory(categoryId);
-  }
-
-  /// Watch notes without a category (uncategorized)
-  Stream<List<Note>> getUncategorizedNotes() {
-    return _noteRepository.getUncategorizedNotes();
-  }
-
-  /// Load note index entries for a specific group (category-based grouping)
-  /// This is used when navigating to a category that might not be indexed yet
-  Future<void> ensureGroupIndexLoaded(String groupId) async {
-    // TODO: Call sync system to ensure the group's index is loaded
-    // For now, this is a placeholder for the SolidCrdtSync API we discussed
-    // In the final implementation, this would call something like:
-    // await syncSystem.loadGroupIndex<NoteIndexEntry>(groupId);
-
-    // Placeholder: just log the request for now
-    print('Ensuring group index is loaded for group: $groupId');
-  }
-
-  /// Load full data for a group (prefetch strategy)
-  /// This is used when the app determines a group will be heavily accessed
-  Future<void> prefetchGroupData(String groupId) async {
-    // TODO: Call sync system to prefetch all notes in the group
-    // For now, this is a placeholder for the SolidCrdtSync API we discussed
-    // In the final implementation, this would call something like:
-    // await syncSystem.loadGroupData<Note>(groupId);
-
-    // Placeholder: just log the request for now
-    print('Prefetching full data for group: $groupId');
-  }
-
-  /// Smart navigation helper: ensures a category's notes are available for browsing
-  /// Returns true if index entries are available, false if group needs loading
-  Future<bool> ensureCategoryAvailable(String categoryId) async {
-    // First, ensure the group index is loaded
-    await ensureGroupIndexLoaded(categoryId);
-
-    // Check if we have index entries for this category by taking the first value from the stream
-    final indexEntries =
-        await watchNoteIndexEntriesByCategory(categoryId).first;
-
-    // Return whether we found any entries (true means ready for browsing)
-    return indexEntries.isNotEmpty;
-  }
-
-  /// Get notes by category with automatic group loading
-  /// This method ensures the category group is available before returning results
-  Future<List<NoteIndexEntry>> getNoteIndexEntriesByCategoryWithLoading(
-      String categoryId) async {
-    // Ensure the category group is loaded
-    await ensureCategoryAvailable(categoryId);
-
-    // Return the index entries (may be empty if the category truly has no notes)
-    return await watchNoteIndexEntriesByCategory(categoryId).first;
   }
 
   /// Generate a unique ID for new notes

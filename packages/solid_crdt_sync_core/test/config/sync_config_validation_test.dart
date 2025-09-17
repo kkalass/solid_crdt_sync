@@ -279,6 +279,7 @@ void main() {
         expect(
           () => GroupIndex(
             TestDocument,
+            TestDocumentGroupKey,
             item: IndexItem(TestDocument, {}),
             groupingProperties: [], // Empty!
           ),

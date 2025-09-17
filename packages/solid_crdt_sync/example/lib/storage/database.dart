@@ -7,7 +7,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 part 'database.g.dart';
 
-/// Type converter for Set<String> to/from JSON
+/// Type converter for `Set<String>` to/from JSON
 class StringSetConverter extends TypeConverter<Set<String>, String> {
   const StringSetConverter();
 
@@ -108,9 +108,6 @@ class NoteIndexEntries extends Table {
 
   /// Category ID (from indexed properties)
   TextColumn get categoryId => text().nullable()();
-
-  /// Group ID - which GroupIndex group this entry belongs to
-  TextColumn get groupId => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -242,32 +239,12 @@ class CategoryDao extends DatabaseAccessor<AppDatabase>
   Future<void> deleteCategoryById(String id) {
     return (delete(categories)..where((c) => c.id.equals(id))).go();
   }
-
-  /// Check if a category exists
-  Future<bool> categoryExists(String id) async {
-    final query = selectOnly(categories)
-      ..addColumns([categories.id.count()])
-      ..where(categories.id.equals(id));
-
-    final result = await query.getSingle();
-    return result.read(categories.id.count())! > 0;
-  }
 }
 
 /// Data Access Object for Notes
 @DriftAccessor(tables: [Notes])
 class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
   NoteDao(super.db);
-
-  /// Watch all notes ordered by modification date (newest first)
-  Stream<List<Note>> getAllNotes() {
-    return (select(notes)
-          ..orderBy([
-            (n) =>
-                OrderingTerm(expression: n.modifiedAt, mode: OrderingMode.desc)
-          ]))
-        .watch();
-  }
 
   /// Get a specific note by ID
   Future<Note?> getNoteById(String id) {
@@ -282,28 +259,6 @@ class NoteDao extends DatabaseAccessor<AppDatabase> with _$NoteDaoMixin {
   /// Delete a note by ID
   Future<void> deleteNoteById(String id) {
     return (delete(notes)..where((n) => n.id.equals(id))).go();
-  }
-
-  /// Watch notes by category
-  Stream<List<Note>> getNotesByCategory(String categoryId) {
-    return (select(notes)
-          ..where((n) => n.categoryId.equals(categoryId))
-          ..orderBy([
-            (n) =>
-                OrderingTerm(expression: n.modifiedAt, mode: OrderingMode.desc)
-          ]))
-        .watch();
-  }
-
-  /// Watch notes without a category
-  Stream<List<Note>> getUncategorizedNotes() {
-    return (select(notes)
-          ..where((n) => n.categoryId.isNull())
-          ..orderBy([
-            (n) =>
-                OrderingTerm(expression: n.modifiedAt, mode: OrderingMode.desc)
-          ]))
-        .watch();
   }
 }
 
@@ -323,12 +278,6 @@ class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
-  /// Get a specific note index entry by ID
-  Future<NoteIndexEntry?> getNoteIndexEntryById(String id) {
-    return (select(noteIndexEntries)..where((n) => n.id.equals(id)))
-        .getSingleOrNull();
-  }
-
   /// Insert or update a note index entry
   Future<void> insertOrUpdateNoteIndexEntry(
       NoteIndexEntriesCompanion companion) {
@@ -338,28 +287,6 @@ class NoteIndexEntryDao extends DatabaseAccessor<AppDatabase>
   /// Delete a note index entry by ID
   Future<void> deleteNoteIndexEntryById(String id) {
     return (delete(noteIndexEntries)..where((n) => n.id.equals(id))).go();
-  }
-
-  /// Watch note index entries by category
-  Stream<List<NoteIndexEntry>> watchNoteIndexEntriesByCategory(
-      String categoryId) {
-    return (select(noteIndexEntries)
-          ..where((n) => n.categoryId.equals(categoryId))
-          ..orderBy([
-            (n) => OrderingTerm(
-                expression: n.dateModified, mode: OrderingMode.desc)
-          ]))
-        .watch();
-  }
-
-  /// Check if a note index entry exists
-  Future<bool> noteIndexEntryExists(String id) async {
-    final query = selectOnly(noteIndexEntries)
-      ..addColumns([noteIndexEntries.id.count()])
-      ..where(noteIndexEntries.id.equals(id));
-
-    final result = await query.getSingle();
-    return result.read(noteIndexEntries.id.count())! > 0;
   }
 }
 

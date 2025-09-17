@@ -50,7 +50,7 @@ dev_dependencies:
   # Code generation
   build_runner: ^2.4.0
   drift_dev: ^2.19.0
-  rdf_mapper_generator: ^0.10.2
+  rdf_mapper_generator: ^0.10.4
 
 flutter:
   uses-material-design: true

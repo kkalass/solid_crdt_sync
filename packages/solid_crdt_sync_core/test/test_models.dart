@@ -19,8 +19,13 @@ class TestVocab {
 class TestDocument {
   final String id;
   final String title;
+  final String category;
+  TestDocument({required this.id, required this.title, required this.category});
+}
 
-  TestDocument({required this.id, required this.title});
+class TestDocumentGroupKey {
+  final String category;
+  TestDocumentGroupKey({required this.category});
 }
 
 /// Test category model

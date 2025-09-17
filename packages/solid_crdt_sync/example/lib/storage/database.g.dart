@@ -888,15 +888,9 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
   late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
       'category_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _groupIdMeta =
-      const VerificationMeta('groupId');
-  @override
-  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
-      'group_id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, name, dateCreated, dateModified, keywords, categoryId, groupId];
+      [id, name, dateCreated, dateModified, keywords, categoryId];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -940,12 +934,6 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
           categoryId.isAcceptableOrUnknown(
               data['category_id']!, _categoryIdMeta));
     }
-    if (data.containsKey('group_id')) {
-      context.handle(_groupIdMeta,
-          groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta));
-    } else if (isInserting) {
-      context.missing(_groupIdMeta);
-    }
     return context;
   }
 
@@ -968,8 +956,6 @@ class $NoteIndexEntriesTable extends NoteIndexEntries
               .read(DriftSqlType.string, data['${effectivePrefix}keywords'])),
       categoryId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}category_id']),
-      groupId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}group_id'])!,
     );
   }
 
@@ -1002,17 +988,13 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
 
   /// Category ID (from indexed properties)
   final String? categoryId;
-
-  /// Group ID - which GroupIndex group this entry belongs to
-  final String groupId;
   const NoteIndexEntry(
       {required this.id,
       required this.name,
       required this.dateCreated,
       required this.dateModified,
       this.keywords,
-      this.categoryId,
-      required this.groupId});
+      this.categoryId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1027,7 +1009,6 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<String>(categoryId);
     }
-    map['group_id'] = Variable<String>(groupId);
     return map;
   }
 
@@ -1043,7 +1024,6 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
-      groupId: Value(groupId),
     );
   }
 
@@ -1057,7 +1037,6 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
       dateModified: serializer.fromJson<DateTime>(json['dateModified']),
       keywords: serializer.fromJson<Set<String>?>(json['keywords']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
-      groupId: serializer.fromJson<String>(json['groupId']),
     );
   }
   @override
@@ -1070,7 +1049,6 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
       'dateModified': serializer.toJson<DateTime>(dateModified),
       'keywords': serializer.toJson<Set<String>?>(keywords),
       'categoryId': serializer.toJson<String?>(categoryId),
-      'groupId': serializer.toJson<String>(groupId),
     };
   }
 
@@ -1080,8 +1058,7 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
           DateTime? dateCreated,
           DateTime? dateModified,
           Value<Set<String>?> keywords = const Value.absent(),
-          Value<String?> categoryId = const Value.absent(),
-          String? groupId}) =>
+          Value<String?> categoryId = const Value.absent()}) =>
       NoteIndexEntry(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -1089,7 +1066,6 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
         dateModified: dateModified ?? this.dateModified,
         keywords: keywords.present ? keywords.value : this.keywords,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
-        groupId: groupId ?? this.groupId,
       );
   NoteIndexEntry copyWithCompanion(NoteIndexEntriesCompanion data) {
     return NoteIndexEntry(
@@ -1103,7 +1079,6 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
       keywords: data.keywords.present ? data.keywords.value : this.keywords,
       categoryId:
           data.categoryId.present ? data.categoryId.value : this.categoryId,
-      groupId: data.groupId.present ? data.groupId.value : this.groupId,
     );
   }
 
@@ -1115,15 +1090,14 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
           ..write('dateCreated: $dateCreated, ')
           ..write('dateModified: $dateModified, ')
           ..write('keywords: $keywords, ')
-          ..write('categoryId: $categoryId, ')
-          ..write('groupId: $groupId')
+          ..write('categoryId: $categoryId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, name, dateCreated, dateModified, keywords, categoryId, groupId);
+  int get hashCode =>
+      Object.hash(id, name, dateCreated, dateModified, keywords, categoryId);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1133,8 +1107,7 @@ class NoteIndexEntry extends DataClass implements Insertable<NoteIndexEntry> {
           other.dateCreated == this.dateCreated &&
           other.dateModified == this.dateModified &&
           other.keywords == this.keywords &&
-          other.categoryId == this.categoryId &&
-          other.groupId == this.groupId);
+          other.categoryId == this.categoryId);
 }
 
 class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
@@ -1144,7 +1117,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
   final Value<DateTime> dateModified;
   final Value<Set<String>?> keywords;
   final Value<String?> categoryId;
-  final Value<String> groupId;
   final Value<int> rowid;
   const NoteIndexEntriesCompanion({
     this.id = const Value.absent(),
@@ -1153,7 +1125,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
     this.dateModified = const Value.absent(),
     this.keywords = const Value.absent(),
     this.categoryId = const Value.absent(),
-    this.groupId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NoteIndexEntriesCompanion.insert({
@@ -1163,13 +1134,11 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
     required DateTime dateModified,
     this.keywords = const Value.absent(),
     this.categoryId = const Value.absent(),
-    required String groupId,
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
         dateCreated = Value(dateCreated),
-        dateModified = Value(dateModified),
-        groupId = Value(groupId);
+        dateModified = Value(dateModified);
   static Insertable<NoteIndexEntry> custom({
     Expression<String>? id,
     Expression<String>? name,
@@ -1177,7 +1146,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
     Expression<DateTime>? dateModified,
     Expression<String>? keywords,
     Expression<String>? categoryId,
-    Expression<String>? groupId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1187,7 +1155,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
       if (dateModified != null) 'date_modified': dateModified,
       if (keywords != null) 'keywords': keywords,
       if (categoryId != null) 'category_id': categoryId,
-      if (groupId != null) 'group_id': groupId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1199,7 +1166,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
       Value<DateTime>? dateModified,
       Value<Set<String>?>? keywords,
       Value<String?>? categoryId,
-      Value<String>? groupId,
       Value<int>? rowid}) {
     return NoteIndexEntriesCompanion(
       id: id ?? this.id,
@@ -1208,7 +1174,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
       dateModified: dateModified ?? this.dateModified,
       keywords: keywords ?? this.keywords,
       categoryId: categoryId ?? this.categoryId,
-      groupId: groupId ?? this.groupId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1235,9 +1200,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
     if (categoryId.present) {
       map['category_id'] = Variable<String>(categoryId.value);
     }
-    if (groupId.present) {
-      map['group_id'] = Variable<String>(groupId.value);
-    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1253,7 +1215,6 @@ class NoteIndexEntriesCompanion extends UpdateCompanion<NoteIndexEntry> {
           ..write('dateModified: $dateModified, ')
           ..write('keywords: $keywords, ')
           ..write('categoryId: $categoryId, ')
-          ..write('groupId: $groupId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2130,7 +2091,6 @@ typedef $$NoteIndexEntriesTableCreateCompanionBuilder
   required DateTime dateModified,
   Value<Set<String>?> keywords,
   Value<String?> categoryId,
-  required String groupId,
   Value<int> rowid,
 });
 typedef $$NoteIndexEntriesTableUpdateCompanionBuilder
@@ -2141,7 +2101,6 @@ typedef $$NoteIndexEntriesTableUpdateCompanionBuilder
   Value<DateTime> dateModified,
   Value<Set<String>?> keywords,
   Value<String?> categoryId,
-  Value<String> groupId,
   Value<int> rowid,
 });
 
@@ -2173,9 +2132,6 @@ class $$NoteIndexEntriesTableFilterComposer
 
   ColumnFilters<String> get categoryId => $composableBuilder(
       column: $table.categoryId, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get groupId => $composableBuilder(
-      column: $table.groupId, builder: (column) => ColumnFilters(column));
 }
 
 class $$NoteIndexEntriesTableOrderingComposer
@@ -2205,9 +2161,6 @@ class $$NoteIndexEntriesTableOrderingComposer
 
   ColumnOrderings<String> get categoryId => $composableBuilder(
       column: $table.categoryId, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get groupId => $composableBuilder(
-      column: $table.groupId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$NoteIndexEntriesTableAnnotationComposer
@@ -2236,9 +2189,6 @@ class $$NoteIndexEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get categoryId => $composableBuilder(
       column: $table.categoryId, builder: (column) => column);
-
-  GeneratedColumn<String> get groupId =>
-      $composableBuilder(column: $table.groupId, builder: (column) => column);
 }
 
 class $$NoteIndexEntriesTableTableManager extends RootTableManager<
@@ -2274,7 +2224,6 @@ class $$NoteIndexEntriesTableTableManager extends RootTableManager<
             Value<DateTime> dateModified = const Value.absent(),
             Value<Set<String>?> keywords = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
-            Value<String> groupId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               NoteIndexEntriesCompanion(
@@ -2284,7 +2233,6 @@ class $$NoteIndexEntriesTableTableManager extends RootTableManager<
             dateModified: dateModified,
             keywords: keywords,
             categoryId: categoryId,
-            groupId: groupId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -2294,7 +2242,6 @@ class $$NoteIndexEntriesTableTableManager extends RootTableManager<
             required DateTime dateModified,
             Value<Set<String>?> keywords = const Value.absent(),
             Value<String?> categoryId = const Value.absent(),
-            required String groupId,
             Value<int> rowid = const Value.absent(),
           }) =>
               NoteIndexEntriesCompanion.insert(
@@ -2304,7 +2251,6 @@ class $$NoteIndexEntriesTableTableManager extends RootTableManager<
             dateModified: dateModified,
             keywords: keywords,
             categoryId: categoryId,
-            groupId: groupId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

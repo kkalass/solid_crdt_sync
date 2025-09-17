@@ -5,7 +5,6 @@ import 'dart:async';
 import 'dart:math';
 
 import '../models/category.dart';
-import '../models/note.dart';
 import '../storage/repositories.dart';
 
 /// Service for managing categories with local-first CRDT synchronization.
@@ -18,9 +17,8 @@ import '../storage/repositories.dart';
 /// Categories use FullIndex with prefetch policy for immediate availability.
 class CategoriesService {
   final CategoryRepository _categoryRepository;
-  final NoteRepository _noteRepository;
 
-  CategoriesService(this._categoryRepository, this._noteRepository);
+  CategoriesService(this._categoryRepository);
 
   /// Watch all categories sorted by name (non-archived only)
   Stream<List<Category>> getAllCategories() {
@@ -69,36 +67,6 @@ class CategoriesService {
       icon: icon,
     );
   }
-
-  /// Watch all notes that belong to a specific category
-  ///
-  /// This method queries notes by category from repository.
-  /// In the future, this could be optimized using GroupIndex.
-  Stream<List<Note>> getNotesInCategory(String categoryId) {
-    return _noteRepository.getNotesByCategory(categoryId);
-  }
-
-  /// Watch count of notes in each category
-  ///
-  /// Returns a stream of map of category ID to note count.
-  Stream<Map<String, int>> getCategoryNoteCounts() {
-    return _noteRepository.getAllNotes().map((notes) {
-      final counts = <String, int>{};
-      for (final note in notes) {
-        if (note.categoryId != null) {
-          counts[note.categoryId!] = (counts[note.categoryId!] ?? 0) + 1;
-        }
-      }
-      return counts;
-    });
-  }
-
-  /// Check if a category exists
-  Future<bool> categoryExists(String id) async {
-    return await _categoryRepository.categoryExists(id);
-  }
-
-  // Note: No dispose method needed - repositories handle their own cleanup
 
   /// Generate a unique ID for new categories
   String _generateCategoryId() {

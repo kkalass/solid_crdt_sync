@@ -6,19 +6,15 @@ import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/services/categories_service.dart';
 
 import 'mock_category_repository.dart';
-import 'mock_note_repository.dart';
 
 void main() {
   group('CategoriesService', () {
     late MockCategoryRepository mockCategoryRepository;
-    late MockNoteRepository mockNoteRepository;
     late CategoriesService categoriesService;
 
     setUp(() {
       mockCategoryRepository = MockCategoryRepository();
-      mockNoteRepository = MockNoteRepository();
-      categoriesService =
-          CategoriesService(mockCategoryRepository, mockNoteRepository);
+      categoriesService = CategoriesService(mockCategoryRepository);
     });
 
     group('createCategory', () {
