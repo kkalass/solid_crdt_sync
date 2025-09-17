@@ -6,6 +6,7 @@ import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 import '../models/note_index_entry.dart';
 import '../models/category.dart' as models;
+import '../models/note_group_key.dart';
 import '../services/notes_service.dart';
 import '../services/categories_service.dart';
 import 'categories_screen.dart';
@@ -29,11 +30,74 @@ class NotesListScreen extends StatefulWidget {
 
 class _NotesListScreenState extends State<NotesListScreen> {
   bool _isConnected = false;
+  NoteGroupKey _selectedMonth = NoteGroupKey.currentMonth;
+  List<NoteGroupKey> _availableMonths = [];
 
   @override
   void initState() {
     super.initState();
     _checkConnectionStatus();
+    _initializeMonthSubscriptions();
+    _loadAvailableMonths();
+  }
+
+  /// Initialize subscription to current and previous month
+  Future<void> _initializeMonthSubscriptions() async {
+    // Auto-subscribe to current and previous month with prefetch
+    await widget.syncSystem.subscribeToGroupIndex(
+      NoteGroupKey.currentMonth,
+      ItemFetchPolicy.prefetch
+    );
+    await widget.syncSystem.subscribeToGroupIndex(
+      NoteGroupKey.previousMonth,
+      ItemFetchPolicy.prefetch
+    );
+
+    // Set initial month filter to current month
+    widget.notesService.setMonthFilter(NoteGroupKey.currentMonth.createdMonth);
+  }
+
+  /// Load available months from existing notes
+  Future<void> _loadAvailableMonths() async {
+    // For demo purposes, generate last 6 months
+    final months = <NoteGroupKey>[];
+    final now = DateTime.now();
+    for (int i = 0; i < 6; i++) {
+      final date = DateTime(now.year, now.month - i, 1);
+      months.add(NoteGroupKey.fromDate(date));
+    }
+    setState(() {
+      _availableMonths = months;
+    });
+  }
+
+  /// Switch to a different month group
+  Future<void> _selectMonth(NoteGroupKey monthKey) async {
+    setState(() {
+      _selectedMonth = monthKey;
+    });
+
+    // Subscribe to the selected month if not already subscribed
+    final isRecent = monthKey == NoteGroupKey.currentMonth ||
+                    monthKey == NoteGroupKey.previousMonth;
+
+    await widget.syncSystem.subscribeToGroupIndex(
+      monthKey,
+      isRecent ? ItemFetchPolicy.prefetch : ItemFetchPolicy.onRequest
+    );
+
+    // Update the service to filter by selected month
+    widget.notesService.setMonthFilter(monthKey.createdMonth);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Switched to ${monthKey.displayName}\n'
+              'Loading strategy: ${isRecent ? "Full prefetch" : "On request"}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   /// Filter notes by category using reactive streams
@@ -43,49 +107,56 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
     // Update the service filter - this will automatically update the stream
     widget.notesService.setCategoryFilter(categoryId);
+  }
 
-    // Demonstrate smart loading strategy decisions
-    if (categoryId != null) {
-      _applySmartLoadingStrategy(categoryId);
+  /// Navigate to previous month
+  Future<void> _navigateToPreviousMonth() async {
+    final currentDate = DateTime.now();
+    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final prevMonth = DateTime(selectedDate.year, selectedDate.month - 1, 1);
+    await _selectMonth(NoteGroupKey.fromDate(prevMonth));
+  }
+
+  /// Navigate to next month
+  Future<void> _navigateToNextMonth() async {
+    final currentDate = DateTime.now();
+    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final nextMonth = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+
+    // Don't allow navigation to future months
+    if (nextMonth.isAfter(DateTime(currentDate.year, currentDate.month + 1, 0))) {
+      return;
     }
 
-    // Show feedback about group loading (for demonstration)
-    if (mounted && categoryId != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Loaded notes for category: $categoryId\n'
-              'Group loading ensures index is available.'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    await _selectMonth(NoteGroupKey.fromDate(nextMonth));
+  }
+
+  /// Show date picker for quick month selection
+  Future<void> _showDatePicker() async {
+    final currentDate = DateTime.now();
+    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate,
+      firstDate: DateTime(2020, 1),
+      lastDate: currentDate,
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Select Month',
+      fieldLabelText: 'Month',
+    );
+
+    if (picked != null) {
+      await _selectMonth(NoteGroupKey.fromDate(picked));
     }
   }
 
-  // FIXME this method probably is intended well, but it seems to be wrong. Need to think about the group prefetching.
-  /// Demonstrate application-level smart loading strategy decisions
-  Future<void> _applySmartLoadingStrategy(String categoryId) async {
-    // This demonstrates how the application can decide between different loading strategies
-    // based on user behavior, category type, or other factors
-
-    // For now, we'll use a simplified strategy based on categoryId
-    // TODO: Look up the actual category to determine the best strategy
-    if (categoryId.contains('work')) {
-      // Work category: User likely to browse multiple items - prefetch full data
-      await widget.notesService.prefetchGroupData(categoryId);
-      print(
-          'Strategy: Prefetching full data for work category (heavy usage expected)');
-    } else if (categoryId.contains('archive')) {
-      // Archive category: User likely just browsing - load index only
-      await widget.notesService.ensureGroupIndexLoaded(categoryId);
-      print(
-          'Strategy: Index-only for archived category (light browsing expected)');
-    } else {
-      // Other categories: Balanced approach - ensure index, prefetch on demand
-      await widget.notesService.ensureGroupIndexLoaded(categoryId);
-      print(
-          'Strategy: Index-first for $categoryId category (balanced approach)');
-    }
+  /// Check if current selected month is a recent month (gets full prefetch)
+  bool _isRecentMonth() {
+    return _selectedMonth == NoteGroupKey.currentMonth ||
+           _selectedMonth == NoteGroupKey.previousMonth;
   }
+
 
   Future<void> _checkConnectionStatus() async {
     // TODO: Check if connected to Solid Pod
@@ -211,12 +282,126 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
   }
 
+  /// Build compact month navigation for AppBar
+  Widget _buildAppBarMonthNavigation() {
+    final currentDate = DateTime.now();
+    final selectedDate = DateTime.parse('${_selectedMonth.createdMonth}-01');
+    final isCurrentMonth = _selectedMonth == NoteGroupKey.currentMonth;
+    final canGoNext = selectedDate.isBefore(DateTime(currentDate.year, currentDate.month, 1));
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Previous month button
+        IconButton(
+          onPressed: _navigateToPreviousMonth,
+          icon: const Icon(Icons.chevron_left),
+          tooltip: 'Previous Month',
+          iconSize: 20,
+        ),
+        // Current month display (tappable for date picker)
+        GestureDetector(
+          onTap: _showDatePicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: isCurrentMonth
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(20),
+              border: isCurrentMonth
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      width: 1,
+                    )
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: isCurrentMonth
+                      ? Theme.of(context).colorScheme.onPrimaryContainer
+                      : Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _selectedMonth.displayName,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isCurrentMonth
+                        ? Theme.of(context).colorScheme.onPrimaryContainer
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.expand_more,
+                  size: 14,
+                  color: isCurrentMonth
+                      ? Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.7)
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Next month button
+        IconButton(
+          onPressed: canGoNext ? _navigateToNextMonth : null,
+          icon: const Icon(Icons.chevron_right),
+          tooltip: canGoNext ? 'Next Month' : 'Cannot go to future months',
+          iconSize: 20,
+        ),
+        // Loading strategy indicator
+        Container(
+          margin: const EdgeInsets.only(left: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 4,
+          ),
+          decoration: BoxDecoration(
+            color: _isRecentMonth()
+                ? Colors.green.withOpacity(0.2)
+                : Colors.orange.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _isRecentMonth() ? Icons.download_done : Icons.download_outlined,
+                size: 12,
+                color: _isRecentMonth() ? Colors.green.shade700 : Colors.orange.shade700,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                _isRecentMonth() ? 'Full' : 'Lazy',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _isRecentMonth() ? Colors.green.shade700 : Colors.orange.shade700,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Personal Notes'),
+        title: _buildAppBarMonthNavigation(),
         elevation: 0,
+        centerTitle: true,
         actions: [
           // Category filter dropdown - demonstrates group loading
           StreamBuilder<String?>(

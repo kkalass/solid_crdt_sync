@@ -1204,7 +1204,7 @@ The `idx:` vocabulary provides the building blocks for both indexing approaches:
 * **`idx:GroupingRule`:** Class defining how resources are assigned to groups
 * **`idx:GroupingRuleProperty`:** Individual property specification within a GroupingRule
 * **`idx:sourceProperty`:** Property to extract grouping value from (in GroupingRuleProperty)
-* **`idx:format`:** Format pattern for date/time values (in GroupingRuleProperty)  
+* **`idx:transform`:** Optional regex transform for value normalization (in GroupingRuleProperty) - see [Regex Transform Specification](REGEX-TRANSFORMS.md)  
 * **`idx:hierarchyLevel`:** Optional hierarchy level for multi-property grouping (in GroupingRuleProperty)
 * **`idx:missingValue`:** Default value when property is absent (in GroupingRuleProperty)
 * **`idx:ModuloHashSharding`:** Class specifying hash-based shard distribution
@@ -1222,7 +1222,7 @@ The GroupingRule determines group membership using the following process:
    - **With `idx:missingValue`:** Use the specified default value
    - **Without `idx:missingValue`:** Return empty set (resource joins no groups)
 3. **Permutation Generation:** Compute Cartesian product of all property value sets
-4. **Format Application:** Apply `idx:format` to each value (for dates/times)
+4. **Transform Application:** Apply `idx:transform` to each value if specified
 5. **Path Generation:** Generate deterministic group paths using hierarchy levels:
    - **With `idx:hierarchyLevel`:** Sort properties by level, create nested path structure
    - **Without hierarchy levels:** Sort properties by source IRI lexicographically, join with '-' separator
@@ -1236,7 +1236,13 @@ idx:groupedBy [
   idx:property [
     a idx:GroupingRuleProperty;
     idx:sourceProperty <predicate>;     # RDF property to extract from
-    idx:format "yyyy-MM";               # Optional formatting (dates/times)
+    idx:transform (                     # Optional value transformation list
+      [
+        a idx:RegexTransform;
+        idx:pattern "^([0-9]{4})-([0-9]{2})-([0-9]{2})$";
+        idx:replacement "${1}-${2}"
+      ]
+    ) ;
     idx:hierarchyLevel 1;               # Optional hierarchy level (default: 1)
     idx:missingValue "default"          # Optional default if property absent
   ];
@@ -1250,7 +1256,13 @@ idx:groupedBy [
 ```turtle
 idx:property [
   idx:sourceProperty schema:dateCreated;
-  idx:format "yyyy-MM"
+  idx:transform (
+    [
+      a idx:RegexTransform;
+      idx:pattern "^([0-9]{4})-([0-9]{2})-([0-9]{2})$";
+      idx:replacement "${1}-${2}"
+    ]
+  ) .
 ];
 # Result: groups/2024-08/index, groups/2024-09/index, etc.
 ```
@@ -1259,11 +1271,23 @@ idx:property [
 ```turtle
 idx:property [
   idx:sourceProperty schema:dateCreated;
-  idx:format "yyyy";
+  idx:transform (
+    [
+      a idx:RegexTransform;
+      idx:pattern "^([0-9]{4})-[0-9]{2}-[0-9]{2}$";
+      idx:replacement "${1}"
+    ]
+  ) ;
   idx:hierarchyLevel 1
 ], [
   idx:sourceProperty schema:dateCreated;
-  idx:format "MM";
+  idx:transform (
+    [
+      a idx:RegexTransform;
+      idx:pattern "^[0-9]{4}-([0-9]{2})-[0-9]{2}$";
+      idx:replacement "${1}"
+    ]
+  ) ;
   idx:hierarchyLevel 2
 ];
 # Result: groups/2024/08/index, groups/2024/09/index, etc.
@@ -1273,7 +1297,13 @@ idx:property [
 ```turtle
 idx:property [
   idx:sourceProperty crdt:deletedAt;
-  idx:format "yyyy"
+  idx:transform (
+    [
+      a idx:RegexTransform;
+      idx:pattern "^([0-9]{4})-[0-9]{2}-[0-9]{2}$";
+      idx:replacement "${1}"
+    ]
+  ) .
   # No missingValue = no group if property absent
 ];
 # Only documents WITH crdt:deletedAt get indexed
@@ -1284,10 +1314,16 @@ idx:property [
 ```turtle
 idx:property [
   idx:sourceProperty schema:dateCreated;
-  idx:format "yyyy-MM"
+  idx:transform (
+    [
+      a idx:RegexTransform;
+      idx:pattern "^([0-9]{4})-([0-9]{2})-([0-9]{2})$";
+      idx:replacement "${1}-${2}"
+    ]
+  ) .
 ], [
   idx:sourceProperty schema:category
-  # No format = use property value directly
+  # No transform = use property value directly
 ];
 # Resource with dateCreated="2024-08-15", category="work"
 # Result: groups/2024-08-work/index (lexicographic IRI ordering)
@@ -1323,7 +1359,8 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 - **Hash computation:** SHA256 with pipe separators (`|`) between all structural inputs
 - **Full IRI usage:** Hash computation uses complete IRIs, not prefixed forms
 - **Directory structure:** Hash-derived directory name + consistent `index` document
-- **GroupingRuleProperties serialization:** Each GroupingRuleProperty serialized as `sourceProperty|format|hierarchyLevel|missingValue`, multiple properties sorted using the same ordering rules as path generation (hierarchy level first, then lexicographic IRI ordering for properties without explicit levels) and concatenated with `&` separator
+- **GroupingRuleProperties serialization:** Each GroupingRuleProperty serialized as `sourceProperty|transformList|hierarchyLevel|missingValue`, where transformList uses canonical transform format (see below), multiple properties sorted using the same ordering rules as path generation (hierarchy level first, then lexicographic IRI ordering for properties without explicit levels) and concatenated with `&` separator
+- **Transform List Canonical Format:** Each RegexTransform serialized as `<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{"pattern":"escaped_pattern","replacement":"escaped_replacement"}` where strings are JSON-escaped, multiple transforms separated by `|`, empty list represented as empty string
 
 **Hash Computation Examples:**
 ```turtle
@@ -1333,23 +1370,23 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 # Document: /indices/recipes/index-full-a1b2c3d4/index
 
 # GroupIndexTemplate for shopping entries with single property
-# groupingRuleProperties: "https://example.org/vocab/meal#requiredForDate|monthYear|yyyy-MM|"
-# (format: sourceProperty|name|format|missingValue - empty missingValue at end)
-# Input: "https://example.org/vocab/meal#requiredForDate|monthYear|yyyy-MM||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
+# groupingRuleProperties: "https://example.org/vocab/meal#requiredForDate|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-([0-9]{2})-([0-9]{2})$\",\"replacement\":\"${1}-${2}\"}||"
+# (format: sourceProperty|transformList_canonical|hierarchyLevel|missingValue - empty missingValue at end)
+# Input: "https://example.org/vocab/meal#requiredForDate|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-([0-9]{2})-([0-9]{2})$\",\"replacement\":\"${1}-${2}\"}|||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
 # Directory: /indices/shopping-entries/index-grouped-e5f6g7h8/
 # Document: /indices/shopping-entries/index-grouped-e5f6g7h8/index
 
 # GroupIndexTemplate with single property (GC index example)
-# groupingRuleProperties: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|deletionYear|YYYY|"
-# Input: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|deletionYear|YYYY||gc/{deletionYear}/index|https://w3id.org/solid-crdt-sync/vocab/sync#ManagedDocument|ModuloHashSharding|xxhash64"
+# groupingRuleProperties: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-[0-9]{2}-[0-9]{2}$\",\"replacement\":\"${1}\"}||"
+# Input: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-[0-9]{2}-[0-9]{2}$\",\"replacement\":\"${1}\"}|||gc/{deletionYear}/index|https://w3id.org/solid-crdt-sync/vocab/sync#ManagedDocument|ModuloHashSharding|xxhash64"
 # Directory: /indices/gc/index-grouped-f9g8h7i6/
 # Document: /indices/gc/index-grouped-f9g8h7i6/index
 
 # GroupIndexTemplate with multiple properties
 # Two properties: rdf:type and schema:keywords
-# groupingRuleProperties: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|type||&https://schema.org/keywords|keyword||default"
-# (sorted by sourceProperty IRI, joined with &)
-# Input: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|type||&https://schema.org/keywords|keyword||default|groups/{type}-{keyword}/index|https://schema.org/Recipe|ModuloHashSharding|xxhash64"
+# groupingRuleProperties: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|||&https://schema.org/keywords|||default"
+# (sorted by sourceProperty IRI, joined with &, empty transform lists represented as empty string)
+# Input: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|||&https://schema.org/keywords|||default|groups/{type}-{keyword}/index|https://schema.org/Recipe|ModuloHashSharding|xxhash64"
 ```
 
 **Automatic Convergence Property:**
@@ -1501,7 +1538,7 @@ Rather than expensive Type Index container scanning, the framework maintains a d
 The following examples demonstrate concrete RDF structures for different types of indices, showing how the indexing architecture works in practice with real data.
 
 **Example 1: A `GroupIndexTemplate` at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/index`**
-This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256(https://example.org/vocab/meal#requiredForDate|yyyy-MM|groups/{value}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64). Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
+This resource is the "rulebook" for all shopping list entry groups in our meal planning application. The name hash is derived from SHA256 of the canonical transform format shown in section 5.3.5. Note that it has no `idx:indexedProperty` because shopping entries are typically loaded in full groups, requiring only Hybrid Logical Clock hashes for change detection.
 
 ```turtle
 @prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
@@ -1532,7 +1569,13 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
      idx:property [
        a idx:GroupingRuleProperty;
        idx:sourceProperty meal:requiredForDate;
-       idx:format "yyyy-MM"
+       idx:transform (
+         [
+           a idx:RegexTransform;
+           idx:pattern "^([0-9]{4})-([0-9]{2})-([0-9]{2})$";
+           idx:replacement "${1}-${2}"
+         ]
+       ) .
      ];
      # No groupTemplate - paths generated deterministically as: groups/{yyyy-MM}/index
    ].
@@ -1886,7 +1929,13 @@ Rather than scanning entire data containers, framework-managed documents with AN
      a idx:GroupingRule;
      idx:property [
        idx:sourceProperty crdt:deletedAt;
-       idx:format "yyyy"
+       idx:transform (
+         [
+           a idx:RegexTransform;
+           idx:pattern "^([0-9]{4})-[0-9]{2}-[0-9]{2}$";
+           idx:replacement "${1}"
+         ]
+       ) .
        # No idx:missingValue = only documents with deletedAt get indexed
      ];
      # No groupTemplate - paths generated deterministically as: gc/{yyyy}/index

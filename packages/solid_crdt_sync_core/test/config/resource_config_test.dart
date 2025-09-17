@@ -31,7 +31,7 @@ void main() {
           groupingProperties: [
             GroupingProperty(
               IriTerm.prevalidated('https://schema.org/category'),
-              format: 'string',
+              // No transforms - use raw value as group key
             ),
           ],
         ),

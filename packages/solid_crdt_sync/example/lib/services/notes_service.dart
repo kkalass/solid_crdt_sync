@@ -20,6 +20,7 @@ class NotesService {
 
   // Reactive filter state
   final _categoryFilterController = BehaviorSubject<String?>.seeded(null);
+  final _monthFilterController = BehaviorSubject<String?>.seeded(null);
 
   NotesService(this._noteRepository);
 
@@ -40,14 +41,34 @@ class NotesService {
     return _noteRepository.watchNoteIndexEntriesByCategory(categoryId);
   }
 
-  /// Reactive stream of filtered note index entries based on current category filter
+  /// Reactive stream of filtered note index entries based on current filters
   Stream<List<NoteIndexEntry>> get filteredNoteIndexEntries {
-    return _categoryFilterController.stream.switchMap((categoryId) {
-      if (categoryId == null) {
-        return watchAllNoteIndexEntries();
-      } else {
-        return watchNoteIndexEntriesByCategory(categoryId);
-      }
+    return Rx.combineLatest2<String?, String?, (String?, String?)>(
+      _categoryFilterController.stream,
+      _monthFilterController.stream,
+      (categoryId, monthFilter) => (categoryId, monthFilter),
+    ).switchMap((filters) {
+      final (categoryId, monthFilter) = filters;
+
+      // Apply both category and month filters
+      return watchAllNoteIndexEntries().map((entries) {
+        var filtered = entries;
+
+        // Filter by category if specified
+        if (categoryId != null) {
+          filtered = filtered.where((entry) => entry.categoryId == categoryId).toList();
+        }
+
+        // Filter by month if specified
+        if (monthFilter != null) {
+          filtered = filtered.where((entry) {
+            final entryMonth = '${entry.dateCreated.year}-${entry.dateCreated.month.toString().padLeft(2, '0')}';
+            return entryMonth == monthFilter;
+          }).toList();
+        }
+
+        return filtered;
+      });
     });
   }
 
@@ -61,6 +82,17 @@ class NotesService {
 
   /// Stream of current category filter state
   Stream<String?> get categoryFilterStream => _categoryFilterController.stream;
+
+  /// Get current month filter
+  String? get currentMonthFilter => _monthFilterController.valueOrNull;
+
+  /// Set month filter (null means show all months)
+  void setMonthFilter(String? monthFilter) {
+    _monthFilterController.add(monthFilter);
+  }
+
+  /// Stream of current month filter state
+  Stream<String?> get monthFilterStream => _monthFilterController.stream;
 
   /// Get a specific note by ID
   Future<Note?> getNote(String id) async {

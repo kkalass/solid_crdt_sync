@@ -45,11 +45,16 @@
      idx:property [
        a idx:GroupingRuleProperty;
        idx:sourceProperty crdt:deletedAt;
-       idx:name "deletionYear";
-       idx:format "YYYY"
+       idx:transform (
+         [
+           a idx:RegexTransform;
+           idx:pattern "^([0-9]{4})-[0-9]{2}-[0-9]{2}$";
+           idx:replacement "${1}"
+         ]
+       ) .
        # No idx:missingValue = documents without deletedAt create no groups
-     ];
-     idx:groupTemplate "gc/{deletionYear}/index"
+     ]
+     # No groupTemplate - paths generated deterministically as: gc/{year}/index
    ];
    # Standard sharding for GC index
    idx:shardingAlgorithm [

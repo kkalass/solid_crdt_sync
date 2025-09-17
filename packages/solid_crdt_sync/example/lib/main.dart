@@ -71,8 +71,12 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
                   PersonalNotesVocab.belongsToCategory
                 }),
                 groupingProperties: [
-                  GroupingProperty(PersonalNotesVocab.belongsToCategory,
-                      missingValue: 'uncategorized')
+                  GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+                      transforms: [
+                        RegexTransform(
+                            r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$',
+                            r'${1}-${2}')
+                      ])
                 ]),
           ],
         ),

@@ -59,6 +59,10 @@ idx:IndexedProperty a rdfs:Class;
     rdfs:label "Indexed Property";
     rdfs:comment "A configuration object that specifies which property should be indexed and tracks which installations actively read from it. Used within idx:indexedProperty to enable property-level reader management." .
 
+idx:RegexTransform a rdfs:Class;
+    rdfs:label "Regex Transform";
+    rdfs:comment "A transform rule that applies regex pattern matching and replacement to RDF literal values for group key generation. Uses cross-platform compatible regex subset." .
+
 # --- Property Definitions ---
 
 idx:belongsToIndexShard a rdf:Property;
@@ -139,11 +143,11 @@ idx:sourceProperty a rdf:Property;
     rdfs:domain idx:GroupingRuleProperty;
     rdfs:range rdf:Property .
 
-idx:format a rdf:Property;
-    rdfs:label "format";
-    rdfs:comment "Optional format string to apply to the sourceProperty's value (e.g., 'yyyy-MM' for dates).";
+idx:transform a rdf:Property;
+    rdfs:label "transform";
+    rdfs:comment "Ordered list of regex transform rules to apply to the sourceProperty's value for group key generation. Transforms are tried in order, first match wins.";
     rdfs:domain idx:GroupingRuleProperty;
-    rdfs:range xsd:string .
+    rdfs:range rdf:List .
 
 idx:hierarchyLevel a rdf:Property;
     rdfs:label "hierarchy level";
@@ -199,3 +203,15 @@ idx:trackedProperty a rdf:Property;
     rdfs:comment "Specifies which RDF property is being tracked in an indexed property configuration object.";
     rdfs:domain idx:IndexedProperty;
     rdfs:range rdf:Property .
+
+idx:pattern a rdf:Property;
+    rdfs:label "pattern";
+    rdfs:comment "Cross-platform compatible regex pattern for matching RDF literal values. No alternation (|) or named character classes allowed.";
+    rdfs:domain idx:RegexTransform;
+    rdfs:range xsd:string .
+
+idx:replacement a rdf:Property;
+    rdfs:label "replacement";
+    rdfs:comment "Replacement template with ${n} backreferences to capture groups. Uses braced syntax for maximum cross-platform compatibility.";
+    rdfs:domain idx:RegexTransform;
+    rdfs:range xsd:string .

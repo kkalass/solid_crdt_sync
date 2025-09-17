@@ -292,6 +292,14 @@ This represents a major expansion beyond single-Pod CRDT synchronization into di
 
 **Related**: Current Public Type Index usage in ARCHITECTURE.md section 4.2
 
+---
+
+## 8. End to End Encryption
+
+It would be really great, if we could support an approach like the one from ANUSII to end-to-end-encrypt (e2ee) the rdf data
+
+## 9. Non-RDF File support
+what about storing e.g. images in the pod, for example for a photo app? How can this be done and managed?
 
 ---
 

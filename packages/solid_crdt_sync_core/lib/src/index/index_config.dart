@@ -132,18 +132,53 @@ class FullIndex extends CrdtIndexConfig {
 ///
 /// Extracts group identifiers from RDF property values using format patterns.
 /// Example: Extract 'yyyy-MM' from schema:dateCreated to group by month.
+/// A regex transform rule for extracting group keys from RDF literal values
+/// Uses cross-platform compatible regex subset with deterministic list processing
+class RegexTransform {
+  /// Cross-platform compatible regex pattern (no alternation, no named character classes)
+  final String pattern;
+
+  /// Replacement template with ${n} backreferences to capture groups
+  final String replacement;
+
+  const RegexTransform(this.pattern, this.replacement);
+
+  @override
+  String toString() => 'RegexTransform($pattern -> $replacement)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RegexTransform &&
+          runtimeType == other.runtimeType &&
+          pattern == other.pattern &&
+          replacement == other.replacement;
+
+  @override
+  int get hashCode => pattern.hashCode ^ replacement.hashCode;
+}
+
 class GroupingProperty {
   /// RDF predicate IRI for the source property (e.g., schema:dateCreated)
   final IriTerm predicate;
 
   final int hierarchyLevel;
 
-  /// Optional format pattern for extracting group values from the property
-  /// Example: 'yyyy-MM' extracts "2025-08" from date values
+  /// Optional regex transforms for extracting group values from the property
+  /// Example: RegexTransform("^([0-9]{4})-([0-9]{2})-([0-9]{2})\$", "\${1}-\${2}")
+  /// extracts "2025-08" from date values like "2025-08-15".
   ///
-  /// If not specified, the raw property value is converted to string via toString()
-  /// and used directly as the group identifier.
-  final String? format;
+  /// Note that the transforms are applied in order, so multiple transforms can be
+  /// chained together for more complex extraction logic.
+  ///
+  /// Also note that the transforms operate on the RDF representation of the property value - not on the dart object.
+  /// For literals, transforms operate on the lexical value (without language tag or datatype);
+  /// for IRIs, transforms operate on the IRI string.
+  ///
+  /// If not specified, the RDF representation of the property value is used as-is.
+  /// For literals, this is the lexical value (without language tag or datatype); for IRIs, the IRI string.
+  ///
+  final List<RegexTransform>? transforms;
 
   /// Value to use when the source property is missing
   /// If null, resources missing the property are excluded from the index
@@ -152,7 +187,7 @@ class GroupingProperty {
 
   const GroupingProperty(
     this.predicate, {
-    this.format,
+    this.transforms,
     this.hierarchyLevel = 1,
     this.missingValue,
   });

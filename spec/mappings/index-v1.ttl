@@ -12,7 +12,7 @@
    # Import base CRDT framework
    mc:imports ( mappings:core-v1 ) ;
    # Define index-specific class mappings
-   mc:classMapping ( <#full-index> <#group-index-template> <#group-index> <#indexed-property> <#grouping-rule> <#grouping-rule-property> <#modulo-hash-sharding> ) .
+   mc:classMapping ( <#full-index> <#group-index-template> <#group-index> <#indexed-property> <#grouping-rule> <#grouping-rule-property> <#modulo-hash-sharding> <#regex-transform> ) .
 
 # FullIndex documents
 <#full-index> a mc:ClassMapping;
@@ -63,8 +63,7 @@
    mc:appliesToClass idx:GroupingRuleProperty;
    mc:rule
      [ mc:predicate idx:sourceProperty; algo:mergeWith algo:Immutable ],  # Source property to extract from
-     [ mc:predicate idx:name; algo:mergeWith algo:Immutable ],            # Variable name for template
-     [ mc:predicate idx:format; algo:mergeWith algo:LWW_Register ],       # Optional format string
+     [ mc:predicate idx:transform; algo:mergeWith algo:Immutable ],       # Transform list (part of grouping identity)
      [ mc:predicate idx:missingValue; algo:mergeWith algo:LWW_Register ] . # Default value for missing properties
 
 # ModuloHashSharding algorithm configuration
@@ -75,3 +74,10 @@
      [ mc:predicate idx:numberOfShards; algo:mergeWith algo:Immutable ],
      [ mc:predicate idx:configVersion; algo:mergeWith algo:LWW_Register ],
      [ mc:predicate idx:autoScaleThreshold; algo:mergeWith algo:LWW_Register ] .
+
+# RegexTransform configuration within transform lists
+<#regex-transform> a mc:ClassMapping;
+   mc:appliesToClass idx:RegexTransform;
+   mc:rule
+     [ mc:predicate idx:pattern; algo:mergeWith algo:LWW_Register ],       # Regex pattern (atomic within blank node)
+     [ mc:predicate idx:replacement; algo:mergeWith algo:LWW_Register ] .  # Replacement template (atomic within blank node)

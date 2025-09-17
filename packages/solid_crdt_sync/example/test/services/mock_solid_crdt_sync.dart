@@ -33,4 +33,13 @@ class MockSolidCrdtSync implements SolidCrdtSync {
     // Mock implementation - return empty subscription
     return Stream<HydrationResult<T>>.empty().listen(null);
   }
+
+  @override
+  Future<void> subscribeToGroupIndex<G>(
+    G groupKey,
+    ItemFetchPolicy itemFetchPolicy, {
+    String localName = defaultIndexLocalName
+  }) async {
+    // Mock implementation - do nothing
+  }
 }
