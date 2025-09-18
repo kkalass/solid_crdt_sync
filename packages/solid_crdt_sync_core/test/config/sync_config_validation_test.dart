@@ -1,4 +1,6 @@
+import 'package:solid_crdt_sync_core/src/config/validation.dart';
 import 'package:test/test.dart';
+import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:solid_crdt_sync_core/src/config/resource_config.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
@@ -30,8 +32,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isTrue);
         expect(result.errors, isEmpty);
       });
@@ -52,8 +53,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
         expect(
@@ -77,8 +77,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
         expect(result.errors.first.message, contains('RDF type IRI collision'));
@@ -97,13 +96,14 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
-        expect(result.errors, hasLength(1));
+        expect(result.errors, hasLength(2));
         expect(result.errors.first.message, contains('No RDF type IRI found'));
         expect(result.errors.first.message, contains('UnmappedType'));
         expect(result.errors.first.message, contains('@PodResource'));
+        expect(result.errors.last.message,
+            contains('Type UnmappedType is not registered in RdfMapper'));
       });
     });
 
@@ -119,8 +119,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(
             result.errors
@@ -139,8 +138,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(
             result.errors.any((e) => e.message.contains('must start with "/"')),
@@ -163,8 +161,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isTrue);
         expect(result.warnings, hasLength(1));
         expect(result.warnings.first.message,
@@ -184,8 +181,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(result.errors.any((e) => e.message.contains('must be absolute')),
             isTrue);
@@ -203,8 +199,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isTrue);
         expect(result.warnings, isNotEmpty);
         expect(
@@ -222,14 +217,13 @@ void main() {
               defaultResourcePath: '/data/documents',
               crdtMapping: Uri.parse('https://example.com/document.ttl'),
               indices: [
-                FullIndex(TestDocument, localName: ''), // Empty local name!
+                FullIndex(localName: ''), // Empty local name!
               ],
             ),
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(
             result.errors
@@ -248,8 +242,7 @@ void main() {
               defaultResourcePath: '/data/documents',
               crdtMapping: Uri.parse('https://example.com/document.ttl'),
               indices: [
-                FullIndex(TestDocument,
-                    localName: 'shared', item: testIndexItem),
+                FullIndex(localName: 'shared', item: testIndexItem),
               ],
             ),
             ResourceConfig(
@@ -257,7 +250,7 @@ void main() {
               defaultResourcePath: '/data/categories',
               crdtMapping: Uri.parse('https://example.com/category.ttl'),
               indices: [
-                FullIndex(TestCategory,
+                FullIndex(
                     localName: 'shared',
                     item: testIndexItem), // Same local name, same item type!
               ],
@@ -265,8 +258,7 @@ void main() {
           ],
         );
 
-        final result =
-            config.validate(config.buildResourceTypeCache(mockMapper));
+        final result = validate(config, mockMapper);
         expect(result.isValid, isFalse);
         expect(
             result.errors
@@ -278,7 +270,6 @@ void main() {
         // Test that the constructor itself prevents creating invalid GroupIndex
         expect(
           () => GroupIndex(
-            TestDocument,
             TestDocumentGroupKey,
             item: IndexItem(TestDocument, {}),
             groupingProperties: [], // Empty!
@@ -290,5 +281,1051 @@ void main() {
         // But since the constructor prevents it, we test the constructor behavior instead
       });
     });
+
+    group('GroupIndex Configuration Validation', () {
+      test('should pass with valid single-property GroupIndex', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+      });
+
+      test(
+          'should fail with invalid regex pattern and call RegexTransform validation',
+          () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'invalid-regex',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      transforms: [
+                        RegexTransform(
+                          r'^(work|personal)$', // Contains alternation - should fail!
+                          r'${1}',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) =>
+                e.message.contains('alternation') &&
+                e.message.contains('RegexTransform')),
+            isTrue,
+            reason:
+                'Should call RegexTransform validation and report alternation error');
+      });
+
+      test(
+          'should fail with invalid replacement syntax through RegexTransform validation',
+          () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'invalid-replacement',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      transforms: [
+                        RegexTransform(
+                          r'^([a-z]+)$',
+                          r'$1', // Should be ${1}!
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) => e.message.contains('replacement')), isTrue,
+            reason:
+                'RegexTransform validation should catch invalid replacement syntax');
+      });
+
+      test('should fail with duplicate groupKeyType and localName combinations',
+          () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'shared-name',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+            ResourceConfig(
+              type: TestCategory,
+              defaultResourcePath: '/data/categories',
+              crdtMapping: Uri.parse('https://example.com/category.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey, // Same groupKeyType!
+                  localName: 'shared-name', // Same localName!
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) =>
+                e.message.contains('Duplicate') &&
+                e.message.contains('groupKeyType') &&
+                e.message.contains('localName')),
+            isTrue,
+            reason:
+                'Should validate uniqueness of groupKeyType and localName combination');
+      });
+
+      test('should allow same groupKeyType with different localNames', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'by-category',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+            ResourceConfig(
+              type: TestCategory,
+              defaultResourcePath: '/data/categories',
+              crdtMapping: Uri.parse('https://example.com/category.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey, // Same groupKeyType is OK
+                  localName: 'different-name', // Different localName
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+      });
+
+      test('should allow same localName with different groupKeyTypes', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'by-category',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+            ResourceConfig(
+              type: TestCategory,
+              defaultResourcePath: '/data/categories',
+              crdtMapping: Uri.parse('https://example.com/category.ttl'),
+              indices: [
+                GroupIndex(
+                  MultiPropertyGroupKey, // Different groupKeyType
+                  localName: 'by-category', // Same localName is OK
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                    GroupingProperty(IriTerm.prevalidated(
+                        'https://test.example/vocab#priority')),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+      });
+
+      test('should fail when dartType has no mapper in registry', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: UnmappedType, // This type has no mapper!
+              defaultResourcePath: '/data/unmapped',
+              crdtMapping: Uri.parse('https://example.com/unmapped.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'unmapped-dart-type',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) =>
+                e.message.contains('No RDF type IRI found') &&
+                e.message.contains('UnmappedType')),
+            isTrue,
+            reason: 'Should validate dartType has mapper in registry');
+      });
+
+      test('should fail when groupKeyType has no mapper in registry', () {
+        // Create a type that doesn't have a mapper registered
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  UnmappedType, // This groupKeyType has no mapper!
+                  localName: 'unmapped-group-key',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) =>
+                e.message.contains('UnmappedType') &&
+                e.message.contains('mapper')),
+            isTrue,
+            reason: 'Should validate groupKeyType has mapper in registry');
+      });
+
+      test('should fail when itemType has no mapper in registry', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'unmapped-item-type',
+                  item: IndexItem(
+                      UnmappedType, {}), // This itemType has no mapper!
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = config.validate(
+            config.buildResourceTypeCache(mockMapper),
+            mapper: mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) =>
+                e.message.contains('UnmappedType') &&
+                e.message.contains('mapper')),
+            isTrue,
+            reason: 'Should validate itemType has mapper in registry');
+      });
+
+      test('should validate all types have proper mappers when all are valid',
+          () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument, // Has mapper
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey, // Has mapper
+                  localName: 'all-mapped',
+                  item: IndexItem(TestDocument, {}), // Has mapper
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty,
+            reason: 'All types have mappers, should pass validation');
+      });
+
+      test('should validate hierarchy levels are properly ordered', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  MultiPropertyGroupKey,
+                  localName: 'hierarchical',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory, hierarchyLevel: 1),
+                    GroupingProperty(
+                        IriTerm.prevalidated(
+                            'https://test.example/vocab#priority'),
+                        hierarchyLevel: 2),
+                    GroupingProperty(
+                        IriTerm.prevalidated(
+                            'https://test.example/vocab#department'),
+                        hierarchyLevel: 3),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+      });
+
+      test('should warn about hierarchy level gaps', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  MultiPropertyGroupKey,
+                  localName: 'level-gap',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory, hierarchyLevel: 1),
+                    GroupingProperty(
+                        IriTerm.prevalidated(
+                            'https://test.example/vocab#priority'),
+                        hierarchyLevel: 3), // Gap! Missing level 2
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.warnings, isNotEmpty);
+        expect(
+            result.warnings
+                .any((w) => w.message.contains('Hierarchy level gap')),
+            isTrue);
+      });
+
+      test(
+          'should allow duplicate hierarchy levels (valid Cartesian product scenario)',
+          () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  MultiPropertyGroupKey,
+                  localName: 'duplicate-levels-ok',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory, hierarchyLevel: 1),
+                    GroupingProperty(
+                        IriTerm.prevalidated(
+                            'https://test.example/vocab#priority'),
+                        hierarchyLevel:
+                            1), // Same level = Cartesian product (valid)
+                    GroupingProperty(
+                        IriTerm.prevalidated(
+                            'https://test.example/vocab#department'),
+                        hierarchyLevel: 2),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+        // Multiple properties at same level are valid (Cartesian product)
+      });
+
+      test('should fail with zero or negative hierarchy levels', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'invalid-level',
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory,
+                        hierarchyLevel: 0), // Invalid!
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any(
+                (e) => e.message.contains('hierarchy level must be positive')),
+            isTrue);
+      });
+
+      test('should fail with empty missing value', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'empty-missing-value',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      missingValue: '', // Empty!
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any(
+                (e) => e.message.contains('missing value cannot be empty')),
+            isTrue);
+      });
+
+      test('should validate complex multi-transform scenario', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'multi-transform',
+                  groupingProperties: [
+                    GroupingProperty(
+                      IriTerm.prevalidated('https://schema.org/dateCreated'),
+                      transforms: [
+                        // Multiple transforms for different date formats
+                        RegexTransform(
+                          r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$',
+                          r'${1}-${2}',
+                        ),
+                        RegexTransform(
+                          r'^([0-9]{2})/([0-9]{2})/([0-9]{4})$',
+                          r'${3}-${1}',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+      });
+    });
+
+    group('Regex Transform Validation Integration', () {
+      test('should call RegexTransform validation for all transforms', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'multiple-invalid-transforms',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      transforms: [
+                        RegexTransform(r'^(a|b)$', r'${1}'), // Alternation
+                        RegexTransform(
+                            r'[[:alpha:]]', r'${0}'), // Named character class
+                        RegexTransform(r'^(.*)$', r'$1'), // Invalid replacement
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+
+        // Should have errors for all three invalid transforms
+        expect(result.errors.length, greaterThanOrEqualTo(3));
+        expect(result.errors.any((e) => e.message.contains('alternation')),
+            isTrue);
+        expect(result.errors.any((e) => e.message.contains('named character')),
+            isTrue);
+        expect(
+            result.errors.any((e) => e.message
+                .contains('RegexTransform replacement contains invalid')),
+            isTrue);
+      });
+
+      test(
+          'should validate transform syntax according to GROUP-INDEXING.md spec',
+          () {
+        // Test patterns from the compatible regex subset
+        final validPatterns = [
+          r'[a-z]',
+          r'[A-Z]',
+          r'[0-9]',
+          r'[abc]',
+          r'[^abc]',
+          r'[a-zA-Z]',
+          r'[0-9a-fA-F]',
+          r'.',
+          r'^start',
+          r'end$',
+          r'a*',
+          r'b+',
+          r'c?',
+          r'd{3}',
+          r'e{2,5}',
+          r'f{1,}',
+          r'(abc)',
+          r'(a)(b)(c)',
+          r'\.',
+          r'\^',
+          r'\$'
+        ];
+
+        for (final pattern in validPatterns) {
+          final config = SyncConfig(
+            resources: [
+              ResourceConfig(
+                type: TestDocument,
+                defaultResourcePath: '/data/documents',
+                crdtMapping: Uri.parse('https://example.com/document.ttl'),
+                indices: [
+                  GroupIndex(
+                    TestDocumentGroupKey,
+                    localName: 'valid-pattern-test',
+                    groupingProperties: [
+                      GroupingProperty(
+                        TestVocab.testCategory,
+                        transforms: [
+                          RegexTransform(pattern, r'${0}'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          final result = validate(config, mockMapper);
+          expect(result.isValid, isTrue,
+              reason:
+                  'Pattern $pattern should be valid per GROUP-INDEXING.md spec');
+        }
+      });
+
+      test('should reject forbidden patterns from GROUP-INDEXING.md spec', () {
+        final forbiddenPatterns = [
+          // Alternation patterns
+          r'(a|b)', r'cat|dog', r'^(yes|no)$',
+          // Named character classes
+          r'[[:alpha:]]', r'[[:digit:]]', r'[[:alnum:]]', r'[[:space:]]'
+        ];
+
+        for (final pattern in forbiddenPatterns) {
+          final config = SyncConfig(
+            resources: [
+              ResourceConfig(
+                type: TestDocument,
+                defaultResourcePath: '/data/documents',
+                crdtMapping: Uri.parse('https://example.com/document.ttl'),
+                indices: [
+                  GroupIndex(
+                    TestDocumentGroupKey,
+                    localName: 'forbidden-pattern-test',
+                    groupingProperties: [
+                      GroupingProperty(
+                        TestVocab.testCategory,
+                        transforms: [
+                          RegexTransform(pattern, r'${0}'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          final result = validate(config, mockMapper);
+          expect(result.isValid, isFalse,
+              reason:
+                  'Pattern $pattern should be forbidden per GROUP-INDEXING.md spec');
+        }
+      });
+
+      test('should validate replacement syntax per GROUP-INDEXING.md spec', () {
+        // Test each replacement with a pattern that has enough capture groups
+        final testCases = [
+          (r'${1}', r'^(.*)$'),           // 1 group needed
+          (r'${2}', r'^(.*)(.*)$'),       // 2 groups needed
+          (r'${0}', r'^(.*)$'),           // 0 refers to whole match
+          (r'${1}${2}', r'^(.*)(.*)$'),   // 2 groups needed
+          (r'prefix-${1}-suffix', r'^(.*)$'), // 1 group needed
+          (r'${1}1', r'^(.*)$'),          // 1 group needed
+          (r'${11}', r'^(.{1})(.{1})(.{1})(.{1})(.{1})(.{1})(.{1})(.{1})(.{1})(.{1})(.{1})(.*)$'), // 11 groups needed
+          (r'$$', r'^(.*)$'),             // No groups needed, just literal $
+        ];
+
+        for (final (replacement, pattern) in testCases) {
+          final config = SyncConfig(
+            resources: [
+              ResourceConfig(
+                type: TestDocument,
+                defaultResourcePath: '/data/documents',
+                crdtMapping: Uri.parse('https://example.com/document.ttl'),
+                indices: [
+                  GroupIndex(
+                    TestDocumentGroupKey,
+                    localName: 'valid-replacement-test',
+                    groupingProperties: [
+                      GroupingProperty(
+                        TestVocab.testCategory,
+                        transforms: [
+                          RegexTransform(pattern, replacement),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          final result = validate(config, mockMapper);
+          expect(result.isValid, isTrue,
+              reason:
+                  'Replacement $replacement with pattern $pattern should be valid per GROUP-INDEXING.md spec');
+        }
+      });
+    });
+
+    group('Mapper Registry Validation', () {
+      test('should comprehensively validate all type mappers exist', () {
+        // Test with a fully valid configuration
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument, // Has global mapper
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                FullIndex(
+                  localName: 'full-documents',
+                  item: IndexItem(TestDocument, {}), // Has global mapper
+                ),
+                GroupIndex(
+                  TestDocumentGroupKey, // Has local mapper
+                  localName: 'grouped-documents',
+                  item: IndexItem(TestDocument, {}), // Has global mapper
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+            ResourceConfig(
+              type: TestCategory, // Has global mapper
+              defaultResourcePath: '/data/categories',
+              crdtMapping: Uri.parse('https://example.com/category.ttl'),
+              indices: [
+                GroupIndex(
+                  MultiPropertyGroupKey, // Has local mapper
+                  localName: 'multi-prop-categories',
+                  item: IndexItem(TestCategory, {}), // Has global mapper
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                    GroupingProperty(IriTerm.prevalidated(
+                        'https://test.example/vocab#priority')),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty);
+      });
+
+      test('should fail when multiple types lack mappers', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: UnmappedType, // No mapper
+              defaultResourcePath: '/data/unmapped1',
+              crdtMapping: Uri.parse('https://example.com/unmapped1.ttl'),
+              indices: [
+                GroupIndex(
+                  UnmappedType, // No mapper for groupKeyType either
+                  localName: 'unmapped-group',
+                  item: IndexItem(
+                      UnmappedType, {}), // No mapper for itemType either
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+
+        // Should have multiple errors for the missing mappers
+        expect(result.errors.length, greaterThanOrEqualTo(1));
+        expect(result.errors.any((e) => e.message.contains('UnmappedType')),
+            isTrue);
+      });
+
+      test('should validate when all required mappers are present', () {
+        // Test comprehensive mapper validation - resource types, group key types, item types
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument, // Has mapper
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  IriPropertyGroupKey, // Has mapper
+                  localName: 'complex-group-key',
+                  item: IndexItem(TestDocument, {}), // Has mapper
+                  groupingProperties: [
+                    GroupingProperty(TestVocab.testCategory),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue,
+            reason: 'All required types should have mappers registered');
+      });
+    });
+
+    group('Edge Cases and Error Handling', () {
+      test('should fail with empty grouping properties list', () {
+        // This should be caught by the constructor assertion
+        expect(
+          () => GroupIndex(
+            TestDocumentGroupKey,
+            localName: 'empty-properties',
+            groupingProperties: [], // Empty!
+          ),
+          throwsA(isA<AssertionError>()),
+        );
+      });
+
+      test('should fail with null predicate in GroupingProperty', () {
+        expect(
+          () => GroupingProperty(
+            IriTerm.prevalidated(''), // Empty IRI
+          ),
+          returnsNormally, // Constructor should accept this, validation catches it
+        );
+
+        // The validation should catch empty predicate IRIs
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'empty-predicate',
+                  groupingProperties: [
+                    GroupingProperty(
+                        IriTerm.prevalidated('')), // Empty predicate
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) => e.message.contains('predicate')), isTrue);
+      });
+
+      test('should fail with malformed regex escape sequences', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'malformed-regex',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      transforms: [
+                        RegexTransform(
+                          r'\', // Incomplete escape sequence
+                          r'${0}',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(
+            result.errors.any((e) => e.message.contains(
+                'RegexTransform pattern ends with incomplete escape sequence')),
+            isTrue);
+      });
+
+      test('should fail with invalid capture group references', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'invalid-capture-group',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      transforms: [
+                        RegexTransform(
+                          r'^([a-z]+)$', // Only one capture group
+                          r'${2}', // References non-existent group 2!
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isFalse);
+        expect(result.errors.any((e) => e.message.contains('capture group')),
+            isTrue);
+      });
+
+      test('should handle extremely large hierarchy levels', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'large-hierarchy',
+                  groupingProperties: [
+                    GroupingProperty(
+                      TestVocab.testCategory,
+                      hierarchyLevel: 999999, // Very large level
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(
+            result.warnings.any((w) => w.message.contains('hierarchy level')),
+            isFalse,
+            reason:
+                'Large hierarchy levels should be allowed but may generate warnings about depth');
+      });
+
+      test('should validate multiple transforms with different formats', () {
+        final config = SyncConfig(
+          resources: [
+            ResourceConfig(
+              type: TestDocument,
+              defaultResourcePath: '/data/documents',
+              crdtMapping: Uri.parse('https://example.com/document.ttl'),
+              indices: [
+                GroupIndex(
+                  TestDocumentGroupKey,
+                  localName: 'multi-format-dates',
+                  groupingProperties: [
+                    GroupingProperty(
+                      IriTerm.prevalidated('https://schema.org/dateCreated'),
+                      transforms: [
+                        // Handle multiple date formats per GROUP-INDEXING.md examples
+                        RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$',
+                            r'${1}-${2}'), // ISO
+                        RegexTransform(r'^([0-9]{2})/([0-9]{2})/([0-9]{4})$',
+                            r'${3}-${1}'), // US
+                        RegexTransform(r'^([0-9]{2})\.([0-9]{2})\.([0-9]{4})$',
+                            r'${3}-${1}'), // EU
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+        final result = validate(config, mockMapper);
+        expect(result.isValid, isTrue);
+        expect(result.errors, isEmpty,
+            reason:
+                'Multiple date format transforms should be valid per GROUP-INDEXING.md spec');
+      });
+    });
   });
 }
+
+ValidationResult validate(SyncConfig config, RdfMapper mockMapper) => config
+    .validate(config.buildResourceTypeCache(mockMapper), mapper: mockMapper);
