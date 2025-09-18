@@ -55,6 +55,39 @@ void main() {
         expect(groupIdentifiers.first, equals('work'));
       });
 
+      test('Creates correct group identifiers for DateTimeGroupKey', () async {
+        final manager = GroupIndexSubscriptionManager(
+            config: SyncConfig(resources: [
+              ResourceConfig(
+                type: TestDocument,
+                crdtMapping: Uri.parse('http://example.org/crdt/document'),
+                indices: [
+                  GroupIndex(
+                    DateTimeGroupKey,
+                    groupingProperties: [
+                      GroupingProperty(
+                          IriTerm('https://test.example/vocab#createdAt'),
+                          transforms: [
+                            RegexTransform(
+                                r'^([0-9]{4})-([0-9]{2})-([0-9]{2}).*',
+                                r'${1}-${2}')
+                          ]),
+                    ],
+                  ),
+                ],
+              ),
+            ]),
+            mapper: createTestMapper());
+
+        final groupIdentifiers =
+            await manager.getGroupIdentifiers<DateTimeGroupKey>(
+          DateTimeGroupKey(createdAt: DateTime(2023, 10, 5)),
+        );
+
+        expect(groupIdentifiers, isNotEmpty);
+        expect(groupIdentifiers.single, equals('2023-10'));
+      });
+
       test('throws exception for unknown group key type', () async {
         expect(
           () => manager.getGroupIdentifiers<String>('invalid',

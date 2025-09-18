@@ -71,8 +71,8 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
                 groupingProperties: [
                   GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
                       transforms: [
-                        RegexTransform(
-                            r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}-${2}')
+                        RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2}).*',
+                            r'${1}-${2}')
                       ])
                 ]),
           ],

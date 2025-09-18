@@ -28,6 +28,11 @@ class TestDocumentGroupKey {
   TestDocumentGroupKey({required this.category});
 }
 
+class DateTimeGroupKey {
+  final DateTime createdAt;
+  DateTimeGroupKey({required this.createdAt});
+}
+
 /// Group key with multiple grouping properties for complex testing
 class MultiPropertyGroupKey {
   final String category;
@@ -130,6 +135,7 @@ RdfMapper createTestMapper() {
           MockResourceMapper<ConflictingTypeA>(TestVocab.sameTypeIri))
       ..registerMapper(
           MockResourceMapper<ConflictingTypeB>(TestVocab.sameTypeIri))
+      ..registerMapper(DateTimeGroupKeyMapper())
     // Note: UnmappedType is intentionally not registered
     ,
     rdfCore: RdfCore.withStandardCodecs(),
@@ -267,6 +273,33 @@ class IriPropertyGroupKeyMapper
         .addValue(
             IriTerm.prevalidated('https://test.example/vocab#relatedDocument'),
             resource.relatedDocument.toString())
+        .build();
+  }
+}
+
+class DateTimeGroupKeyMapper implements LocalResourceMapper<DateTimeGroupKey> {
+  @override
+  IriTerm? get typeIri => null;
+
+  @override
+  DateTimeGroupKey fromRdfResource(
+      BlankNodeTerm subject, DeserializationContext context) {
+    final reader = context.reader(subject);
+    final String createdAtStr = reader.require(IriTerm(
+        'https://test.example/vocab#createdAt')); // Assuming it's a string
+    final DateTime createdAt = DateTime.parse(createdAtStr);
+    return DateTimeGroupKey(createdAt: createdAt);
+  }
+
+  @override
+  (BlankNodeTerm, Iterable<Triple>) toRdfResource(
+      DateTimeGroupKey resource, SerializationContext context,
+      {RdfSubject? parentSubject}) {
+    final subject = BlankNodeTerm();
+    return context
+        .resourceBuilder(subject)
+        .addValue(IriTerm('https://test.example/vocab#createdAt'),
+            resource.createdAt.toIso8601String())
         .build();
   }
 }
