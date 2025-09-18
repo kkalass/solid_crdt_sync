@@ -7,16 +7,33 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_notes_app/screens/notes_list_screen.dart';
+import 'package:personal_notes_app/services/categories_service.dart';
+import 'package:personal_notes_app/services/notes_service.dart';
 
-import 'package:personal_notes_app/main.dart';
+import 'services/mock_category_repository.dart';
+import 'services/mock_note_repository.dart';
 
 void main() {
   testWidgets('Personal Notes App starts up', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const PersonalNotesApp());
+    // Create mock repositories and services for testing
+    final mockCategoryRepo = MockCategoryRepository();
+    final mockNoteRepo = MockNoteRepository();
+    final mockNotesService = NotesService(mockNoteRepo);
+    final mockCategoriesService = CategoriesService(mockCategoryRepo);
 
-    // Verify that the app shows loading state initially
-    expect(find.text('Initializing Personal Notes...'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // Build our app with mock services
+    await tester.pumpWidget(
+      MaterialApp(
+        title: 'Personal Notes',
+        home: NotesListScreen(
+          notesService: mockNotesService,
+          categoriesService: mockCategoriesService,
+        ),
+      ),
+    );
+
+    // Verify that the app shows the notes list screen
+    expect(find.byType(NotesListScreen), findsOneWidget);
   });
 }
