@@ -161,12 +161,7 @@ class AppDatabase extends _$AppDatabase {
       ''');
 
           await m.database.customStatement('''
-        CREATE INDEX IF NOT EXISTS idx_note_index_entries_group 
-        ON note_index_entries(group_id);
-      ''');
-
-          await m.database.customStatement('''
-        CREATE INDEX IF NOT EXISTS idx_note_index_entries_category 
+        CREATE INDEX IF NOT EXISTS idx_note_index_entries_category
         ON note_index_entries(category_id);
       ''');
         },
@@ -184,12 +179,7 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(noteIndexEntries);
 
             await m.database.customStatement('''
-              CREATE INDEX IF NOT EXISTS idx_note_index_entries_group 
-              ON note_index_entries(group_id);
-            ''');
-
-            await m.database.customStatement('''
-              CREATE INDEX IF NOT EXISTS idx_note_index_entries_category 
+              CREATE INDEX IF NOT EXISTS idx_note_index_entries_category
               ON note_index_entries(category_id);
             ''');
           }
