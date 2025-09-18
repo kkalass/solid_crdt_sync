@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Reference
+
+**Architecture**: 4-layer (Data Resource → Merge Contract → Indexing → Sync Strategy)
+**CRDT Types**: LWW-Register, FWW-Register, OR-Set, 2P-Set, Immutable
+**Index Types**: FullIndex (monolithic) vs GroupIndex (partitioned), with ItemFetchPolicy (onRequest/prefetch)
+**Scale**: 2-100 installations (optimal: 2-20)
+**Key Commands**: `melos bootstrap`, `melos test`, `melos format`, `dart tool/run_tests.dart`
+**Critical Rule**: Always discuss API design before implementing
+
 ## Project Overview
 
 This is a multipackage Dart library (`solid_crdt_sync`) that enables synchronization of RDF data to Solid Pods using CRDT (Conflict-free Replicated Data Types) for local-first, interoperable applications. The library follows a state-based CRDT approach with passive storage backends.
@@ -37,9 +46,9 @@ The project is built around a **4-layer architecture** that enables local-first,
    - Group-based organization using regex transformations for hierarchical structures
 
 4. **Sync Strategy Layer**: Application-controlled synchronization patterns
-   - **FullSync**: Immediate download of all indexed resources
-   - **GroupedSync**: Selective sync of specific groups (e.g., date ranges, categories)
-   - **OnDemandSync**: Lazy loading with explicit resource requests
+   - **Index Types**: FullIndex (single index for all items) vs GroupIndex (partitioned by groups)
+   - **ItemFetchPolicy**: onRequest (on-demand) vs prefetch (eager loading)
+   - **Sharding**: Indices split into multiple shards for performance
 
 ### Core Design Principles
 
@@ -50,25 +59,10 @@ The project is built around a **4-layer architecture** that enables local-first,
 - **Semantic Preservation**: RDF semantics maintained throughout synchronization process
 - **Managed Resource Discoverability**: Self-describing system via `sync:ManagedDocument` Type Index registrations
 
-### Scale and Performance Characteristics
+### Key Constraints
 
-**Target Scale:**
-- Designed for **2-100 installations** with optimal performance at **2-20 installations**
-- Personal sync: 2-5 installations (multiple devices)
-- Family collaboration: 5-15 installations
-- Small teams: 10-20 installations
-- Small organizations: up to 100 installations
-
-**Performance Patterns:**
-- **Cold Start**: O(s) where s = number of index shards (must download all)
-- **Incremental Sync**: O(k) where k = number of changed shards
-- **Change Detection**: O(1) per shard via Hybrid Logical Clock hash comparison
-- **Bandwidth Efficiency**: Index headers provide metadata without downloading full resources
-
-**Current Scope Limitations:**
-- **Single-Pod Focus**: Designed for CRDT synchronization within one Solid Pod
-- **Multi-Pod Integration**: Cross-Pod data integration requires additional orchestration (planned for v2/v3)
-- Applications requiring data from multiple Pods need separate discovery and coordination mechanisms
+**Scale**: Designed for 2-100 installations (optimal: 2-20) - personal to small team collaboration
+**Single-Pod Focus**: CRDT synchronization within one Solid Pod (multi-Pod integration planned for v2/v3)
 
 The core philosophy is that this service acts as an "add-on" for synchronization, not a database replacement. Developers retain full control over local storage and querying.
 
@@ -210,92 +204,41 @@ When working on this codebase:
 
 ### CRDT Implementation
 
-**State-Based CRDT Algorithms:**
-- **LWW-Register (Last-Writer-Wins)**: Single-value properties where newest wins (names, timestamps, status)
-- **FWW-Register (First-Writer-Wins)**: Immutable properties where first write wins (IDs, permanent classifications)
-- **OR-Set (Observed-Remove Set)**: Multi-value properties with add/remove tracking (keywords, tags, ingredient lists)
-- **2P-Set (Two-Phase Set)**: Add-only sets with tombstone removal (prevent re-addition after removal)
-- **Immutable**: Strict framework constraint - any modification causes merge failure, forces resource versioning
-
-**Hybrid Logical Clock Mechanics:**
-- Combines logical causality tracking (tamper-proof) with physical timestamps (intuitive tie-breaking)
-- Each installation maintains monotonically increasing logical counters
-- Physical timestamps provide "most recent wins" semantics for concurrent operations
-- Clock hash comparison enables efficient change detection
-
-**Deletion and Tombstone Handling:**
-- RDF reification tombstones for property-level deletion
-- Document-level deletion via `crdt:deletedAt` triples
-- Framework deletion for system cleanup vs application soft deletion
-- Universal emptying process preserves framework metadata while removing semantic content
+**Core Algorithms**: State-based CRDTs with Hybrid Logical Clocks for causality + physical timestamp tie-breaking
+**Deletion**: RDF reification tombstones (property-level), `crdt:deletedAt` triples (document-level)
+**Performance**: O(1) change detection via clock hash comparison, efficient bandwidth usage
+**Details**: See `spec/docs/CRDT-SPECIFICATION.md` for complete algorithm specifications
 
 ### Indexing Strategy
 
-**Index Types:**
-- **FullIndex (Monolithic)**: Single index covering entire dataset, good for bounded collections
-- **GroupedIndex (Partitioned)**: Hierarchical organization using property transformations
-  - Regex-based property extraction and normalization
-  - Hierarchical group keys mapping to filesystem directories
-  - Cross-platform compatible regex subset for consistent group generation
-
-**Sharding and Performance:**
-- Sharded indices for scalable data organization (1-16 shards typical)
-- Index entries contain lightweight headers + Hybrid Logical Clock hashes
-- Change detection via shard hash comparison (O(1) per shard)
-- Minimize default indices, allow app-specific indices
-
-**Group Key Generation:**
-- Property transformations using compatible regex subset
-- Date-based grouping (year/month/day hierarchies)
-- Category-based organization
-- Cross-platform consistency ensuring identical results across installations
+**Types**: FullIndex (monolithic) vs GroupedIndex (partitioned with regex transformations)
+**Sharding**: 1-16 shards with lightweight headers, O(1) change detection per shard
+**Organization**: Hierarchical group keys for date/category-based organization
+**Details**: See `spec/docs/GROUP-INDEXING.md` and `spec/docs/SHARDING.md`
 
 ### API Design Patterns
 
-**Sync Strategy Pattern:**
-- Configurable sync behaviors (FullSync, GroupedSync, OnDemandSync)
-- Developer declares preferred approach, implementation handles discovery/creation
-- Index selection based on application needs and group subscriptions
+**Repository-Based Hydration**: Main pattern using `hydrateStreaming<T>()` with callbacks:
+- `getCurrentCursor()`: Repository provides current sync position
+- `onUpdate(item)`: Handle new/updated items from sync
+- `onDelete(item)`: Handle deleted items from sync
+- `onCursorUpdate(cursor)`: Persist new sync position
 
-**Event-Driven Architecture:**
-- Listener interfaces (IndexChangeListener, DataChangeListener)
-- `onIndexUpdate`: Notifies app with synchronized index headers
-- `onUpdate`: Provides complete merged objects for local storage
-- Clear separation between index sync and resource fetch phases
-
-**Developer Control Model:**
-- Developer controls local storage and querying completely
-- Library handles Pod communication, CRDT merging, and conflict resolution
-- `fetchFromRemote()` for explicit on-demand resource requests
-- Lazy evaluation principles minimize unnecessary work
-
-**Integration Patterns:**
-- Discovery-first approach balances Pod configuration with developer intent
-- Compatible index reuse when available, creation when needed
-- HTTP caching and change detection for bandwidth efficiency
-- Type Index integration for resource location discovery
+**Developer Control**: App controls local storage/querying via repositories, library handles CRDT merging
+**Sync Operations**: `syncSystem.save<T>(object)` and `syncSystem.deleteDocument<T>(object)` for changes
+**Index Configuration**: Configure per-resource via FullIndex or GroupIndex with ItemFetchPolicy
 
 ### Deletion Handling
 - Framework deletion is for system-level cleanup (storage optimization, retention policies)
-- Applications typically implement domain-specific soft deletion (`archived: true`, `hidden: true`) 
-- Framework APIs: `deleteDocument()` methods are syntactic sugar for adding `crdt:deletedAt` triples
-- Document-level deletion: deleting primary resource triggers cleanup of entire document
+- Applications typically implement domain-specific soft deletion (`archived: true`, `hidden: true`)
+- Document-level deletion: `deleteDocument()` performs complete CRDT deletion processing
 - Layered approach: applications can use both soft deletion (user-facing) and framework deletion (backend cleanup)
 
 ## Testing Approach
 
-This project uses Dart's built-in `test` package with comprehensive coverage across all architectural layers:
-
-**Test Coverage Areas:**
-- CRDT algorithm implementations (LWW-Register, OR-Set, FWW-Register, Immutable, 2P-Set)
-- Hybrid Logical Clock mechanics and causality determination
-- Index management and sharding strategies
-- Group key generation and regex transformations
-- Merge contract resolution and property mapping
-- Sync strategy implementations and performance characteristics
-- Error handling and graceful degradation patterns
-
-Run the comprehensive test suite with coverage using the provided tool script: `dart tool/run_tests.dart`
+Uses Dart's built-in `test` package with comprehensive coverage across all architectural layers.
+**Key Areas**: CRDT algorithms, HLC mechanics, indexing/sharding, merge contracts, sync strategies, error handling
+**Run Tests**: `dart tool/run_tests.dart` (with coverage) or `melos test` (all packages)
 
 ## Code Style
 
