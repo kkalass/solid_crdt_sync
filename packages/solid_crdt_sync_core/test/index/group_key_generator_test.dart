@@ -358,6 +358,208 @@ void main() {
       });
     });
 
+    group('cartesian product generation', () {
+      test('generates cartesian product from multiple properties with multiple values', () {
+        // Test the core Cartesian product functionality as specified in ARCHITECTURE.md 5.3.3
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate), // Multiple values: work, personal
+            GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+                transforms: [
+                  RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}-${2}'),
+                ]), // Multiple values: 2024-08, 2024-09
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          // Two category values
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('work')),
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('personal')),
+          // Two date values
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-08-15')),
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-09-20')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Should generate 2x2 = 4 combinations
+        // Lexicographic IRI ordering: category < dateCreated
+        expect(
+            result,
+            equals({
+              'work-2024-08',
+              'work-2024-09',
+              'personal-2024-08',
+              'personal-2024-09'
+            }));
+      });
+
+      test('generates cartesian product across hierarchy levels', () {
+        final priorityPredicate = IriTerm.prevalidated('http://example.org/priority');
+
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            // Level 1: Two properties, each with multiple values
+            GroupingProperty(categoryPredicate, hierarchyLevel: 1),
+            GroupingProperty(priorityPredicate, hierarchyLevel: 1),
+            // Level 2: One property with multiple values
+            GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+                hierarchyLevel: 2,
+                transforms: [
+                  RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}'),
+                ]),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          // Two categories
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('work')),
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('personal')),
+          // Two priorities
+          Triple(testSubject, priorityPredicate, LiteralTerm.string('high')),
+          Triple(testSubject, priorityPredicate, LiteralTerm.string('low')),
+          // Two years
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2023-08-15')),
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-08-15')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Should generate 2x2x2 = 8 combinations
+        // Level 1: category-priority (lexicographic: category < priority)
+        // Level 2: year
+        expect(
+            result,
+            equals({
+              'work-high/2023',
+              'work-high/2024',
+              'work-low/2023',
+              'work-low/2024',
+              'personal-high/2023',
+              'personal-high/2024',
+              'personal-low/2023',
+              'personal-low/2024',
+            }));
+      });
+
+      test('handles cartesian product with missing values', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate, missingValue: 'default'),
+            GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
+                transforms: [
+                  RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}-${2}'),
+                ]),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          // No category (will use missing value)
+          // Two dates
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-08-15')),
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-09-20')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Should generate 1x2 = 2 combinations using missing value
+        expect(
+            result,
+            equals({
+              'default-2024-08',
+              'default-2024-09',
+            }));
+      });
+    });
+
+    group('deduplication and edge cases', () {
+      test('deduplicates identical group keys from different transform paths', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(
+              categoryPredicate,
+              transforms: [
+                RegexTransform(r'^work-(.+)$', r'${1}'), // Transform 1
+                RegexTransform(r'^(.+)-project$', r'${1}'), // Transform 2
+              ],
+            ),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          // These should both transform to 'alpha'
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('work-alpha')),
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('alpha-project')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Should deduplicate to single 'alpha' result
+        expect(result, equals({'alpha'}));
+      });
+
+      test('handles different datatypes with same string representation', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(SchemaNoteDigitalDocument.dateCreated),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          // Different RDF datatypes but same string content
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('42')),
+          Triple(
+              testSubject,
+              SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm('42',
+                  datatype: IriTerm.prevalidated(
+                      'http://www.w3.org/2001/XMLSchema#integer'))),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Should deduplicate based on string representation
+        expect(result, equals({'42'}));
+      });
+
+      test('handles literals with language tags', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(
+              testSubject,
+              categoryPredicate,
+              LiteralTerm('travail', language: 'fr')), // French
+          Triple(
+              testSubject,
+              categoryPredicate,
+              LiteralTerm('work', language: 'en')), // English
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Should use string content, ignoring language tags
+        expect(result, equals({'travail', 'work'}));
+      });
+    });
+
     group('multiple triples handling', () {
       test(
           'generates multiple group keys when multiple property values present',
