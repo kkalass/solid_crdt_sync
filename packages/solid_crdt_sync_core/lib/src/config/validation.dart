@@ -26,13 +26,13 @@ class ValidationResult {
       Map<String, Object> contextDetails, ValidationResult result) {
     // Add transform validation errors to the overall result
     for (final error in result.errors) {
-      result.addError('$contextMessage: ${error.message}',
+      addError('$contextMessage: ${error.message}',
           context: {...contextDetails, 'subvalidation_error': error});
     }
 
     // Add transform validation warnings
     for (final warning in result.warnings) {
-      result.addWarning('$contextMessage: ${warning.message}',
+      addWarning('$contextMessage: ${warning.message}',
           context: {...contextDetails, 'subvalidation_warning': warning});
     }
   }

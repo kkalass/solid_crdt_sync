@@ -44,10 +44,8 @@ class GroupIndexSubscriptionManager {
   /// - The GroupIndex configuration has valid group key generators
   ///
   /// Returns the set of group identifiers generated from the group key.
-  Future<Set<String>> subscribeToGroupIndex<G>(
-    G groupKey,
-    String localName,
-  ) async {
+  Future<Set<String>> subscribeToGroupIndex<G>(G groupKey,
+      {String localName = defaultIndexLocalName}) async {
     // Step 1: Find the GroupIndex configuration for type G and localName
     final groupIndexConfig = _findGroupIndexConfig<G>(localName);
     if (groupIndexConfig == null) {

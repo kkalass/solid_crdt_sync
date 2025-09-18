@@ -14,7 +14,6 @@ void main() {
     group('basic functionality', () {
       test('generates simple group key from single property', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -39,7 +38,6 @@ void main() {
 
       test('generates group key without transforms', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(categoryPredicate),
@@ -57,7 +55,6 @@ void main() {
 
       test('returns null when required property is missing', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(SchemaNoteDigitalDocument.dateCreated),
@@ -76,7 +73,6 @@ void main() {
 
       test('uses missing value when property is absent', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -101,7 +97,6 @@ void main() {
     group('hierarchical grouping', () {
       test('generates hierarchical group key with multiple levels', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -135,7 +130,6 @@ void main() {
 
       test('handles multiple properties at the same hierarchy level', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -169,7 +163,6 @@ void main() {
 
       test('processes hierarchy levels in correct order', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -210,7 +203,6 @@ void main() {
     group('regex transform integration', () {
       test('applies multiple transforms in order - first match wins', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -244,7 +236,6 @@ void main() {
 
       test('handles complex transform patterns from specification', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -279,7 +270,6 @@ void main() {
 
       test('uses original value when no transforms match', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -305,7 +295,6 @@ void main() {
     group('RDF term type handling', () {
       test('handles IRI objects', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -329,7 +318,6 @@ void main() {
 
       test('handles literal with datatype', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -354,7 +342,6 @@ void main() {
 
       test('returns null for blank node objects', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(categoryPredicate),
@@ -376,7 +363,6 @@ void main() {
           'generates multiple group keys when multiple property values present',
           () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(categoryPredicate),
@@ -401,7 +387,6 @@ void main() {
 
       test('handles mixed relevant and irrelevant triples', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -434,7 +419,6 @@ void main() {
     group('edge cases and error handling', () {
       test('handles empty triples list', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(categoryPredicate),
@@ -449,7 +433,6 @@ void main() {
 
       test('handles empty triples list with missing values', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -470,7 +453,6 @@ void main() {
         // The constructor should throw an assertion error for empty grouping properties
         expect(
             () => GroupIndex(
-                  String, // dartType
                   String, // groupKeyType
                   groupingProperties: [], // This will fail assertion
                 ),
@@ -479,7 +461,6 @@ void main() {
 
       test('handles mixed missing and present properties', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(
@@ -513,7 +494,6 @@ void main() {
     group('performance and efficiency', () {
       test('efficiently organizes extractors by level', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(categoryPredicate, hierarchyLevel: 2),
@@ -548,7 +528,6 @@ void main() {
         final zProperty = IriTerm.prevalidated('http://example.org/z');
 
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             // Intentionally declare in reverse alphabetical order
@@ -570,7 +549,6 @@ void main() {
 
       test('reuses compiled regex patterns', () {
         final config = GroupIndex(
-          String, // dartType
           String, // groupKeyType
           groupingProperties: [
             GroupingProperty(

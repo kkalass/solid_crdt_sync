@@ -34,10 +34,9 @@ class IndexItem {
   const IndexItem(this.itemType, this.properties);
 }
 
+/// The Dart type being indexed (e.g., Note - the source data type) is inferred from the ResourceConfig
+/// which contains this index configuration.
 sealed class CrdtIndexConfig {
-  /// The Dart type being indexed (e.g., Note - the source data type)
-  Type get dartType;
-
   /// Local name for referencing this index within the app (not used in Pod structure)
   /// Defaults to [defaultIndexLocalName]. Must be unique per index item type
   /// across all resources (e.g., if multiple resources use NoteIndexEntry,
@@ -64,10 +63,6 @@ sealed class CrdtIndexConfig {
 /// Groups data by time periods or other criteria for efficient partial sync.
 /// Example: Group notes by year-month for scalable historical data handling.
 class GroupIndex extends CrdtIndexConfig {
-  /// The Dart type being indexed (e.g., Note)
-  @override
-  final Type dartType;
-
   final Type groupKeyType;
 
   /// Local name for referencing this index within the app (not used in Pod structure)
@@ -86,7 +81,6 @@ class GroupIndex extends CrdtIndexConfig {
   final List<GroupingProperty> groupingProperties;
 
   const GroupIndex(
-    this.dartType,
     this.groupKeyType, {
     this.localName = defaultIndexLocalName,
     this.defaultIndexPath,
@@ -101,10 +95,6 @@ class GroupIndex extends CrdtIndexConfig {
 /// Creates a single index covering an entire dataset for bounded collections.
 /// Example: All user contacts, recipe collection, document library.
 class FullIndex extends CrdtIndexConfig {
-  /// The Dart type being indexed (e.g., Contact)
-  @override
-  final Type dartType;
-
   /// Local name for referencing this index within the app (not used in Pod structure)
   @override
   final String localName;
@@ -119,8 +109,7 @@ class FullIndex extends CrdtIndexConfig {
 
   final ItemFetchPolicy itemFetchPolicy;
 
-  const FullIndex(
-    this.dartType, {
+  const FullIndex({
     this.localName = defaultIndexLocalName,
     this.defaultIndexPath,
     this.item,

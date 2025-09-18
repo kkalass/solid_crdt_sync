@@ -8,8 +8,6 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 class TestVocab {
   static const baseIri = 'https://test.example/vocab#';
   static const testDocument = IriTerm.prevalidated('${baseIri}TestDocument');
-  static const testDocumentGroupKey =
-      IriTerm.prevalidated('${baseIri}TestDocumentGroupKey');
   static const testCategory = IriTerm.prevalidated('${baseIri}TestCategory');
   static const testNote = IriTerm.prevalidated('${baseIri}TestNote');
   static const note = IriTerm.prevalidated('${baseIri}Note');
@@ -28,6 +26,30 @@ class TestDocument {
 class TestDocumentGroupKey {
   final String category;
   TestDocumentGroupKey({required this.category});
+}
+
+/// Group key with multiple grouping properties for complex testing
+class MultiPropertyGroupKey {
+  final String category;
+  final String priority;
+  final String department;
+  MultiPropertyGroupKey({
+    required this.category,
+    required this.priority,
+    required this.department,
+  });
+}
+
+/// Group key with IRI properties to test filesystem safety
+class IriPropertyGroupKey {
+  final String category;
+  final Uri resourceIri;
+  final Uri relatedDocument;
+  IriPropertyGroupKey({
+    required this.category,
+    required this.resourceIri,
+    required this.relatedDocument,
+  });
 }
 
 /// Test category model
@@ -97,8 +119,9 @@ RdfMapper createTestMapper() {
   return RdfMapper(
     registry: RdfMapperRegistry()
       ..registerMapper(MockResourceMapper<TestDocument>(TestVocab.testDocument))
-      ..registerMapper(MockResourceMapper<TestDocumentGroupKey>(
-          TestVocab.testDocumentGroupKey))
+      ..registerMapper(TestDocumentGroupKeyMapper())
+      ..registerMapper(MultiPropertyGroupKeyMapper())
+      ..registerMapper(IriPropertyGroupKeyMapper())
       ..registerMapper(MockResourceMapper<TestCategory>(TestVocab.testCategory))
       ..registerMapper(MockResourceMapper<TestNote>(TestVocab.testNote))
       ..registerMapper(MockResourceMapper<Note>(TestVocab.note))
@@ -143,5 +166,107 @@ class MockResourceMapper<T> implements GlobalResourceMapper<T> {
       T value, SerializationContext context,
       {RdfSubject? parentSubject}) {
     throw UnimplementedError();
+  }
+}
+
+class TestDocumentGroupKeyMapper
+    implements LocalResourceMapper<TestDocumentGroupKey> {
+  @override
+  IriTerm? get typeIri => null;
+
+  @override
+  TestDocumentGroupKey fromRdfResource(
+      BlankNodeTerm subject, DeserializationContext context) {
+    final reader = context.reader(subject);
+    final String category =
+        reader.require(TestVocab.testCategory); // Assuming it's a string
+    return TestDocumentGroupKey(category: category);
+  }
+
+  @override
+  (BlankNodeTerm, Iterable<Triple>) toRdfResource(
+      TestDocumentGroupKey resource, SerializationContext context,
+      {RdfSubject? parentSubject}) {
+    final subject = BlankNodeTerm();
+    return context
+        .resourceBuilder(subject)
+        .addValue(TestVocab.testCategory, resource.category)
+        .build();
+  }
+}
+
+class MultiPropertyGroupKeyMapper
+    implements LocalResourceMapper<MultiPropertyGroupKey> {
+  @override
+  IriTerm? get typeIri => null;
+
+  @override
+  MultiPropertyGroupKey fromRdfResource(
+      BlankNodeTerm subject, DeserializationContext context) {
+    final reader = context.reader(subject);
+    final String category = reader.require(TestVocab.testCategory);
+    final String priority = reader.require(IriTerm.prevalidated(
+        'https://test.example/vocab#priority')); // Assuming it's a string
+    final String department = reader.require(IriTerm.prevalidated(
+        'https://test.example/vocab#department')); // Assuming it's a string
+    return MultiPropertyGroupKey(
+      category: category,
+      priority: priority,
+      department: department,
+    );
+  }
+
+  @override
+  (BlankNodeTerm, Iterable<Triple>) toRdfResource(
+      MultiPropertyGroupKey resource, SerializationContext context,
+      {RdfSubject? parentSubject}) {
+    final subject = BlankNodeTerm();
+    return context
+        .resourceBuilder(subject)
+        .addValue(TestVocab.testCategory, resource.category)
+        .addValue(IriTerm.prevalidated('https://test.example/vocab#priority'),
+            resource.priority)
+        .addValue(IriTerm.prevalidated('https://test.example/vocab#department'),
+            resource.department)
+        .build();
+  }
+}
+
+class IriPropertyGroupKeyMapper
+    implements LocalResourceMapper<IriPropertyGroupKey> {
+  @override
+  IriTerm? get typeIri => null;
+
+  @override
+  IriPropertyGroupKey fromRdfResource(
+      BlankNodeTerm subject, DeserializationContext context) {
+    final reader = context.reader(subject);
+    final String category = reader.require(TestVocab.testCategory);
+    final Uri resourceIri = Uri.parse(reader.require(
+        IriTerm.prevalidated('https://test.example/vocab#resourceIri')));
+    final Uri relatedDocument = Uri.parse(reader.require(
+        IriTerm.prevalidated('https://test.example/vocab#relatedDocument')));
+    return IriPropertyGroupKey(
+      category: category,
+      resourceIri: resourceIri,
+      relatedDocument: relatedDocument,
+    );
+  }
+
+  @override
+  (BlankNodeTerm, Iterable<Triple>) toRdfResource(
+      IriPropertyGroupKey resource, SerializationContext context,
+      {RdfSubject? parentSubject}) {
+    final subject = BlankNodeTerm();
+    return context
+        .resourceBuilder(subject)
+        .addValue(TestVocab.testCategory, resource.category)
+        .addValue(
+            IriTerm.prevalidated('https://test.example/vocab#resourceIri'),
+            resource.resourceIri.toString())
+        .addValue(
+            IriTerm.prevalidated('https://test.example/vocab#relatedDocument'),
+            resource.relatedDocument.toString())
+        .build();
   }
 }

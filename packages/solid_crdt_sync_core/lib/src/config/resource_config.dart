@@ -94,10 +94,25 @@ class SyncConfig {
     }
   }
 
+  /// Validates an IRI string by attempting to construct an IriTerm from it.
+  /// Adds an error to the ValidationResult if the IRI is invalid.
+  static void _validateIri(String iri, ValidationResult result, String context,
+      {Map<String, Object>? contextData}) {
+    try {
+      IriTerm(iri);
+    } catch (e) {
+      result.addError('$context: Invalid IRI "$iri" - $e', context: {
+        'iri': iri,
+        'validation_error': e.toString(),
+        ...?contextData,
+      });
+    }
+  }
+
   /// Validate this configuration for consistency and correctness.
   ValidationResult validate(
     Map<Type, IriTerm> resourceTypeCache, {
-    RdfMapper? mapper,
+    required RdfMapper mapper,
   }) {
     final result = ValidationResult();
 
@@ -105,9 +120,8 @@ class SyncConfig {
     _validateDefaultPaths(result);
     _validateCrdtMappings(result);
     _validateIndexConfigurations(result);
-    if (mapper != null) {
-      _validateMapperTypes(result, mapper);
-    }
+
+    _validateMapperTypes(result, mapper);
 
     return result;
   }
@@ -279,21 +293,80 @@ class SyncConfig {
               .putIfAbsent(combinationKey, () => [])
               .add((resource.type, index.localName));
 
-          // Validate regex transforms in grouping properties
+          // Validate grouping properties
           for (final property in index.groupingProperties) {
+            // Validate predicate IRI
+            _validateIri(
+              property.predicate.iri,
+              result,
+              'GroupingProperty predicate for ${resource.type}',
+              contextData: {
+                'type': resource.type,
+                'property': property.predicate.iri,
+                'index': index,
+              },
+            );
+
+            // Check for zero or negative hierarchy levels
+            if (property.hierarchyLevel <= 0) {
+              result.addError(
+                  'GroupingProperty hierarchy level must be positive for ${resource.type}. Got: ${property.hierarchyLevel}',
+                  context: {
+                    'type': resource.type,
+                    'property': property.predicate.iri,
+                    'hierarchyLevel': property.hierarchyLevel,
+                    'index': index,
+                  });
+            }
+
+            // Check for empty missing value
+            if (property.missingValue != null &&
+                property.missingValue!.isEmpty) {
+              result.addError(
+                  'GroupingProperty missing value cannot be empty for ${resource.type}. Use null to indicate no default value.',
+                  context: {
+                    'type': resource.type,
+                    'property': property.predicate.iri,
+                    'missingValue': property.missingValue,
+                    'index': index,
+                  });
+            }
+
+            // Validate regex transforms
             if (property.transforms != null &&
                 property.transforms!.isNotEmpty) {
               final transformValidationResult =
                   RegexTransformValidator.validateList(property.transforms!);
               result.addSubvalidationResult(
-                  'Regex transform in grouping property '
-                  '${property.predicate.iri} for ${resource.type}',
+                  '[${resource.type}][Grouping][${property.predicate.iri}]',
                   {
                     'type': resource.type,
                     'property': property.predicate.iri,
                     'index': index,
                   },
                   transformValidationResult);
+            }
+          }
+
+          // Check for hierarchy level gaps
+          final hierarchyLevels = index.groupingProperties
+              .map((p) => p.hierarchyLevel)
+              .toSet()
+              .toList()
+            ..sort();
+
+          for (int i = 1; i < hierarchyLevels.length; i++) {
+            if (hierarchyLevels[i] - hierarchyLevels[i - 1] > 1) {
+              result.addWarning(
+                  'Hierarchy level gap detected in GroupIndex for ${resource.type}: '
+                  'level ${hierarchyLevels[i - 1]} is followed by ${hierarchyLevels[i]}. '
+                  'Consider using consecutive hierarchy levels for better organization.',
+                  context: {
+                    'type': resource.type,
+                    'gap_before': hierarchyLevels[i - 1],
+                    'gap_after': hierarchyLevels[i],
+                    'index': index,
+                  });
             }
           }
         }
@@ -344,7 +417,7 @@ class SyncConfig {
       requiredTypes.add(resource.type);
     }
 
-    // Add all index item types
+    // Add all index item types and groupKeyTypes
     for (final resource in resources) {
       for (final index in resource.indices) {
         if (index.item != null) {
@@ -358,33 +431,37 @@ class SyncConfig {
       }
     }
 
-    // Check if mapper can handle each required type by attempting a simple operation
+    // Check if mapper can handle each required type
     for (final type in requiredTypes) {
-      try {
-        // Try to get serializers for the type - this will throw if not registered
-        // We use a simple approach: try to create an empty graph and see if we can decode it
-        final emptyGraph = RdfGraph.fromTriples([]);
+      // Skip primitive types like String - they're not mappable types
+      if (type == String || type == int || type == double || type == bool) {
+        result.addError(
+            'Type $type is a primitive type and cannot be used as a mappable resource, groupKey, or itemType. '
+            'Use proper RDF-mapped classes instead.',
+            context: {'type': type});
+        continue;
+      }
 
-        // This test tries to decode an empty graph to the target type
-        // If the type is not registered, this should throw an exception
-        try {
-          switch (type) {
-            case const (String):
-              // String is a primitive type, always supported
-              break;
-            default:
-              // For complex types, try to decode an empty graph
-              // This will fail if the type is not registered
-              mapper.graph.decodeObject<Object>(emptyGraph);
+      // Try to get a serializer for the type - this is the definitive test
+      try {
+        final serializer = mapper.registry.getResourceSerializerByType(type);
+        if (serializer.typeIri != null) {
+          var hasDeserializer = mapper.registry
+                  .hasGlobalResourceDeserializerForType(serializer.typeIri!) ||
+              mapper.registry
+                  .hasGlobalResourceDeserializerForType(serializer.typeIri!);
+          if (!hasDeserializer) {
+            result.addError(
+                'Type $type has a serializer but no deserializer registered in RdfMapper. '
+                'Ensure the type is properly annotated with @PodResource, @RdfGlobalResource or @RdfLocalResource - or a mapper is implemented and registered manually.',
+                context: {'type': type, 'typeIri': serializer.typeIri});
           }
-        } catch (e) {
-          // If decoding fails, it likely means the type is not registered
-          result.addWarning(
-              'Type $type may not be properly registered in RdfMapper. '
-              'Ensure the type is properly annotated and the mapper is initialized with all required types. '
-              'This validation is best-effort and may produce false positives.',
-              context: {'type': type, 'decode_error': e.toString()});
         }
+      } on SerializerNotFoundException {
+        result.addError(
+            'Type $type is not registered in RdfMapper. '
+            'Ensure the type is properly annotated with @PodResource, @RdfGlobalResource or @RdfLocalResource - or a mapper is implemented and registered manually.',
+            context: {'type': type});
       } catch (e) {
         result.addWarning(
             'Could not verify mapper registration for type $type: $e',

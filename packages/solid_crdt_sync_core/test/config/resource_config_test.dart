@@ -23,9 +23,8 @@ void main() {
 
     test('should create ResourceConfig with indices', () {
       final indices = [
-        FullIndex(TestDocument, localName: 'documents'),
+        FullIndex(localName: 'documents'),
         GroupIndex(
-          TestDocument,
           TestDocumentGroupKey,
           localName: 'documents-by-category',
           item: IndexItem(TestDocument, {}),
@@ -64,7 +63,7 @@ void main() {
     test(
         'should create ResourceConfig with single index using named constructor',
         () {
-      final index = FullIndex(TestDocument, localName: 'documents');
+      final index = FullIndex(localName: 'documents');
 
       final config = ResourceConfig.withSingleIndex(
         type: TestDocument,
@@ -102,8 +101,8 @@ void main() {
     });
 
     test('should get all indices across all resources', () {
-      final docIndex = FullIndex(TestDocument, localName: 'documents');
-      final categoryIndex = FullIndex(TestCategory, localName: 'categories');
+      final docIndex = FullIndex(localName: 'documents');
+      final categoryIndex = FullIndex(localName: 'categories');
 
       final config = SyncConfig(
         resources: [

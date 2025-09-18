@@ -136,7 +136,6 @@ void main() {
       final indexItem =
           IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       final index = FullIndex(
-        TestNote,
         localName: 'title-index',
         item: indexItem,
       );
@@ -185,7 +184,6 @@ void main() {
       final indexItem =
           IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       final index = FullIndex(
-        TestNote,
         localName: 'title-index',
         item: indexItem,
       );
@@ -222,7 +220,6 @@ void main() {
       final indexItem =
           IndexItem(String, {IriTerm('http://example.org/title')});
       final index = FullIndex(
-        TestNote,
         localName: 'unregistered-index',
         item: indexItem,
       );
@@ -251,7 +248,6 @@ void main() {
 
     test('should handle index with null item', () {
       final index = FullIndex(
-        TestNote,
         localName: 'null-item-index',
         item: null,
       );
@@ -282,13 +278,11 @@ void main() {
           IndexItem(String, {IriTerm('http://example.org/content')});
 
       final titleIndex = FullIndex(
-        TestNote,
         localName: 'title-index',
         item: titleIndexItem,
       );
 
       final contentIndex = FullIndex(
-        TestNote,
         localName: 'content-index',
         item: contentIndexItem,
       );
@@ -325,7 +319,6 @@ void main() {
       final indexItem =
           IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       final index = FullIndex(
-        TestNote,
         localName: 'title-index',
         item: indexItem,
       );

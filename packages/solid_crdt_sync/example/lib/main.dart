@@ -12,7 +12,6 @@ import 'package:flutter/material.dart';
 import 'package:personal_notes_app/init_rdf_mapper.g.dart';
 import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
-import 'package:personal_notes_app/models/note_group_key.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
 import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
@@ -21,8 +20,8 @@ import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
 
 import 'screens/notes_list_screen.dart';
-import 'services/notes_service.dart';
 import 'services/categories_service.dart';
+import 'services/notes_service.dart';
 import 'storage/database.dart' show AppDatabase;
 import 'storage/repositories.dart' show CategoryRepository, NoteRepository;
 
@@ -58,11 +57,9 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
         // Configure Note resource with grouping index by category
         ResourceConfig(
           type: Note,
-          defaultResourcePath: '/data/notes',
           crdtMapping: Uri.parse('$baseUrl/note-v1.ttl'),
           indices: [
-            GroupIndex(Note, NoteGroupKey,
-                defaultIndexPath: '/index/notes',
+            GroupIndex(Note,
                 item: IndexItem(NoteIndexEntry, {
                   SchemaNoteDigitalDocument.name,
                   SchemaNoteDigitalDocument.dateCreated,
@@ -83,13 +80,8 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
         // Configure Category resource with full index
         ResourceConfig(
           type: Category,
-          defaultResourcePath: '/data/categories',
           crdtMapping: Uri.parse('$baseUrl/category-v1.ttl'),
-          indices: [
-            FullIndex(Category,
-                defaultIndexPath: '/index/categories',
-                itemFetchPolicy: ItemFetchPolicy.prefetch)
-          ],
+          indices: [FullIndex(itemFetchPolicy: ItemFetchPolicy.prefetch)],
         ),
       ],
     ),

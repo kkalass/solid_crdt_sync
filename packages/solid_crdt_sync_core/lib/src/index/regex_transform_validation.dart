@@ -33,8 +33,8 @@ class RegexTransformValidator {
   static ValidationResult validate(RegexTransform transform) {
     final result = ValidationResult();
 
-    _validatePattern(transform.pattern, result);
-    _validateReplacement(transform.replacement, result);
+    final captureGroupCount = _validatePattern(transform.pattern, result);
+    _validateReplacement(transform.replacement, result, captureGroupCount);
 
     return result;
   }
@@ -45,10 +45,10 @@ class RegexTransformValidator {
     return ValidationResult.merge(results);
   }
 
-  static void _validatePattern(String pattern, ValidationResult result) {
+  static int _validatePattern(String pattern, ValidationResult result) {
     if (pattern.isEmpty) {
       result.addError('RegexTransform pattern cannot be empty');
-      return;
+      return 0;
     }
 
     // Check for forbidden alternation using pattern matching
@@ -68,8 +68,8 @@ class RegexTransformValidator {
       );
     }
 
-    // Check for proper escaping and structural issues first
-    _validatePatternStructure(pattern, result);
+    // Check for proper escaping and structural issues first, and count capture groups
+    final captureGroupCount = _validatePatternStructure(pattern, result);
 
     // Then validate that the pattern can be compiled as a regex if structure is OK
     if (result.errors.isEmpty) {
@@ -82,10 +82,12 @@ class RegexTransformValidator {
         );
       }
     }
+
+    return captureGroupCount;
   }
 
   static void _validateReplacement(
-      String replacement, ValidationResult result) {
+      String replacement, ValidationResult result, int captureGroupCount) {
     if (replacement.isEmpty) {
       result.addError('RegexTransform replacement cannot be empty');
       return;
@@ -107,7 +109,7 @@ class RegexTransformValidator {
       );
     }
 
-    // Validate all backreferences are valid numbers
+    // Validate all backreferences are valid numbers and exist in the pattern
     final anyBraceMatches = _anyBracePattern.allMatches(replacement);
     for (final match in anyBraceMatches) {
       final groupStr = match.group(1)!;
@@ -117,17 +119,27 @@ class RegexTransformValidator {
           'RegexTransform replacement contains invalid backreference \${$groupStr}',
           context: replacement,
         );
+      } else if (groupStr.isNotEmpty) {
+        // Check if the group number exists in the pattern
+        final groupNum = int.parse(groupStr);
+        if (groupNum > captureGroupCount) {
+          result.addError(
+            'RegexTransform replacement references capture group \${$groupStr} but pattern only has $captureGroupCount capture groups',
+            context: replacement,
+          );
+        }
       }
     }
   }
 
-  static void _validatePatternStructure(
+  static int _validatePatternStructure(
       String pattern, ValidationResult result) {
-    // Validate escape sequences and bracket matching
+    // Validate escape sequences and bracket matching, and count capture groups
     var bracketDepth = 0;
     var parenDepth = 0;
     var braceDepth = 0;
     var inCharClass = false;
+    var captureGroupCount = 0;
 
     for (int i = 0; i < pattern.length; i++) {
       final char = pattern[i];
@@ -140,7 +152,7 @@ class RegexTransformValidator {
               'RegexTransform pattern ends with incomplete escape sequence',
               context: pattern,
             );
-            return;
+            return 0;
           }
 
           final nextChar = pattern[i + 1];
@@ -168,7 +180,18 @@ class RegexTransformValidator {
           }
 
         case '(':
-          if (!inCharClass) parenDepth++;
+          if (!inCharClass) {
+            parenDepth++;
+            // Check if this is a capture group (not a non-capturing group)
+            if (i + 2 < pattern.length &&
+                pattern[i + 1] == '?' &&
+                pattern[i + 2] == ':') {
+              // This is a non-capturing group (?:...), don't count it
+            } else {
+              // This is a capturing group
+              captureGroupCount++;
+            }
+          }
 
         case ')':
           if (!inCharClass) {
@@ -178,7 +201,7 @@ class RegexTransformValidator {
                 'RegexTransform pattern contains unmatched closing parenthesis',
                 context: pattern,
               );
-              return;
+              return 0;
             }
           }
 
@@ -193,7 +216,7 @@ class RegexTransformValidator {
                 'RegexTransform pattern contains unmatched closing brace',
                 context: pattern,
               );
-              return;
+              return 0;
             }
           }
       }
@@ -218,5 +241,7 @@ class RegexTransformValidator {
         context: pattern,
       );
     }
+
+    return captureGroupCount;
   }
 }
