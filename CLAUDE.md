@@ -17,12 +17,58 @@ The project is organized as a monorepo with the following packages:
 
 ## Key Architecture Concepts
 
-The project is built around a **4-layer architecture**:
+The project is built around a **4-layer architecture** that enables local-first, collaborative, and truly interoperable applications using Solid Pods as synchronization backends:
+
+### 4-Layer Architecture
 
 1. **Data Resource Layer**: Individual RDF resources with clean, standard vocabularies
-2. **Merge Contract Layer**: Public rules defining CRDT merge behavior via `sync:` and `crdt:` vocabularies  
-3. **Indexing Layer**: Optional performance layer using sharded indices with `idx:` vocabulary
-4. **Sync Strategy Layer**: Client-side strategies (FullSync, PartitionedSync, OnDemandSync)
+   - Clean RDF using standard vocabularies (schema.org, custom vocabularies)
+   - Fragment identifiers (#it) to distinguish "things" from documents
+   - Self-contained resources with semantic IRIs
+
+2. **Merge Contract Layer**: Public CRDT rules for conflict resolution
+   - Declarative property-to-CRDT mappings via `sync:` and `crdt:` vocabularies
+   - Public, discoverable merge contracts for cross-application interoperability
+   - Property-level merge strategies (LWW-Register, OR-Set, Immutable, etc.)
+
+3. **Indexing Layer**: Performance optimization through sharded indices
+   - Sharded indices with `idx:` vocabulary for scalable data organization
+   - Supports both monolithic (`idx:RootIndex`) and partitioned (`idx:PartitionedIndex`) indices
+   - Group-based organization using regex transformations for hierarchical structures
+
+4. **Sync Strategy Layer**: Application-controlled synchronization patterns
+   - **FullSync**: Immediate download of all indexed resources
+   - **GroupedSync**: Selective sync of specific groups (e.g., date ranges, categories)
+   - **OnDemandSync**: Lazy loading with explicit resource requests
+
+### Core Design Principles
+
+- **Local-First**: Fully functional offline with cached data, optional partial sync for large datasets
+- **State-Based CRDTs**: Synchronizes complete resource states (not operations) using property-specific algorithms
+- **Hybrid Logical Clocks**: Combines logical causality tracking with physical timestamps for tamper-resistant ordering
+- **Passive Storage Integration**: Works with Solid Pods as simple storage buckets, all logic client-side
+- **Semantic Preservation**: RDF semantics maintained throughout synchronization process
+- **Managed Resource Discoverability**: Self-describing system via `sync:ManagedDocument` Type Index registrations
+
+### Scale and Performance Characteristics
+
+**Target Scale:**
+- Designed for **2-100 installations** with optimal performance at **2-20 installations**
+- Personal sync: 2-5 installations (multiple devices)
+- Family collaboration: 5-15 installations
+- Small teams: 10-20 installations
+- Small organizations: up to 100 installations
+
+**Performance Patterns:**
+- **Cold Start**: O(s) where s = number of index shards (must download all)
+- **Incremental Sync**: O(k) where k = number of changed shards
+- **Change Detection**: O(1) per shard via Hybrid Logical Clock hash comparison
+- **Bandwidth Efficiency**: Index headers provide metadata without downloading full resources
+
+**Current Scope Limitations:**
+- **Single-Pod Focus**: Designed for CRDT synchronization within one Solid Pod
+- **Multi-Pod Integration**: Cross-Pod data integration requires additional orchestration (planned for v2/v3)
+- Applications requiring data from multiple Pods need separate discovery and coordination mechanisms
 
 The core philosophy is that this service acts as an "add-on" for synchronization, not a database replacement. Developers retain full control over local storage and querying.
 
@@ -52,16 +98,34 @@ The core philosophy is that this service acts as an "add-on" for synchronization
 ## Key Files and Structure
 
 ### Core Documentation
-- `spec/docs/ARCHITECTURE.md` - Detailed 4-layer architecture explanation with RDF examples
+- `spec/docs/ARCHITECTURE.md` - Complete architectural specification with 4-layer model, CRDT algorithms, and implementation guidance
+- `spec/docs/CRDT-SPECIFICATION.md` - Detailed CRDT algorithms, Hybrid Logical Clock mechanics, and merge procedures
+- `spec/docs/GROUP-INDEXING.md` - Group indexing system with regex transformations and hierarchical organization
+- `spec/docs/PERFORMANCE.md` - Performance analysis, benchmarks, and optimization guidance
+- `spec/docs/ERROR-HANDLING.md` - Comprehensive error handling and graceful degradation patterns
+- `spec/docs/SHARDING.md` - Index sharding strategies and filesystem mapping
+- `spec/docs/FUTURE-TOPICS.md` - Roadmap for multi-Pod integration and advanced features
 
-### RDF Vocabularies
+### RDF Vocabularies and Specifications
+
+**Core Vocabularies:**
 - `vocabularies/` - Custom RDF vocabularies:
-  - `crdt-algorithms.ttl` - CRDT merge algorithms (`algo:` namespace: LWW-Register, OR-Set, etc.)
-  - `crdt-mechanics.ttl` - Framework infrastructure (`crdt:` namespace: clocks, installations, deletion)
-  - `idx.ttl`, `sync.ttl` - Indexing and synchronization vocabularies
+  - `crdt-algorithms.ttl` - CRDT merge algorithms (`algo:` namespace: LWW-Register, OR-Set, FWW-Register, Immutable, 2P-Set)
+  - `crdt-mechanics.ttl` - Framework infrastructure (`crdt:` namespace: clocks, installations, deletion, tombstones)
+  - `idx.ttl` - Indexing vocabulary (sharding, group keys, index types)
+  - `sync.ttl` - Synchronization vocabulary (managed documents, strategies, contracts)
+
+**Merge Contract Mappings:**
 - `mappings/` - Semantic mapping files for CRDT merge contracts:
   - `core-v1.ttl` - Essential CRDT mappings imported by all other mapping files
-  - Application-specific mapping files (client-installation-v1.ttl, etc.)
+  - Application-specific mapping files (client-installation-v1.ttl, recipe-v1.ttl, etc.)
+  - Public, discoverable contracts enabling cross-application interoperability
+
+**RDF Integration Patterns:**
+- Fragment identifiers (#it) for clean thing/document separation
+- RDF reification for semantically correct deletion tombstones
+- Blank node context identification for stable CRDT object identity
+- Standard vocabulary usage (schema.org) with CRDT extensions
 
 ### Tools
 - `tool/` - Dart utilities for testing, versioning, and releases
@@ -145,22 +209,71 @@ When working on this codebase:
 - Follow semantic web best practices with proper vocabulary usage
 
 ### CRDT Implementation
-- State-based (not operation-based) CRDT approach
-- Hybrid Logical Clocks for versioning metadata
-- RDF reification tombstones for deletion handling
-- Property-level merge strategies (LWW-Register, FWW-Register, OR-Set, Immutable, etc.)
+
+**State-Based CRDT Algorithms:**
+- **LWW-Register (Last-Writer-Wins)**: Single-value properties where newest wins (names, timestamps, status)
+- **FWW-Register (First-Writer-Wins)**: Immutable properties where first write wins (IDs, permanent classifications)
+- **OR-Set (Observed-Remove Set)**: Multi-value properties with add/remove tracking (keywords, tags, ingredient lists)
+- **2P-Set (Two-Phase Set)**: Add-only sets with tombstone removal (prevent re-addition after removal)
+- **Immutable**: Strict framework constraint - any modification causes merge failure, forces resource versioning
+
+**Hybrid Logical Clock Mechanics:**
+- Combines logical causality tracking (tamper-proof) with physical timestamps (intuitive tie-breaking)
+- Each installation maintains monotonically increasing logical counters
+- Physical timestamps provide "most recent wins" semantics for concurrent operations
+- Clock hash comparison enables efficient change detection
+
+**Deletion and Tombstone Handling:**
+- RDF reification tombstones for property-level deletion
+- Document-level deletion via `crdt:deletedAt` triples
+- Framework deletion for system cleanup vs application soft deletion
+- Universal emptying process preserves framework metadata while removing semantic content
 
 ### Indexing Strategy
-- Support both monolithic (`idx:RootIndex`) and partitioned (`idx:PartitionedIndex`) indices
-- Use sharding for performance with large datasets
-- Minimize default indices, allow app-specific indices
+
+**Index Types:**
+- **FullIndex (Monolithic)**: Single index covering entire dataset, good for bounded collections
+- **GroupedIndex (Partitioned)**: Hierarchical organization using property transformations
+  - Regex-based property extraction and normalization
+  - Hierarchical group keys mapping to filesystem directories
+  - Cross-platform compatible regex subset for consistent group generation
+
+**Sharding and Performance:**
+- Sharded indices for scalable data organization (1-16 shards typical)
 - Index entries contain lightweight headers + Hybrid Logical Clock hashes
+- Change detection via shard hash comparison (O(1) per shard)
+- Minimize default indices, allow app-specific indices
+
+**Group Key Generation:**
+- Property transformations using compatible regex subset
+- Date-based grouping (year/month/day hierarchies)
+- Category-based organization
+- Cross-platform consistency ensuring identical results across installations
 
 ### API Design Patterns
-- SyncStrategy pattern for different sync behaviors
+
+**Sync Strategy Pattern:**
+- Configurable sync behaviors (FullSync, GroupedSync, OnDemandSync)
+- Developer declares preferred approach, implementation handles discovery/creation
+- Index selection based on application needs and group subscriptions
+
+**Event-Driven Architecture:**
 - Listener interfaces (IndexChangeListener, DataChangeListener)
-- Developer controls local storage, library handles sync
-- On-demand fetching for large datasets
+- `onIndexUpdate`: Notifies app with synchronized index headers
+- `onUpdate`: Provides complete merged objects for local storage
+- Clear separation between index sync and resource fetch phases
+
+**Developer Control Model:**
+- Developer controls local storage and querying completely
+- Library handles Pod communication, CRDT merging, and conflict resolution
+- `fetchFromRemote()` for explicit on-demand resource requests
+- Lazy evaluation principles minimize unnecessary work
+
+**Integration Patterns:**
+- Discovery-first approach balances Pod configuration with developer intent
+- Compatible index reuse when available, creation when needed
+- HTTP caching and change detection for bandwidth efficiency
+- Type Index integration for resource location discovery
 
 ### Deletion Handling
 - Framework deletion is for system-level cleanup (storage optimization, retention policies)
@@ -171,7 +284,18 @@ When working on this codebase:
 
 ## Testing Approach
 
-This project uses Dart's built-in `test` package. Run the comprehensive test suite with coverage using the provided tool script.
+This project uses Dart's built-in `test` package with comprehensive coverage across all architectural layers:
+
+**Test Coverage Areas:**
+- CRDT algorithm implementations (LWW-Register, OR-Set, FWW-Register, Immutable, 2P-Set)
+- Hybrid Logical Clock mechanics and causality determination
+- Index management and sharding strategies
+- Group key generation and regex transformations
+- Merge contract resolution and property mapping
+- Sync strategy implementations and performance characteristics
+- Error handling and graceful degradation patterns
+
+Run the comprehensive test suite with coverage using the provided tool script: `dart tool/run_tests.dart`
 
 ## Code Style
 
@@ -179,7 +303,10 @@ This project uses Dart's built-in `test` package. Run the comprehensive test sui
 - Use clear, semantic naming that reflects RDF/Solid concepts
 - Document public APIs with usage examples
 - Maintain separation between sync logic and local storage concerns
-- We are in the initial development phase and must not our code with "legacy" or "backwards compatibility" code - just get rid of code that is not right (any more)
+- We are in the initial development phase and must not burden our code with "legacy" or "backwards compatibility" code - just get rid of code that is not right (any more)
+- Align with W3C CRDT for RDF Community Group standardization efforts
+- Follow semantic web best practices with proper vocabulary usage
+- Maintain interoperability through public merge contracts and standard RDF
 
 ### Code Quality
   - Write idiomatic Dart following language conventions and best practices
