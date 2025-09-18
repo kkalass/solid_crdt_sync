@@ -6,29 +6,30 @@ void main() {
   group('RegexTransformValidator', () {
     group('pattern validation', () {
       test('accepts valid patterns from specification', () {
-        final validPatterns = [
-          r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', // Date pattern
-          r'^([a-zA-Z]+)[-_].*$', // Category extraction
-          r'^([A-Z]{2})([0-9]+)$', // Identifier format
-          r'[a-z]+', // Simple character class
-          r'[^abc]', // Negated character class
-          r'[0-9a-fA-F]+', // Combined ranges
-          r'.*', // Any character
-          r'test+', // One or more quantifier
-          r'test*', // Zero or more quantifier
-          r'test?', // Zero or one quantifier
-          r'test{3}', // Exact quantifier
-          r'test{2,5}', // Range quantifier
-          r'test{2,}', // Open-ended quantifier
-          r'(group)', // Capture group
-          r'\.', // Escaped special character
+        // Test patterns with appropriate replacements that match capture groups
+        final validTransforms = [
+          (r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}'), // Date pattern with 1 capture group
+          (r'^([a-zA-Z]+)[-_].*$', r'${1}'), // Category extraction with 1 capture group
+          (r'^([A-Z]{2})([0-9]+)$', r'${1}-${2}'), // Identifier format with 2 capture groups
+          (r'(group)', r'${1}'), // Capture group
+          (r'[a-z]+', r'match'), // Simple character class with literal replacement
+          (r'[^abc]', r'found'), // Negated character class with literal replacement
+          (r'[0-9a-fA-F]+', r'hex'), // Combined ranges with literal replacement
+          (r'.*', r'all'), // Any character with literal replacement
+          (r'test+', r'tests'), // One or more quantifier with literal replacement
+          (r'test*', r'maybe'), // Zero or more quantifier with literal replacement
+          (r'test?', r'optional'), // Zero or one quantifier with literal replacement
+          (r'test{3}', r'exactly'), // Exact quantifier with literal replacement
+          (r'test{2,5}', r'range'), // Range quantifier with literal replacement
+          (r'test{2,}', r'many'), // Open-ended quantifier with literal replacement
+          (r'\.', r'dot'), // Escaped special character with literal replacement
         ];
 
-        for (final pattern in validPatterns) {
-          final transform = RegexTransform(pattern, r'${1}');
+        for (final (pattern, replacement) in validTransforms) {
+          final transform = RegexTransform(pattern, replacement);
           final result = RegexTransformValidator.validate(transform);
           expect(result.isValid, isTrue,
-              reason: 'Pattern should be valid: $pattern');
+              reason: 'Transform should be valid: $pattern -> $replacement');
         }
       });
 
@@ -135,23 +136,24 @@ void main() {
 
     group('replacement validation', () {
       test('accepts valid replacement patterns', () {
-        final validReplacements = [
-          r'${1}',
-          r'${0}',
-          r'${1}-${2}',
-          r'prefix-${1}',
-          r'${1}-suffix',
-          r'$$', // Literal dollar
-          r'${1}$$${2}', // Mixed with literal dollars
-          r'${10}', // Double-digit groups
-          r'${1}1', // Group followed by literal digit
+        // Test replacements with patterns that have appropriate capture groups
+        final validTransforms = [
+          (r'(.+)', r'${1}'), // Pattern with 1 group, replacement uses group 1
+          (r'(.+)', r'${0}'), // Group 0 is always valid (full match)
+          (r'(.+)(.+)', r'${1}-${2}'), // Pattern with 2 groups, replacement uses both
+          (r'(.+)', r'prefix-${1}'), // Prefix with group reference
+          (r'(.+)', r'${1}-suffix'), // Suffix with group reference
+          (r'(.+)', r'$$'), // Literal dollar (no group reference needed)
+          (r'(.+)(.+)', r'${1}$$${2}'), // Mixed with literal dollars
+          (r'(.+)(.+)(.+)(.+)(.+)(.+)(.+)(.+)(.+)(.+)', r'${10}'), // Double-digit groups
+          (r'(.+)', r'${1}1'), // Group followed by literal digit
         ];
 
-        for (final replacement in validReplacements) {
-          final transform = RegexTransform(r'(.+)', replacement);
+        for (final (pattern, replacement) in validTransforms) {
+          final transform = RegexTransform(pattern, replacement);
           final result = RegexTransformValidator.validate(transform);
           expect(result.isValid, isTrue,
-              reason: 'Replacement should be valid: $replacement');
+              reason: 'Replacement should be valid: $replacement with pattern $pattern');
         }
       });
 
@@ -227,7 +229,7 @@ void main() {
 
         final result = RegexTransformValidator.validateList(transforms);
         expect(result.isValid, isFalse);
-        expect(result.errors.length, equals(2));
+        expect(result.errors.length, equals(3)); // 1 alternation error + 1 capture group error + 1 replacement syntax error
         expect(result.errors.any((e) => e.message.contains('alternation')),
             isTrue);
         expect(result.errors.any((e) => e.message.contains('invalid \$ usage')),
