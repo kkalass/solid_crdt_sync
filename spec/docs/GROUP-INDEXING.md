@@ -1,5 +1,9 @@
 # Group Indexing Specification
 
+**Version:** 0.10.0-draft
+**Last Updated:** September 2025
+**Status:** Draft Specification
+
 ## Overview
 
 The Solid CRDT Sync framework uses group indices to organize resources into hierarchical structures for efficient querying and synchronization. This document specifies the complete group indexing system, including property transformations, group key generation, hierarchical organization, and filesystem mapping.
@@ -405,11 +409,11 @@ Keys are preserved unchanged when they meet all criteria:
 - **Name safety:** Not `.`, `..`, or hidden (starting with `.`)
 
 #### Hash-Based Fallback
-Keys that fail safety checks are automatically converted using xxHash64:
-- **Format:** `{originalLength}_{16-char-hex-hash}`
-- **Hash algorithm:** xxHash64 (consistent with framework's sharding and clock hashing)
+Keys that fail safety checks are automatically converted using MD5:
+- **Format:** `{originalLength}_{32-char-hex-hash}`
+- **Hash algorithm:** MD5 (consistent with framework's sharding and clock hashing)
 - **Deterministic:** Identical input always produces identical hash
-- **Collision resistant:** 64-bit hash provides excellent collision resistance for grouping use cases
+- **Collision resistant:** 128-bit hash provides excellent collision resistance for grouping use cases
 
 ### Implementation Examples
 
@@ -423,17 +427,17 @@ Keys that fail safety checks are automatically converted using xxHash64:
 
 **Unsafe keys (hashed):**
 ```
-"contains/slash" → "14_a1b2c3d4e5f67890"
-"very-long-category-name-exceeding-fifty-characters" → "52_9876543210abcdef"
-"http://example.org/resource" → "26_fedcba0987654321"
-"unicode-café-résumé" → "18_1234567890abcdef"
+"contains/slash" → "14_5d41402abc4b2a76b9719d911017c592"
+"very-long-category-name-exceeding-fifty-characters" → "52_c4ca4238a0b923820dcc509a6f75849b"
+"http://example.org/resource" → "26_098f6bcd4621d373cade4e832627b4f6"
+"unicode-café-résumé" → "18_9bb58f26192e4ba00f01e2e7b136bbd8"
 ```
 
 **Hierarchical paths:**
 ```
 Safe: work/2024-08/high-priority
-Mixed: work/14_a1b2c3d4e5f67890/high-priority
-Unsafe: 4_abc123/26_def456/13_789abc
+Mixed: work/14_5d41402abc4b2a76b9719d911017c592/high-priority
+Unsafe: 4_abc123def456/26_def456789abc/13_789abcdef012
 ```
 
 ### Benefits
@@ -442,7 +446,7 @@ Unsafe: 4_abc123/26_def456/13_789abc
 
 **Debuggability:** Character count prefix helps identify original content length and spot potential issues.
 
-**Performance:** xxHash64 provides fast hashing with excellent distribution for collision avoidance.
+**Performance:** MD5 provides fast hashing with excellent distribution for collision avoidance.
 
 **Determinism:** Identical group keys always produce identical filesystem-safe representations across all systems.
 

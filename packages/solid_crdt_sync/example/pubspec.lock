@@ -934,7 +934,7 @@ packages:
     source: sdk
     version: "0.0.0"
   solid_auth:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "."
       ref: "feat/migrate-to-bdaya-oidc-security-fix"

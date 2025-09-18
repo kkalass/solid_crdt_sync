@@ -816,7 +816,7 @@ void main() {
         final groupKey = result.first;
 
         // Should be hashed due to unsafe characters
-        expect(groupKey, equals('14_27ee8130bc8cbbba'));
+        expect(groupKey, equals('14_a483ee140ab4c8dd7a20be801e2982d7'));
       });
 
       test('makes unsafe hierarchical group keys filesystem-safe', () {
@@ -848,7 +848,7 @@ void main() {
         final groupKey = result.first;
 
         // Should have safe date component and hashed category component
-        expect(groupKey, equals('15_2a0058a9a9adda33/2024-08'));
+        expect(groupKey, equals('15_2e6ebbea1fa1fa110a66dc847c0e9b36/2024-08'));
       });
 
       test('handles mixed safe and unsafe components in hierarchical paths', () {
@@ -899,7 +899,7 @@ void main() {
         final groupKey = result.first;
 
         // IRI contains unsafe characters, should be hashed
-        expect(groupKey, equals('32_634439c763d336ff'));
+        expect(groupKey, equals('32_5b2b9616e0134f026cc73e3bf8115ab6'));
       });
 
       test('ensures deterministic filesystem-safe results', () {
@@ -923,7 +923,7 @@ void main() {
 
         // Should be hashed due to unicode characters
         final groupKey = result1.first;
-        expect(groupKey, equals('12_2132607b07f7e7a9'));
+        expect(groupKey, equals('12_cdc649a181b63cd672da583bf751418c'));
       });
     });
   });

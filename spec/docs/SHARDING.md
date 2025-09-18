@@ -1,5 +1,9 @@
 # Index Sharding Implementation Guide
 
+**Version:** 0.10.0-draft
+**Last Updated:** September 2025
+**Status:** Draft Specification
+
 This document provides detailed implementation guidance for the sharding algorithms used in the solid-crdt-sync indexing layer. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Sharding Algorithm Details
@@ -10,9 +14,9 @@ When a new resource is created or an existing resource is updated, the framework
 
 ```
 1. Extract resource IRI: https://alice.podprovider.org/data/recipes/tomato-soup
-2. Apply hash function: xxhash64("https://alice.podprovider.org/data/recipes/tomato-soup") → 0x1A2B3C4D5E6F7890
-3. Convert to decimal: 1883669071845588112
-4. Calculate modulo: 1883669071845588112 % 2 = 0
+2. Apply hash function: md5("https://alice.podprovider.org/data/recipes/tomato-soup") → 5d41402abc4b2a76b9719d911017c592
+3. Convert to integer: Take first 8 hex chars → 0x5d41402a → 1564917802
+4. Calculate modulo: 1564917802 % 2 = 0
 5. Assign to shard: shard-0
 ```
 
@@ -43,18 +47,18 @@ In Solid's decentralized context, users are not system administrators and cannot
 <https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index>
   idx:shardingAlgorithm [
     a idx:ModuloHashSharding ;
-    idx:hashAlgorithm "xxhash64" ;
+    idx:hashAlgorithm "md5" ;
     idx:numberOfShards 4 ;           # Current configuration (auto-scaled from 1)
     idx:configVersion "1_2_0" ;      # Default v1, auto-scale 2 (1→2→4), conflict 0
     idx:autoScaleThreshold 1000      # Framework default threshold
   ] ;
   idx:hasShard 
     # Evolution: single shard → 2 shards → 4 shards
-    # Legacy: <shard-mod-xxhash64-1-0-v1_0_0> (migrated out, tombstoned)
-    # Legacy: <shard-mod-xxhash64-2-0-v1_1_0>, <shard-mod-xxhash64-2-1-v1_1_0> (migrated out)
+    # Legacy: <shard-mod-md5-1-0-v1_0_0> (migrated out, tombstoned)
+    # Legacy: <shard-mod-md5-2-0-v1_1_0>, <shard-mod-md5-2-1-v1_1_0> (migrated out)
     # Current shards (4-shard configuration) 
-    <shard-mod-xxhash64-4-0-v1_2_0>, <shard-mod-xxhash64-4-1-v1_2_0>, 
-    <shard-mod-xxhash64-4-2-v1_2_0>, <shard-mod-xxhash64-4-3-v1_2_0> .
+    <shard-mod-md5-4-0-v1_2_0>, <shard-mod-md5-4-1-v1_2_0>, 
+    <shard-mod-md5-4-2-v1_2_0>, <shard-mod-md5-4-3-v1_2_0> .
 ```
 
 ### Recommended Library Implementation
@@ -64,12 +68,12 @@ In Solid's decentralized context, users are not system administrators and cannot
 <https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index>
   idx:shardingAlgorithm [
     a idx:ModuloHashSharding ;
-    idx:hashAlgorithm "xxhash64" ;
+    idx:hashAlgorithm "md5" ;
     idx:numberOfShards 1 ;           # Explicit default
     idx:configVersion "1_0_0" ;      # Explicit default  
     idx:autoScaleThreshold 1000      # Explicit default
   ] ;
-  idx:hasShard <shard-mod-xxhash64-1-0-v1_0_0> .
+  idx:hasShard <shard-mod-md5-1-0-v1_0_0> .
 ```
 
 ## Automatic Scaling Algorithm
@@ -83,7 +87,7 @@ In Solid's decentralized context, users are not system administrators and cannot
 ## Self-Describing Shard Names
 
 - **Format:** `shard-{algorithm}-{hash}-{totalShards}-{shardNumber}-v{major}_{scale}_{conflict}`
-- **Example:** `shard-mod-xxhash64-4-0-v1_2_0` = modulo, xxhash64, 4 shards, shard #0, dev version 1, auto-scale version 2, conflict resolution 0
+- **Example:** `shard-mod-md5-4-0-v1_2_0` = modulo, md5, 4 shards, shard #0, dev version 1, auto-scale version 2, conflict resolution 0
 - **Version Components:**
   - `major`: Developer-controlled version (increment for breaking changes)
   - `scale`: Auto-increment when system increases shard count due to size thresholds
@@ -113,7 +117,7 @@ In Solid's decentralized context, users are not system administrators and cannot
 - **Never "finished":** Accept that some entries may remain in non-current shards indefinitely  
 - **Graceful lookup:** Check all active shards in `idx:hasShard` list (empty shards are automatically tombstoned)
 
-**Example migration:** Resource `tomato-soup` with hash `...1112` starts in legacy `shard-mod-xxhash64-2-0-v1` (1112 % 2 = 0), eventually migrates to new `shard-mod-xxhash64-4-0-v2` (1112 % 4 = 0) when accessed.
+**Example migration:** Resource `tomato-soup` with hash `...1112` starts in legacy `shard-mod-md5-2-0-v1` (1112 % 2 = 0), eventually migrates to new `shard-mod-md5-4-0-v2` (1112 % 4 = 0) when accessed.
 
 ## Index Entry Conflict Resolution
 
@@ -166,8 +170,8 @@ When a client detects that `idx:configVersion` was not properly incremented, the
 
 ### Auto-Resolution Algorithm
 
-1. **Detect conflict:** `shard-mod-xxhash64-2-0-v2_0_0` has tombstoned entries blocking new additions
-2. **Auto-increment conflict:** Try `shard-mod-xxhash64-2-0-v2_0_1`, then `v2_0_2`, `v2_0_3`, etc.
+1. **Detect conflict:** `shard-mod-md5-2-0-v2_0_0` has tombstoned entries blocking new additions
+2. **Auto-increment conflict:** Try `shard-mod-md5-2-0-v2_0_1`, then `v2_0_2`, `v2_0_3`, etc.
 3. **Find unused version:** Stop at first version without conflicts (no shard or entry tombstones)
 4. **Update configuration:** Set `idx:configVersion` to the working version (e.g., `"2_0_1"`)
 5. **Continue sync:** Proceed with new shards using the conflict-free version

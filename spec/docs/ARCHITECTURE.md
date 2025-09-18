@@ -1,7 +1,7 @@
 # A Framework for Local-First, Interoperable Apps on Solid
 
-**Version:** 0.9.0-draft  
-**Last Updated:** September 2025  
+**Version:** 0.10.0-draft
+**Last Updated:** September 2025
 **Status:** Draft Specification  
 **Authors:** Klas Kalaß  
 **Target Audience:** Library implementers, application developers, Solid ecosystem contributors  
@@ -13,6 +13,16 @@ This is a **draft specification** under active development. The architecture and
 **Feedback Welcome:** Please report issues, suggestions, or questions at [GitHub Issues](https://github.com/anthropics/claude-code/issues) or contribute via pull requests.
 
 ## Document Changelog
+
+### Version 0.10.0-draft (September 2025)
+- **BREAKING CHANGE:** Replace xxHash64 with MD5 for cross-platform compatibility
+  - Updated hash algorithm from xxHash64 to MD5 throughout specification
+  - Modified hash output format: 16 hex chars → 32 hex chars
+  - Updated shard naming: `shard-mod-xxhash64-*` → `shard-mod-md5-*`
+  - Changed group key safety format: `{length}_{16-char-hash}` → `{length}_{32-char-hash}`
+  - Ensures JavaScript/web compatibility while maintaining deterministic hashing
+- Updated vocabularies, templates, and implementation to use MD5
+- All examples and documentation reflect new hash format
 
 ### Version 0.9.0-draft (September 2025)
 - Initial comprehensive draft specification
@@ -893,7 +903,7 @@ This resource uses a semantic IRI based on the recipe name. The resource describ
    # Pointer to the Merge Contract (Layer 2) - imports CRDT library + app mappings
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/recipe-v1> ;
    # Pointer to the specific index shard this resource belongs to
-   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0> .
+   idx:belongsToIndexShard <../../indices/recipes/index-full-a1b2c3d4/shard-mod-md5-2-0-v1_0_0> .
 ```
 
 ### 5.2. Layer 2: The Merge Contract
@@ -1007,7 +1017,7 @@ This resource demonstrates semantic date-based organization and shows how shoppi
    # Uses a different DocumentMapping for shopping list entries (imports CRDT library + shopping mappings)
    sync:isGovernedBy <https://kkalass.github.io/meal-planning-app/crdt-mappings/shopping-entry-v1> ;
    # Points to index shard within the appropriate group
-   idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0> .
+   idx:belongsToIndexShard <../../../../../indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-md5-4-0-v1_0_0> .
 ```
 
 **Following the Merge Contract Link: shopping-entry-v1**
@@ -1343,8 +1353,8 @@ Both FullIndex and GroupIndex instances use **sharding** for performance optimiz
 
 **Example Shard Structure:**
 ```turtle
-<index> idx:hasShard <shard-mod-xxhash64-4-0-v1_2_0>, <shard-mod-xxhash64-4-1-v1_2_0>,
-                     <shard-mod-xxhash64-4-2-v1_2_0>, <shard-mod-xxhash64-4-3-v1_2_0> .
+<index> idx:hasShard <shard-mod-md5-4-0-v1_2_0>, <shard-mod-md5-4-1-v1_2_0>,
+                     <shard-mod-md5-4-2-v1_2_0>, <shard-mod-md5-4-3-v1_2_0> .
 ```
 
 **Implementation Details:** For comprehensive sharding algorithms, migration procedures, and version handling, see [SHARDING.md](SHARDING.md).
@@ -1367,20 +1377,20 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 **Hash Computation Examples:**
 ```turtle
 # FullIndex for recipes
-# Input: "https://schema.org/Recipe|ModuloHashSharding|xxhash64"
+# Input: "https://schema.org/Recipe|ModuloHashSharding|md5"
 # Directory: /indices/recipes/index-full-a1b2c3d4/
 # Document: /indices/recipes/index-full-a1b2c3d4/index
 
 # GroupIndexTemplate for shopping entries with single property
 # groupingRuleProperties: "https://example.org/vocab/meal#requiredForDate|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-([0-9]{2})-([0-9]{2})$\",\"replacement\":\"${1}-${2}\"}||"
 # (format: sourceProperty|transformList_canonical|hierarchyLevel|missingValue - empty missingValue at end)
-# Input: "https://example.org/vocab/meal#requiredForDate|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-([0-9]{2})-([0-9]{2})$\",\"replacement\":\"${1}-${2}\"}|||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|xxhash64"
+# Input: "https://example.org/vocab/meal#requiredForDate|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-([0-9]{2})-([0-9]{2})$\",\"replacement\":\"${1}-${2}\"}|||groups/{monthYear}/index|https://example.org/vocab/meal#ShoppingListEntry|ModuloHashSharding|md5"
 # Directory: /indices/shopping-entries/index-grouped-e5f6g7h8/
 # Document: /indices/shopping-entries/index-grouped-e5f6g7h8/index
 
 # GroupIndexTemplate with single property (GC index example)
 # groupingRuleProperties: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-[0-9]{2}-[0-9]{2}$\",\"replacement\":\"${1}\"}||"
-# Input: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-[0-9]{2}-[0-9]{2}$\",\"replacement\":\"${1}\"}|||gc/{deletionYear}/index|https://w3id.org/solid-crdt-sync/vocab/sync#ManagedDocument|ModuloHashSharding|xxhash64"
+# Input: "https://w3id.org/solid-crdt-sync/vocab/crdt#deletedAt|<https://w3id.org/solid-crdt-sync/vocab/idx#RegexTransform>{\"pattern\":\"^([0-9]{4})-[0-9]{2}-[0-9]{2}$\",\"replacement\":\"${1}\"}|||gc/{deletionYear}/index|https://w3id.org/solid-crdt-sync/vocab/sync#ManagedDocument|ModuloHashSharding|md5"
 # Directory: /indices/gc/index-grouped-f9g8h7i6/
 # Document: /indices/gc/index-grouped-f9g8h7i6/index
 
@@ -1388,7 +1398,7 @@ Multiple CRDT-enabled applications automatically converge on shared indices thro
 # Two properties: rdf:type and schema:keywords
 # groupingRuleProperties: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|||&https://schema.org/keywords|||default"
 # (sorted by sourceProperty IRI, joined with &, empty transform lists represented as empty string)
-# Input: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|||&https://schema.org/keywords|||default|groups/{type}-{keyword}/index|https://schema.org/Recipe|ModuloHashSharding|xxhash64"
+# Input: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type|||&https://schema.org/keywords|||default|groups/{type}-{keyword}/index|https://schema.org/Recipe|ModuloHashSharding|md5"
 ```
 
 **Automatic Convergence Property:**
@@ -1418,7 +1428,7 @@ When installations attempt to create indices with conflicting immutable properti
 
 **Example Coordination Scenarios:**
 ```turtle
-# App A and App B both need FullIndex for recipes with xxhash64
+# App A and App B both need FullIndex for recipes with md5
 # → Both generate identical name: index-full-a1b2c3d4
 # → Automatic sharing through convergent naming
 
@@ -1490,9 +1500,9 @@ When any installation encounters a populating index during sync:
 ```turtle
 <FullIndex>
    idx:populationState "populating";
-   idx:hasPopulatingShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0>;
+   idx:hasPopulatingShard <shard-mod-md5-2-0-v1_0_0>, <shard-mod-md5-2-1-v1_0_0>;
    # Target shards created with minimal entries (resource IRIs only)
-   idx:hasShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0> .
+   idx:hasShard <shard-mod-md5-2-0-v1_0_0>, <shard-mod-md5-2-1-v1_0_0> .
 ```
 
 **GroupIndexTemplate during population:**
@@ -1500,8 +1510,8 @@ When any installation encounters a populating index during sync:
 <GroupIndexTemplate>
    idx:populationState "populating";
    # Temporary coordination shards for distributed work
-   idx:hasPopulatingShard <pop-mod-xxhash64-4-0-v1_0_0>, <pop-mod-xxhash64-4-1-v1_0_0>, 
-                          <pop-mod-xxhash64-4-2-v1_0_0>, <pop-mod-xxhash64-4-3-v1_0_0> .
+   idx:hasPopulatingShard <pop-mod-md5-4-0-v1_0_0>, <pop-mod-md5-4-1-v1_0_0>, 
+                          <pop-mod-md5-4-2-v1_0_0>, <pop-mod-md5-4-3-v1_0_0> .
 ```
 
 #### 5.3.7. Installation Index Management and Scalability
@@ -1560,7 +1570,7 @@ This resource is the "rulebook" for all shopping list entry groups in our meal p
    # Resources within each group are assigned to shards using: hash(resourceIRI) % numberOfShards
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";  # Framework standard: xxhash64 provides fast, consistent hashing
+     idx:hashAlgorithm "md5";  # Framework standard: md5 provides fast, consistent hashing
      idx:numberOfShards 4
    ] ;
    sync:isGovernedBy mappings:group-index-template-v1;
@@ -1595,17 +1605,17 @@ This is a concrete index for shopping list entries from August 2024 meal plans.
    # Back-link to the rulebook.
    idx:basedOn <../../index-grouped-e5f6g7h8/index>;
    # Inherits configuration from GroupIndexTemplate:
-   # - Sharding algorithm (ModuloHashSharding with xxhash64, 4 shards)
+   # - Sharding algorithm (ModuloHashSharding with md5, 4 shards)
    # - Indexed properties (none defined, so minimal entries only)
    # - CRDT merge contract (mappings:index-v1)
    # Since the template has no idx:indexedProperty defined, this group's shards
    # will contain only resource IRIs and Hybrid Logical Clock hashes (no header data).
    # It has its own list of active shards, which are sibling documents.
-   idx:hasShard <shard-mod-xxhash64-4-0-v1_0_0>, <shard-mod-xxhash64-4-1-v1_0_0>, 
-                <shard-mod-xxhash64-4-2-v1_0_0>, <shard-mod-xxhash64-4-3-v1_0_0> .
+   idx:hasShard <shard-mod-md5-4-0-v1_0_0>, <shard-mod-md5-4-1-v1_0_0>, 
+                <shard-mod-md5-4-2-v1_0_0>, <shard-mod-md5-4-3-v1_0_0> .
 ```
 
-**Example 3: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-xxhash64-4-0-v1_0_0`**
+**Example 3: A Shard Document at `https://alice.podprovider.org/indices/shopping-entries/index-grouped-e5f6g7h8/groups/2024-08/shard-mod-md5-4-0-v1_0_0`**
 This document contains entries pointing to shopping list data resources from August 2024. Since shopping entries are typically loaded in full groups, this index contains minimal entries (only resource IRI and Hybrid Logical Clock hash, no header properties).
 
 ```turtle
@@ -1630,7 +1640,7 @@ This document contains entries pointing to shopping list data resources from Aug
 ```
 
 **Example 4: A Recipe Index for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/index`**
-This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing. The name hash is derived from SHA256(https://schema.org/Recipe|ModuloHashSharding|xxhash64).
+This is a `FullIndex` for Alice's recipe collection, configured for OnDemand synchronization to enable recipe browsing. The name hash is derived from SHA256(https://schema.org/Recipe|ModuloHashSharding|md5).
 
 ```turtle
 @prefix sync: <https://w3id.org/solid-crdt-sync/vocab/sync#> .
@@ -1659,15 +1669,15 @@ This is a `FullIndex` for Alice's recipe collection, configured for OnDemand syn
    # Resources are assigned to shards using: hash(resourceIRI) % numberOfShards
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";
+     idx:hashAlgorithm "md5";
      idx:numberOfShards 2
    ];
    sync:isGovernedBy mappings:full-index-v1;
    # List of active shards containing recipe entries
-   idx:hasShard <shard-mod-xxhash64-2-0-v1_0_0>, <shard-mod-xxhash64-2-1-v1_0_0> .
+   idx:hasShard <shard-mod-md5-2-0-v1_0_0>, <shard-mod-md5-2-1-v1_0_0> .
 ```
 
-**Example 5: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0`**
+**Example 5: A Recipe Index Shard for OnDemand Sync at `https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-md5-2-0-v1_0_0`**
 This document contains entries for recipe resources. Since recipes are used with OnDemand sync, the index includes header properties (schema:name, schema:keywords, etc.) as specified in the FullIndex's `idx:indexedProperty` list to support browsing without loading full recipe data.
 
 ```turtle
@@ -1944,7 +1954,7 @@ Rather than scanning entire data containers, framework-managed documents with AN
    ];
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";
+     idx:hashAlgorithm "md5";
      idx:numberOfShards 1
    ];
    idx:populationState "active";
@@ -2130,8 +2140,8 @@ await syncLibrary.syncDataType('schema:Recipe', { strategy: 'OnDemandSync' });
 
 // 2. Index Synchronization: Library fetches recipe index and its shards
 // Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4
-// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-0-v1_0_0
-// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-xxhash64-2-1-v1_0_0
+// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-md5-2-0-v1_0_0
+// Internal: GET https://alice.podprovider.org/indices/recipes/index-full-a1b2c3d4/shard-mod-md5-2-1-v1_0_0
 
 // 3. App Notification: Library provides index headers for browsing
 syncLibrary.onIndexUpdate((headers) => {
@@ -2219,7 +2229,7 @@ To avoid expensive Type Index container scanning, the framework maintains a dedi
    ];
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";
+     idx:hashAlgorithm "md5";
      idx:numberOfShards 1
    ] .
 ```

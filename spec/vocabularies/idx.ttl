@@ -97,7 +97,7 @@ idx:shardingAlgorithm a rdf:Property;
 
 idx:hashAlgorithm a rdf:Property;
     rdfs:label "hash algorithm";
-    rdfs:comment "The hashing algorithm to be used (e.g., 'xxhash64').";
+    rdfs:comment "The hashing algorithm to be used (e.g., 'md5').";
     rdfs:domain idx:ModuloHashSharding;
     rdfs:range xsd:string .
 

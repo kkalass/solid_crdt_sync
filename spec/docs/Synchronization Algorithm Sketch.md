@@ -172,7 +172,7 @@ This process handles automatic shard scaling when capacity thresholds are exceed
    1. Calculate new shard count (typically double: 1→2→4→8→16)
    2. Auto-increment configVersion scale component: `v1_0_0` → `v1_1_0`
    3. Update index configuration with new `numberOfShards` and `configVersion`
-   4. Add new shard names to `idx:hasShard` list using format `shard-mod-xxhash64-{count}-{num}-v{major}_{scale}_{conflict}`
+   4. Add new shard names to `idx:hasShard` list using format `shard-mod-md5-{count}-{num}-v{major}_{scale}_{conflict}`
 
 3. **Lazy Migration Initialization:**
    1. Begin using new shard count for all new entries

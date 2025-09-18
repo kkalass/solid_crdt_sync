@@ -21,7 +21,7 @@ void main() {
         ];
 
         for (final key in safeKeys) {
-          final result = FilesystemSafety.makeFilesystemSafe(key);
+          final result = FilesystemSafety.makeSafe(key);
           expect(result, equals(key), reason: 'Safe key should be preserved: $key');
         }
       });
@@ -29,7 +29,7 @@ void main() {
       test('preserves keys at maximum safe length', () {
         // Exactly 50 characters - should be preserved
         final maxLengthKey = 'a' * 50;
-        final result = FilesystemSafety.makeFilesystemSafe(maxLengthKey);
+        final result = FilesystemSafety.makeSafe(maxLengthKey);
         expect(result, equals(maxLengthKey));
         expect(result.length, equals(50));
       });
@@ -53,10 +53,10 @@ void main() {
         ];
 
         for (final key in unsafeKeys) {
-          final result = FilesystemSafety.makeFilesystemSafe(key);
+          final result = FilesystemSafety.makeSafe(key);
 
           // Should be hashed with format: {length}_{16-char-hex}
-          expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+          expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                  reason: 'Unsafe key should be hashed: $key → $result');
 
           // Should start with character count
@@ -69,9 +69,9 @@ void main() {
       test('hashes keys exceeding length limit', () {
         // 51 characters - exceeds limit, should be hashed
         final longKey = 'a' * 51;
-        final result = FilesystemSafety.makeFilesystemSafe(longKey);
+        final result = FilesystemSafety.makeSafe(longKey);
 
-        expect(result, matches(r'^51_[0-9a-f]{16}$'));
+        expect(result, matches(r'^51_[0-9a-f]{32}$'));
         expect(result, isNot(equals(longKey)));
       });
 
@@ -84,15 +84,15 @@ void main() {
         ];
 
         for (final name in reservedNames) {
-          final result = FilesystemSafety.makeFilesystemSafe(name);
-          expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+          final result = FilesystemSafety.makeSafe(name);
+          expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                  reason: 'Reserved name should be hashed: $name → $result');
         }
       });
 
       test('hashes empty strings', () {
-        final result = FilesystemSafety.makeFilesystemSafe('');
-        expect(result, equals('0_10b924c8ae271667')); // Exact deterministic result
+        final result = FilesystemSafety.makeSafe('');
+        expect(result, equals('0_d41d8cd98f00b204e9800998ecf8427e')); // Exact deterministic result (MD5 empty string)
       });
     });
 
@@ -106,8 +106,8 @@ void main() {
         ];
 
         for (final testCase in testCases) {
-          final result1 = FilesystemSafety.makeFilesystemSafe(testCase);
-          final result2 = FilesystemSafety.makeFilesystemSafe(testCase);
+          final result1 = FilesystemSafety.makeSafe(testCase);
+          final result2 = FilesystemSafety.makeSafe(testCase);
           expect(result1, equals(result2),
                  reason: 'Hash should be deterministic for: $testCase');
         }
@@ -121,7 +121,7 @@ void main() {
           'completely different content here',
         ];
 
-        final results = inputs.map(FilesystemSafety.makeFilesystemSafe).toSet();
+        final results = inputs.map(FilesystemSafety.makeSafe).toSet();
         expect(results.length, equals(inputs.length),
                reason: 'Different inputs should produce different hashes');
       });
@@ -137,7 +137,7 @@ void main() {
         ];
 
         for (final input in testInputs) {
-          final result = FilesystemSafety.makeFilesystemSafe(input);
+          final result = FilesystemSafety.makeSafe(input);
 
           if (!RegExp(r'^[a-zA-Z0-9._-]+$').hasMatch(input) ||
               input.length > 50 ||
@@ -145,7 +145,7 @@ void main() {
               input == '.' ||
               input == '..') {
             // Should be hashed
-            expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+            expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                    reason: 'Expected hash format for unsafe input: $input → $result');
 
             // Verify character count prefix
@@ -155,8 +155,8 @@ void main() {
                    reason: 'Character count prefix should match input length');
 
             // Verify hash part length
-            expect(parts[1].length, equals(16),
-                   reason: 'Hash part should be exactly 16 characters');
+            expect(parts[1].length, equals(32),
+                   reason: 'Hash part should be exactly 32 characters');
           }
         }
       });
@@ -165,33 +165,33 @@ void main() {
     group('exact hash verification', () {
       test('produces exact expected hash values', () {
         final exactCases = {
-          'contains/slash': '14_27ee8130bc8cbbba',
-          'http://example.org/category/work': '32_634439c763d336ff',
-          'unicode-café': '12_2132607b07f7e7a9',
-          'unsafe:category': '15_2a0058a9a9adda33',
-          '': '0_10b924c8ae271667',
-          '.': '1_4e9fac3f104c7ff8',
-          '.hidden': '7_47dd2ace6c550720',
+          'contains/slash': '14_a483ee140ab4c8dd7a20be801e2982d7',
+          'http://example.org/category/work': '32_5b2b9616e0134f026cc73e3bf8115ab6',
+          'unicode-café': '12_cdc649a181b63cd672da583bf751418c',
+          'unsafe:category': '15_2e6ebbea1fa1fa110a66dc847c0e9b36',
+          '': '0_d41d8cd98f00b204e9800998ecf8427e',
+          '.': '1_5058f1af8388633f609cadb75a75dc9d',
+          '.hidden': '7_6b96ab441bab2f8d5022c57ffb17136e',
         };
 
         for (final entry in exactCases.entries) {
           final input = entry.key;
           final expected = entry.value;
-          final result = FilesystemSafety.makeFilesystemSafe(input);
+          final result = FilesystemSafety.makeSafe(input);
           expect(result, equals(expected),
                  reason: 'Exact hash mismatch for input: $input');
         }
       });
 
       test('verifies hash implementation consistency', () {
-        // This test ensures our xxHash64 implementation produces consistent results
+        // This test ensures our MD5 implementation produces consistent results
         // If this test fails, it indicates a change in the hash algorithm
         const input = 'test/hash/consistency';
-        const expectedHash = '21_265f6fe50e5c69f9'; // Update if hash algorithm changes
+        const expectedHash = '21_157b5e7ca4f67a725df2b59eaf37503c'; // MD5 hash
 
-        final result = FilesystemSafety.makeFilesystemSafe(input);
+        final result = FilesystemSafety.makeSafe(input);
         expect(result, equals(expectedHash),
-               reason: 'Hash algorithm consistency check failed - did the xxHash64 implementation change?');
+               reason: 'Hash algorithm consistency check failed - did the MD5 implementation change?');
       });
     });
 
@@ -212,13 +212,13 @@ void main() {
         for (final entry in examples.entries) {
           final input = entry.key;
           final expected = entry.value;
-          final result = FilesystemSafety.makeFilesystemSafe(input);
+          final result = FilesystemSafety.makeSafe(input);
 
           if (expected.endsWith('_')) {
             // Testing hash prefix format
             expect(result, startsWith(expected),
                    reason: 'Hash should start with correct character count: $input');
-            expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+            expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                    reason: 'Hash should match expected format: $input → $result');
           } else {
             // Testing exact preservation
@@ -237,10 +237,10 @@ void main() {
         ];
 
         for (final iri in iris) {
-          final result = FilesystemSafety.makeFilesystemSafe(iri);
+          final result = FilesystemSafety.makeSafe(iri);
 
           // IRIs contain unsafe characters, should be hashed
-          expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+          expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                  reason: 'IRI should be hashed for filesystem safety: $iri');
 
           // Character count should match IRI length
@@ -256,11 +256,11 @@ void main() {
         final singleChars = ['a', 'Z', '1', '_', '-', '.'];
 
         for (final char in singleChars) {
-          final result = FilesystemSafety.makeFilesystemSafe(char);
+          final result = FilesystemSafety.makeSafe(char);
 
           if (char == '.') {
             // Special case: '.' is reserved
-            expect(result, matches(r'^1_[0-9a-f]{16}$'));
+            expect(result, matches(r'^1_[0-9a-f]{32}$'));
           } else {
             // Should be preserved
             expect(result, equals(char));
@@ -282,13 +282,13 @@ void main() {
 
           // Create safe string of specified length
           final testString = 'a' * length;
-          final result = FilesystemSafety.makeFilesystemSafe(testString);
+          final result = FilesystemSafety.makeSafe(testString);
 
           if (shouldPreserve) {
             expect(result, equals(testString),
                    reason: 'Safe string of length $length should be preserved');
           } else {
-            expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+            expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                    reason: 'String of length $length should be hashed');
             expect(result, startsWith('${length}_'),
                    reason: 'Hash should include correct character count');
@@ -306,10 +306,10 @@ void main() {
         ];
 
         for (final str in unicodeStrings) {
-          final result = FilesystemSafety.makeFilesystemSafe(str);
+          final result = FilesystemSafety.makeSafe(str);
 
           // Unicode characters are not in the safe whitelist, should be hashed
-          expect(result, matches(r'^\d+_[0-9a-f]{16}$'),
+          expect(result, matches(r'^\d+_[0-9a-f]{32}$'),
                  reason: 'Unicode string should be hashed: $str');
 
           final expectedLength = str.length;

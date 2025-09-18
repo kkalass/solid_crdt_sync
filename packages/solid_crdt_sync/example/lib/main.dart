@@ -16,6 +16,7 @@ import 'package:personal_notes_app/models/note_group_key.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
 import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
+import 'package:solid_auth/solid_auth.dart';
 import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
@@ -25,6 +26,9 @@ import 'services/categories_service.dart';
 import 'services/notes_service.dart';
 import 'storage/database.dart' show AppDatabase;
 import 'storage/repositories.dart' show CategoryRepository, NoteRepository;
+
+const appBaseUrl =
+    'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,14 +44,13 @@ void main() async {
 /// - All resources (Note, Category) with their paths, indices, and CRDT mappings
 /// - Returns a fully configured sync system
 Future<SolidCrdtSync> initializeSolidCrdtSync(
-    {DriftWebOptions? driftWeb, DriftNativeOptions? driftNative}) async {
-  const baseUrl =
-      'https://kkalass.github.io/solid_crdt_sync/example/personal_notes_app/mappings';
-
+    {DriftWebOptions? driftWeb,
+    DriftNativeOptions? driftNative,
+    required SolidAuth solidAuth}) async {
   return await SolidCrdtSync.setup(
     /* control behaviour and system integration */
     storage: DriftStorage(web: driftWeb, native: driftNative),
-    auth: SolidAuth(),
+    auth: SolidAuthBridge(solidAuth),
     mapperInitializer: (context) => initRdfMapper(
         $resourceIriFactory: context.resourceIriFactory,
         $resourceRefFactory: context.resourceRefFactory),
@@ -58,7 +61,7 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
         // Configure Note resource with grouping index by category
         ResourceConfig(
           type: Note,
-          crdtMapping: Uri.parse('$baseUrl/note-v1.ttl'),
+          crdtMapping: Uri.parse('$appBaseUrl/mappings/note-v1.ttl'),
           indices: [
             GroupIndex(NoteGroupKey,
                 item: IndexItem(NoteIndexEntry, {
@@ -81,7 +84,7 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
         // Configure Category resource with full index
         ResourceConfig(
           type: Category,
-          crdtMapping: Uri.parse('$baseUrl/category-v1.ttl'),
+          crdtMapping: Uri.parse('$appBaseUrl/mappings/category-v1.ttl'),
           indices: [FullIndex(itemFetchPolicy: ItemFetchPolicy.prefetch)],
         ),
       ],
@@ -163,8 +166,16 @@ class _AppInitializerState extends State<AppInitializer>
         driftWorker: Uri.parse('drift_worker.js'),
       );
 
+      // Initialize Solid Auth
+      final solidAuth = SolidAuth(
+          oidcClientId: '$appBaseUrl/auth/client-config.json',
+          appUrlScheme: 'com.example.personal_notes_app',
+          frontendRedirectUrl: Uri.parse('$appBaseUrl/redirect.html'));
+      await solidAuth.init();
+
       // Initialize the CRDT sync system
-      final syncSys = await initializeSolidCrdtSync(driftWeb: webOptions);
+      final syncSys = await initializeSolidCrdtSync(
+          driftWeb: webOptions, solidAuth: solidAuth);
 
       // Initialize app database (Drift)
       final appDb = AppDatabase(web: webOptions);

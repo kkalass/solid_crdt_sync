@@ -4,4 +4,4 @@
 /// authentication interfaces and the solid-auth library.
 library solid_crdt_sync_auth;
 
-export 'src/solid_auth_provider.dart';
+export 'src/solid_auth_bridge.dart';

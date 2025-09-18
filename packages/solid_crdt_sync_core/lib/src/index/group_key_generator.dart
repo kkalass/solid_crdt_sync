@@ -135,7 +135,7 @@ class GroupKeyGenerator {
         // Combine values at this level with hyphen separator
         final levelKey = levelCombination.join('-');
         // Apply filesystem safety to the level key before adding to path
-        final safeLevelKey = FilesystemSafety.makeFilesystemSafe(levelKey);
+        final safeLevelKey = FilesystemSafety.makeSafe(levelKey);
         final newPath = [...currentPath, safeLevelKey];
 
         // Recurse to next level

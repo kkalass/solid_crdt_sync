@@ -32,7 +32,7 @@
    # Single shard for installation index (typically small dataset)
    idx:shardingAlgorithm [
      a idx:ModuloHashSharding;
-     idx:hashAlgorithm "xxhash64";
+     idx:hashAlgorithm "md5";
      idx:numberOfShards 1
    ];
    idx:populationState "active";

@@ -19,7 +19,8 @@ environment:
 
 dependencies:
   logging: ^1.2.0
-  
+  crypto: ^3.0.3
+
   # RDF mapping
   rdf_core: ^0.9.14
   rdf_mapper: ^0.10.1
