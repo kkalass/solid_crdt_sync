@@ -234,8 +234,10 @@ class NoteRepository {
 
   /// Get a specific note by ID
   Future<models.Note?> getNote(String id) async {
-    final driftNote = await _noteDao.getNoteById(id);
-    return driftNote != null ? _noteFromDrift(driftNote) : null;
+    return _syncSystem.ensure<models.Note>(id, loadFromLocal: (id) async {
+      final driftNote = await _noteDao.getNoteById(id);
+      return driftNote != null ? _noteFromDrift(driftNote) : null;
+    });
   }
 
   /// Save a note (insert or update) with sync coordination
@@ -254,56 +256,51 @@ class NoteRepository {
   }
 
   /// Convert Drift Note to app Note model
-  models.Note _noteFromDrift(Note drift) {
-    return models.Note(
-      id: drift.id,
-      title: drift.title,
-      content: drift.content,
-      tags: drift.tags, // Now properly handled by StringSetConverter
-      categoryId: drift.categoryId,
-      createdAt: drift.createdAt,
-      modifiedAt: drift.modifiedAt,
-    );
-  }
+  models.Note _noteFromDrift(Note drift) => models.Note(
+        id: drift.id,
+        title: drift.title,
+        content: drift.content,
+        tags: drift.tags, // Now properly handled by StringSetConverter
+        categoryId: drift.categoryId,
+        createdAt: drift.createdAt,
+        modifiedAt: drift.modifiedAt,
+      );
 
   /// Convert app Note model to Drift NotesCompanion
-  static NotesCompanion _noteToDriftCompanion(models.Note note) {
-    return NotesCompanion(
-      id: Value(note.id),
-      title: Value(note.title),
-      content: Value(note.content),
-      tags: Value(note.tags), // Now properly handled by StringSetConverter
-      categoryId: Value(note.categoryId),
-      createdAt: Value(note.createdAt),
-      modifiedAt: Value(note.modifiedAt),
-    );
-  }
+  static NotesCompanion _noteToDriftCompanion(models.Note note) =>
+      NotesCompanion(
+        id: Value(note.id),
+        title: Value(note.title),
+        content: Value(note.content),
+        tags: Value(note.tags), // Now properly handled by StringSetConverter
+        categoryId: Value(note.categoryId),
+        createdAt: Value(note.createdAt),
+        modifiedAt: Value(note.modifiedAt),
+      );
 
   /// Convert Drift NoteIndexEntry to app NoteIndexEntry model
-  models.NoteIndexEntry _noteIndexEntryFromDrift(NoteIndexEntry drift) {
-    return models.NoteIndexEntry(
-      id: drift.id,
-      name: drift.name,
-      dateCreated: drift.dateCreated,
-      dateModified: drift.dateModified,
-      keywords: drift.keywords ?? <String>{}, // Handle null with empty set
-      categoryId: drift.categoryId,
-    );
-  }
+  models.NoteIndexEntry _noteIndexEntryFromDrift(NoteIndexEntry drift) =>
+      models.NoteIndexEntry(
+        id: drift.id,
+        name: drift.name,
+        dateCreated: drift.dateCreated,
+        dateModified: drift.dateModified,
+        keywords: drift.keywords ?? <String>{}, // Handle null with empty set
+        categoryId: drift.categoryId,
+      );
 
   /// Convert app NoteIndexEntry model to Drift NoteIndexEntriesCompanion
   static NoteIndexEntriesCompanion _noteIndexEntryToDriftCompanion(
-      models.NoteIndexEntry noteEntry) {
-    return NoteIndexEntriesCompanion(
-      id: Value(noteEntry.id),
-      name: Value(noteEntry.name),
-      dateCreated: Value(noteEntry.dateCreated),
-      dateModified: Value(noteEntry.dateModified),
-      keywords: Value(
-          noteEntry.keywords), // Now properly handled by StringSetConverter
-      categoryId: Value(noteEntry.categoryId),
-    );
-  }
+          models.NoteIndexEntry noteEntry) =>
+      NoteIndexEntriesCompanion(
+        id: Value(noteEntry.id),
+        name: Value(noteEntry.name),
+        dateCreated: Value(noteEntry.dateCreated),
+        dateModified: Value(noteEntry.dateModified),
+        keywords: Value(
+            noteEntry.keywords), // Now properly handled by StringSetConverter
+        categoryId: Value(noteEntry.categoryId),
+      );
 
   /// Watch all note index entries reactively
   Stream<List<models.NoteIndexEntry>> watchAllNoteIndexEntries() {
@@ -312,14 +309,9 @@ class NoteRepository {
   }
 
   /// Configure subscription to a specific month group for note index entries
-  Future<void> configureMonthGroupSubscription(NoteGroupKey monthKey, ItemFetchPolicy fetchPolicy) async {
-    await _syncSystem.configureGroupIndexSubscription(_formatMonthKey(monthKey.createdMonth), fetchPolicy);
-  }
-
-
-  /// Format a DateTime to match the NoteGroupKey format
-  String _formatMonthKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+  Future<void> configureMonthGroupSubscription(
+      NoteGroupKey monthKey, ItemFetchPolicy fetchPolicy) async {
+    await _syncSystem.configureGroupIndexSubscription(monthKey, fetchPolicy);
   }
 
   /// Dispose resources when repository is no longer needed

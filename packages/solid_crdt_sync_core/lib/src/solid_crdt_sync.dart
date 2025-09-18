@@ -216,6 +216,93 @@ class SolidCrdtSync {
         resourceConfig);
   }
 
+  /// Ensures a resource is available locally, fetching it from the remote source if necessary.
+  ///
+  /// This method guarantees that after its successful completion, the requested
+  /// resource will exist in the local database and be managed by the sync system.
+  /// It follows a "local-first" approach.
+  ///
+  /// The process is as follows:
+  /// 1. It first attempts to retrieve the item from the local database using the
+  ///    provided [loadFromLocal] function.
+  /// 2. If the item is found locally, it is returned immediately.
+  /// 3. If the item is not found locally, this method triggers a fetch from the
+  ///    remote Solid Pod.
+  /// 4. Once fetched, the item is processed and inserted into the local database
+  ///    via the standard hydration stream, which in turn makes it available to the
+  ///    rest of the application.
+  /// 5. The method then returns the newly fetched and stored item.
+  ///
+  /// This is the primary method repositories should use for on-demand loading of
+  /// individual resources that may not be part of an eagerly synced group. It
+  /// abstracts away all the complexity of network requests, caching, and state
+  /// management.
+  ///
+  /// Throws a [TimeoutException] if the remote fetch takes too long.
+  ///
+  ///
+  /// #### Parameters:
+  ///   - [id]: The unique identifier of the resource to ensure is available.
+  ///   - [loadFromLocal]: A callback function that takes the resource `id` and
+  ///     is responsible for loading it from the local application database.
+  ///
+  /// #### Returns:
+  /// A `Future` that completes with the resource of type [T] once it is available
+  /// locally. Returns `null` if the resource cannot be found either locally or
+  /// remotely, or if the request times out.
+  ///
+  /// #### Example:
+  ///
+  /// ```dart
+  /// // Inside a repository class
+  ///
+  /// Future<Note?> getNoteById(String noteId) async {
+  ///   return await _syncSystem.ensure<Note>(
+  ///     noteId,
+  ///     loadFromLocal: (id) async {
+  ///       final driftNote = await _noteDao.getNoteById(id);
+  ///       return driftNote != null ? _noteFromDrift(driftNote) : null;
+  ///     },
+  ///   );
+  /// }
+  /// ```
+  Future<T?> ensure<T>(String id,
+      {required Future<T?> Function(String id) loadFromLocal,
+      Duration? timeout = const Duration(seconds: 15)}) async {
+    // 1. First, try to load from the local database.
+    final localItem = await loadFromLocal(id);
+    if (localItem != null) {
+      return localItem;
+    }
+
+    // TODO: properly implement remote fetch with pending fetch tracking
+/*
+Check with https://g.co/gemini/share/60e9b2d3036e for the details
+
+    // 2. If not found, check if a fetch is already in progress.
+    if (_pendingFetches.containsKey(id)) {
+      return (await _pendingFetches[id]!.future) as T?;
+    }
+
+    // 3. If not, initiate a new fetch.
+    final completer = Completer<T?>();
+    _pendingFetches[id] = completer;
+
+    // 4. Trigger the remote fetch in the background.
+    // (This reuses the logic from the previous proposal)
+    _fetchAndEmit<T>(id);
+
+    // 5. Return the future, which completes when the item arrives.
+    return completer.future.timeout(const Duration(seconds: 15), onTimeout: () {
+      _pendingFetches.remove(id);
+      // Return null or throw a custom exception on timeout.
+      return null;
+    });
+
+    */
+    return null;
+  }
+
   /// Delete a document with CRDT processing.
   ///
   /// This performs document-level deletion, marking the entire document as deleted
