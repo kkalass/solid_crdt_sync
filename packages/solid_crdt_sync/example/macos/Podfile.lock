@@ -95,7 +95,7 @@ SPEC CHECKSUMS:
   fast_rsa: 940a67b8d8e425f37708189361efc90be7299d66
   flutter_appauth: 84cbf57c7926a898a612726e99241a031e33fac3
   flutter_secure_storage_macos: 7f45e30f838cf2659862a4e4e3ee1c347c2b3b54
-  FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   oidc_macos: 3f8328ab4bb21e519483f57d459837838bc669cf
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
@@ -104,6 +104,6 @@ SPEC CHECKSUMS:
   url_launcher_macos: 0fba8ddabfc33ce0a9afe7c5fef5aab3d8d2d673
   window_to_front: 9e76fd432e36700a197dac86a0011e49c89abe0a
 
-PODFILE CHECKSUM: 7eb978b976557c8c1cd717d8185ec483fd090a82
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 
 COCOAPODS: 1.16.2

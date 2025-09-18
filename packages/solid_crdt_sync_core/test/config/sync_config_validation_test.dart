@@ -499,7 +499,7 @@ void main() {
                   localName: 'by-category', // Same localName is OK
                   groupingProperties: [
                     GroupingProperty(TestVocab.testCategory),
-                    GroupingProperty(IriTerm.prevalidated(
+                    GroupingProperty(IriTerm(
                         'https://test.example/vocab#priority')),
                   ],
                 ),
@@ -650,11 +650,11 @@ void main() {
                   groupingProperties: [
                     GroupingProperty(TestVocab.testCategory, hierarchyLevel: 1),
                     GroupingProperty(
-                        IriTerm.prevalidated(
+                        IriTerm(
                             'https://test.example/vocab#priority'),
                         hierarchyLevel: 2),
                     GroupingProperty(
-                        IriTerm.prevalidated(
+                        IriTerm(
                             'https://test.example/vocab#department'),
                         hierarchyLevel: 3),
                   ],
@@ -683,7 +683,7 @@ void main() {
                   groupingProperties: [
                     GroupingProperty(TestVocab.testCategory, hierarchyLevel: 1),
                     GroupingProperty(
-                        IriTerm.prevalidated(
+                        IriTerm(
                             'https://test.example/vocab#priority'),
                         hierarchyLevel: 3), // Gap! Missing level 2
                   ],
@@ -718,12 +718,12 @@ void main() {
                   groupingProperties: [
                     GroupingProperty(TestVocab.testCategory, hierarchyLevel: 1),
                     GroupingProperty(
-                        IriTerm.prevalidated(
+                        IriTerm(
                             'https://test.example/vocab#priority'),
                         hierarchyLevel:
                             1), // Same level = Cartesian product (valid)
                     GroupingProperty(
-                        IriTerm.prevalidated(
+                        IriTerm(
                             'https://test.example/vocab#department'),
                         hierarchyLevel: 2),
                   ],
@@ -812,7 +812,7 @@ void main() {
                   localName: 'multi-transform',
                   groupingProperties: [
                     GroupingProperty(
-                      IriTerm.prevalidated('https://schema.org/dateCreated'),
+                      IriTerm('https://schema.org/dateCreated'),
                       transforms: [
                         // Multiple transforms for different date formats
                         RegexTransform(
@@ -1063,7 +1063,7 @@ void main() {
                   item: IndexItem(TestCategory, {}), // Has global mapper
                   groupingProperties: [
                     GroupingProperty(TestVocab.testCategory),
-                    GroupingProperty(IriTerm.prevalidated(
+                    GroupingProperty(IriTerm(
                         'https://test.example/vocab#priority')),
                   ],
                 ),
@@ -1299,7 +1299,7 @@ void main() {
                   localName: 'multi-format-dates',
                   groupingProperties: [
                     GroupingProperty(
-                      IriTerm.prevalidated('https://schema.org/dateCreated'),
+                      IriTerm('https://schema.org/dateCreated'),
                       transforms: [
                         // Handle multiple date formats per GROUP-INDEXING.md examples
                         RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$',
