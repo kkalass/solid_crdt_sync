@@ -34,7 +34,7 @@ class IndexItem {
   const IndexItem(this.itemType, this.properties);
 }
 
-abstract interface class CrdtIndexConfig {
+sealed class CrdtIndexConfig {
   /// The Dart type being indexed (e.g., Note - the source data type)
   Type get dartType;
 

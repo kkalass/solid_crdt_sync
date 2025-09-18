@@ -6,7 +6,9 @@ import 'package:solid_crdt_sync_core/src/mapping/pod_iri_config.dart';
 
 // Mock types for testing
 class TestNote {}
+
 class TestCategory {}
+
 class TestUser {}
 
 void main() {
@@ -26,7 +28,9 @@ void main() {
     });
 
     group('Programming Constraints (StateError)', () {
-      test('should throw StateError when creating resource mapper after setup complete', () {
+      test(
+          'should throw StateError when creating resource mapper after setup complete',
+          () {
         // Complete setup first
         service.createResourceIriMapper<TestNote>(mockConfig);
         service.finishSetupAndValidate(mockResourceTypeCache);
@@ -42,7 +46,9 @@ void main() {
         );
       });
 
-      test('should throw StateError when creating reference mapper after setup complete', () {
+      test(
+          'should throw StateError when creating reference mapper after setup complete',
+          () {
         // Complete setup first
         service.createResourceIriMapper<TestNote>(mockConfig);
         service.finishSetupAndValidate(mockResourceTypeCache);
@@ -60,7 +66,8 @@ void main() {
     });
 
     group('Configuration Validation', () {
-      test('should collect validation error for duplicate type registration', () {
+      test('should collect validation error for duplicate type registration',
+          () {
         // Register same type twice
         service.createResourceIriMapper<TestNote>(mockConfig);
         service.createResourceIriMapper<TestNote>(mockConfig);
@@ -70,7 +77,8 @@ void main() {
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
         expect(result.errors.first.message, contains('already registered'));
-        expect((result.errors.first.context as Map?)?['type'], equals(TestNote));
+        expect(
+            (result.errors.first.context as Map?)?['type'], equals(TestNote));
       });
 
       test('should collect validation error for unreferenced types', () {
@@ -81,11 +89,15 @@ void main() {
 
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
-        expect(result.errors.first.message, contains('was not registered as a resource type'));
-        expect((result.errors.first.context as Map?)?['referencedType'], equals(TestUser));
+        expect(result.errors.first.message,
+            contains('was not registered as a resource type'));
+        expect((result.errors.first.context as Map?)?['referencedType'],
+            equals(TestUser));
       });
 
-      test('should collect validation error for missing IRI in resource type cache', () {
+      test(
+          'should collect validation error for missing IRI in resource type cache',
+          () {
         service.createResourceIriMapper<TestNote>(mockConfig);
 
         // Pass cache missing the registered type
@@ -94,8 +106,10 @@ void main() {
 
         expect(result.isValid, isFalse);
         expect(result.errors, hasLength(1));
-        expect(result.errors.first.message, contains('Missing IRI term for registered type'));
-        expect((result.errors.first.context as Map?)?['type'], equals(TestNote));
+        expect(result.errors.first.message,
+            contains('Missing IRI term for registered type'));
+        expect(
+            (result.errors.first.context as Map?)?['type'], equals(TestNote));
       });
 
       test('should collect multiple validation errors', () {
@@ -110,8 +124,10 @@ void main() {
         expect(result.errors, hasLength(2)); // Duplicate + unreferenced
 
         final errorMessages = result.errors.map((e) => e.message).toList();
-        expect(errorMessages.any((msg) => msg.contains('already registered')), isTrue);
-        expect(errorMessages.any((msg) => msg.contains('was not registered')), isTrue);
+        expect(errorMessages.any((msg) => msg.contains('already registered')),
+            isTrue);
+        expect(errorMessages.any((msg) => msg.contains('was not registered')),
+            isTrue);
       });
     });
 
@@ -128,7 +144,8 @@ void main() {
         expect(result.warnings, isEmpty);
       });
 
-      test('should transition to runtime state only on successful validation', () {
+      test('should transition to runtime state only on successful validation',
+          () {
         service.createResourceIriMapper<TestNote>(mockConfig);
 
         final result = service.finishSetupAndValidate(mockResourceTypeCache);
@@ -144,7 +161,8 @@ void main() {
 
       test('should remain in setup state if validation fails', () {
         service.createResourceIriMapper<TestNote>(mockConfig);
-        service.createResourceIriMapper<TestNote>(mockConfig); // Duplicate - validation error
+        service.createResourceIriMapper<TestNote>(
+            mockConfig); // Duplicate - validation error
 
         final result = service.finishSetupAndValidate(mockResourceTypeCache);
 
@@ -159,7 +177,8 @@ void main() {
 
       test('should allow retry after failed validation', () {
         service.createResourceIriMapper<TestNote>(mockConfig);
-        service.createResourceRefMapper<String>(TestUser); // Missing registration
+        service
+            .createResourceRefMapper<String>(TestUser); // Missing registration
 
         // First attempt fails
         var result = service.finishSetupAndValidate(mockResourceTypeCache);
@@ -183,17 +202,23 @@ void main() {
         expect(iri.iri, equals('app://local/TestNote/note123'));
 
         // Test reverse mapping (IRI to tuple)
-        final tuple = mapper.fromRdfTerm(IriTerm('app://local/TestNote/note456'), MockDeserializationContext());
+        final tuple = mapper.fromRdfTerm(
+            IriTerm('app://local/TestNote/note456'),
+            MockDeserializationContext());
         expect(tuple, equals(('note456',)));
       });
 
-      test('should create reference IRI mapper with same scheme as resource', () {
-        final resourceMapper = service.createResourceIriMapper<TestNote>(mockConfig);
+      test('should create reference IRI mapper with same scheme as resource',
+          () {
+        final resourceMapper =
+            service.createResourceIriMapper<TestNote>(mockConfig);
         final refMapper = service.createResourceRefMapper<String>(TestNote);
 
         // Both should generate the same IRI for the same ID
-        final resourceIri = resourceMapper.toRdfTerm(('note123',), MockSerializationContext());
-        final refIri = refMapper.toRdfTerm('note123', MockSerializationContext());
+        final resourceIri =
+            resourceMapper.toRdfTerm(('note123',), MockSerializationContext());
+        final refIri =
+            refMapper.toRdfTerm('note123', MockSerializationContext());
 
         expect(resourceIri.iri, equals(refIri.iri));
         expect(resourceIri.iri, equals('app://local/TestNote/note123'));
@@ -203,7 +228,8 @@ void main() {
         final mapper = service.createResourceIriMapper<TestNote>(mockConfig);
 
         expect(
-          () => mapper.fromRdfTerm(IriTerm('http://invalid.com/wrong/pattern'), MockDeserializationContext()),
+          () => mapper.fromRdfTerm(IriTerm('http://invalid.com/wrong/pattern'),
+              MockDeserializationContext()),
           throwsA(isA<ArgumentError>().having(
             (e) => e.message,
             'message',

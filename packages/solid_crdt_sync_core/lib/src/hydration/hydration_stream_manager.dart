@@ -13,7 +13,8 @@ class HydrationStreamManager {
   final Map<TypeLocalNameKey, StreamController> _controllers = {};
 
   /// Get or create a stream controller for the given type and local name
-  StreamController<HydrationResult<T>> getOrCreateController<T>(String localName) {
+  StreamController<HydrationResult<T>> getOrCreateController<T>(
+      String localName) {
     final key = TypeLocalNameKey(T, localName);
     if (!_controllers.containsKey(key)) {
       _controllers[key] = StreamController<HydrationResult<T>>.broadcast();
@@ -25,7 +26,8 @@ class HydrationStreamManager {
   void emitToStream<T>(TypeLocalNameKey key, HydrationResult<T> result) {
     final controller = _controllers[key];
     if (controller == null) {
-      throw StateError('No stream controller exists for key $key. This indicates a programming error - ensure the stream is created before emitting to it.');
+      throw StateError(
+          'No stream controller exists for key $key. This indicates a programming error - ensure the stream is created before emitting to it.');
     }
     Future.microtask(() => controller.add(result));
   }

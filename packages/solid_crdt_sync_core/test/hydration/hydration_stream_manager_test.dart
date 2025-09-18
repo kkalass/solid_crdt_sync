@@ -18,7 +18,7 @@ void main() {
 
     test('should create and return stream controller', () {
       final controller = manager.getOrCreateController<String>('test');
-      
+
       expect(controller, isNotNull);
       expect(controller.stream, isNotNull);
     });
@@ -26,21 +26,21 @@ void main() {
     test('should return same controller for same type and local name', () {
       final controller1 = manager.getOrCreateController<String>('test');
       final controller2 = manager.getOrCreateController<String>('test');
-      
+
       expect(controller1, equals(controller2));
     });
 
     test('should return different controllers for different types', () {
       final controller1 = manager.getOrCreateController<String>('test');
       final controller2 = manager.getOrCreateController<int>('test');
-      
+
       expect(controller1, isNot(equals(controller2)));
     });
 
     test('should return different controllers for different local names', () {
       final controller1 = manager.getOrCreateController<String>('test1');
       final controller2 = manager.getOrCreateController<String>('test2');
-      
+
       expect(controller1, isNot(equals(controller2)));
     });
 
@@ -83,7 +83,7 @@ void main() {
 
       // Should throw StateError for programming errors
       expect(
-        () => manager.emitToStream(key, result), 
+        () => manager.emitToStream(key, result),
         throwsA(isA<StateError>().having(
           (e) => e.message,
           'message',
@@ -95,7 +95,7 @@ void main() {
     test('should handle multiple concurrent listeners', () async {
       final controller = manager.getOrCreateController<String>('test');
       final key = TypeLocalNameKey(String, 'test');
-      
+
       final result = HydrationResult<String>(
         items: ['broadcast'],
         deletedItems: [],
@@ -107,7 +107,7 @@ void main() {
       // Set up multiple listeners
       final events1 = <HydrationResult<String>>[];
       final events2 = <HydrationResult<String>>[];
-      
+
       final sub1 = controller.stream.listen(events1.add);
       final sub2 = controller.stream.listen(events2.add);
 

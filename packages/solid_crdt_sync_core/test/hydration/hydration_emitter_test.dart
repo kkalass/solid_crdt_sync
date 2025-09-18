@@ -15,7 +15,7 @@ class TestNote {
   final String title;
   final String content;
   TestNote(this.title, this.content);
-  
+
   @override
   String toString() => 'TestNote($title, $content)';
 }
@@ -23,7 +23,7 @@ class TestNote {
 class TestNoteIndex {
   final String title;
   TestNoteIndex(this.title);
-  
+
   @override
   String toString() => 'TestNoteIndex($title)';
 }
@@ -32,20 +32,21 @@ class TestNoteIndex {
 class TestHydrationStreamManager implements HydrationStreamManager {
   final List<String> emittedKeys = [];
   final List<dynamic> emittedResults = [];
-  
+
   @override
   void emitToStream<T>(TypeLocalNameKey key, HydrationResult<T> result) {
     emittedKeys.add(key.toString());
     emittedResults.add(result);
   }
-  
+
   @override
-  StreamController<HydrationResult<T>> getOrCreateController<T>(String localName) =>
+  StreamController<HydrationResult<T>> getOrCreateController<T>(
+          String localName) =>
       throw UnimplementedError('Not needed for emission tests');
-      
+
   @override
   Future<void> close() async {}
-  
+
   void clear() {
     emittedKeys.clear();
     emittedResults.clear();
@@ -54,12 +55,12 @@ class TestHydrationStreamManager implements HydrationStreamManager {
 
 class TestIndexItemConverterRegistry implements IndexItemConverterRegistry {
   final Map<TypeLocalNameKey, dynamic> _converters = {};
-  
+
   @override
   void registerConverter<T>(TypeLocalNameKey key, converter) {
     _converters[key] = converter;
   }
-  
+
   @override
   IndexItemConverter<T>? getConverter<T>(TypeLocalNameKey key) {
     return _converters[key] as IndexItemConverter<T>?;
@@ -68,15 +69,18 @@ class TestIndexItemConverterRegistry implements IndexItemConverterRegistry {
 
 class TestIndexItemConverter implements IndexItemConverter<TestNoteIndex> {
   @override
-  HydrationResult<TestNoteIndex> convertHydrationResult<T>(HydrationResult<T> result) {
+  HydrationResult<TestNoteIndex> convertHydrationResult<T>(
+      HydrationResult<T> result) {
     // Convert TestNote items to TestNoteIndex items
-    final indexItems = result.items.cast<TestNote>()
+    final indexItems = result.items
+        .cast<TestNote>()
         .map((note) => TestNoteIndex(note.title))
         .toList();
-    final deletedIndexItems = result.deletedItems.cast<TestNote>()
+    final deletedIndexItems = result.deletedItems
+        .cast<TestNote>()
         .map((note) => TestNoteIndex(note.title))
         .toList();
-    
+
     return HydrationResult<TestNoteIndex>(
       items: indexItems,
       deletedItems: deletedIndexItems,
@@ -129,13 +133,14 @@ void main() {
 
     test('should emit to both resource and index streams', () {
       // Set up index configuration
-      final indexItem = IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
+      final indexItem =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       final index = FullIndex(
         TestNote,
         localName: 'title-index',
         item: indexItem,
       );
-      
+
       final config = ResourceConfig(
         type: TestNote,
         crdtMapping: Uri.parse('http://example.org/mapping'),
@@ -158,17 +163,18 @@ void main() {
 
       // Should emit to both streams
       expect(streamManager.emittedKeys, hasLength(2));
-      
+
       // Check resource stream emission
       expect(streamManager.emittedKeys[0], contains('TestNote'));
       expect(streamManager.emittedKeys[0], contains('default'));
       expect(streamManager.emittedResults[0], equals(result));
-      
+
       // Check index stream emission
       expect(streamManager.emittedKeys[1], contains('TestNoteIndex'));
       expect(streamManager.emittedKeys[1], contains('title-index'));
-      
-      final indexResult = streamManager.emittedResults[1] as HydrationResult<TestNoteIndex>;
+
+      final indexResult =
+          streamManager.emittedResults[1] as HydrationResult<TestNoteIndex>;
       expect(indexResult.items, hasLength(1));
       expect(indexResult.items.first.title, equals('Test Title'));
       expect(indexResult.originalCursor, equals('cursor1'));
@@ -176,13 +182,14 @@ void main() {
     });
 
     test('should handle deletions in index conversion', () {
-      final indexItem = IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
+      final indexItem =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       final index = FullIndex(
         TestNote,
         localName: 'title-index',
         item: indexItem,
       );
-      
+
       final config = ResourceConfig(
         type: TestNote,
         crdtMapping: Uri.parse('http://example.org/mapping'),
@@ -204,20 +211,22 @@ void main() {
 
       // Check index deletion conversion
       expect(streamManager.emittedKeys, hasLength(2));
-      final indexResult = streamManager.emittedResults[1] as HydrationResult<TestNoteIndex>;
+      final indexResult =
+          streamManager.emittedResults[1] as HydrationResult<TestNoteIndex>;
       expect(indexResult.deletedItems, hasLength(1));
       expect(indexResult.deletedItems.first.title, equals('Deleted Title'));
       expect(indexResult.items, isEmpty);
     });
 
     test('should skip index emission when converter not registered', () {
-      final indexItem = IndexItem(String, {IriTerm('http://example.org/title')});
+      final indexItem =
+          IndexItem(String, {IriTerm('http://example.org/title')});
       final index = FullIndex(
         TestNote,
         localName: 'unregistered-index',
         item: indexItem,
       );
-      
+
       final config = ResourceConfig(
         type: TestNote,
         crdtMapping: Uri.parse('http://example.org/mapping'),
@@ -246,7 +255,7 @@ void main() {
         localName: 'null-item-index',
         item: null,
       );
-      
+
       final config = ResourceConfig(
         type: TestNote,
         crdtMapping: Uri.parse('http://example.org/mapping'),
@@ -267,21 +276,23 @@ void main() {
     });
 
     test('should handle multiple indices', () {
-      final titleIndexItem = IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
-      final contentIndexItem = IndexItem(String, {IriTerm('http://example.org/content')});
-      
+      final titleIndexItem =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
+      final contentIndexItem =
+          IndexItem(String, {IriTerm('http://example.org/content')});
+
       final titleIndex = FullIndex(
         TestNote,
         localName: 'title-index',
         item: titleIndexItem,
       );
-      
+
       final contentIndex = FullIndex(
         TestNote,
         localName: 'content-index',
         item: contentIndexItem,
       );
-      
+
       final config = ResourceConfig(
         type: TestNote,
         crdtMapping: Uri.parse('http://example.org/mapping'),
@@ -311,13 +322,14 @@ void main() {
     });
 
     test('should preserve all HydrationResult fields in conversion', () {
-      final indexItem = IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
+      final indexItem =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       final index = FullIndex(
         TestNote,
         localName: 'title-index',
         item: indexItem,
       );
-      
+
       final config = ResourceConfig(
         type: TestNote,
         crdtMapping: Uri.parse('http://example.org/mapping'),
@@ -337,7 +349,8 @@ void main() {
 
       emitter.emit(result, config);
 
-      final indexResult = streamManager.emittedResults[1] as HydrationResult<TestNoteIndex>;
+      final indexResult =
+          streamManager.emittedResults[1] as HydrationResult<TestNoteIndex>;
       expect(indexResult.originalCursor, equals('original-cursor'));
       expect(indexResult.nextCursor, equals('next-cursor'));
       expect(indexResult.hasMore, equals(true));

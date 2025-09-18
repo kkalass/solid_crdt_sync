@@ -29,7 +29,7 @@ import 'package:personal_notes_app/models/note_index_entry.rdf_mapper.g.dart'
 RdfMapper initRdfMapper({
   RdfMapper? rdfMapper,
   required IriTermMapper<(String id,)> Function<T>(scsc.PodIriConfig)
-  $resourceIriFactory,
+      $resourceIriFactory,
   required IriTermMapper<String> Function<T>(Type) $resourceRefFactory,
 }) {
   if (rdfMapper == null) {

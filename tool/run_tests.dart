@@ -6,7 +6,7 @@
 /// Script to run tests across all packages using melos
 ///
 /// Usage: dart tool/run_tests.dart
-/// 
+///
 /// For individual package coverage, run:
 ///   cd packages/PACKAGE_NAME && dart test --coverage=coverage
 library;
@@ -38,8 +38,10 @@ Future<void> main() async {
   print('  cd packages/solid_crdt_sync_auth && dart test --coverage=coverage');
   print('  cd packages/solid_crdt_sync_ui && dart test --coverage=coverage');
   print('');
-  print('Note: Multipackage coverage aggregation requires individual package reports.');
-  print('Consider using melos for per-package coverage or implement coverage merger.');
+  print(
+      'Note: Multipackage coverage aggregation requires individual package reports.');
+  print(
+      'Consider using melos for per-package coverage or implement coverage merger.');
 
   // Skip coverage processing for now - melos doesn't aggregate coverage easily
   print('Tests completed successfully!');

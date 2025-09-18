@@ -5,7 +5,7 @@ void main() {
   group('TypeLocalNameKey', () {
     test('should create key with type and local name', () {
       const key = TypeLocalNameKey(String, 'test');
-      
+
       expect(key.type, equals(String));
       expect(key.localName, equals('test'));
     });
@@ -32,7 +32,7 @@ void main() {
 
     test('should have meaningful toString', () {
       const key = TypeLocalNameKey(String, 'test');
-      
+
       expect(key.toString(), equals('TypeLocalNameKey(String, test)'));
     });
   });

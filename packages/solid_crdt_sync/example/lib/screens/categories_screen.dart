@@ -236,7 +236,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               ),
             );
           }
-          
+
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -274,85 +274,86 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             itemCount: categories.length,
             itemBuilder: (context, index) {
               final category = categories[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: category.color != null
-                                      ? _parseColor(category.color!)
-                                      : Theme.of(context).primaryColor,
-                                  child: Text(
-                                    category.icon ??
-                                        category.name[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        category.name,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          color: category.archived ? Colors.grey : null,
-                                          decoration: category.archived ? TextDecoration.lineThrough : null,
-                                        ),
-                                      ),
-                                    ),
-                                    if (category.archived)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade300,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          'ARCHIVED',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                subtitle: category.description != null
-                                    ? Text(category.description!)
-                                    : null,
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (action) {
-                                    switch (action) {
-                                      case 'edit':
-                                        _showCategoryDialog(category: category);
-                                        break;
-                                      case 'archive':
-                                        _archiveCategory(category);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Edit'),
-                                    ),
-                                    if (!category.archived)
-                                      const PopupMenuItem(
-                                        value: 'archive',
-                                        child: Text('Archive'),
-                                      ),
-                                  ],
-                                ),
-                              ),
+              return Card(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: category.color != null
+                        ? _parseColor(category.color!)
+                        : Theme.of(context).primaryColor,
+                    child: Text(
+                      category.icon ?? category.name[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          category.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: category.archived ? Colors.grey : null,
+                            decoration: category.archived
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                      ),
+                      if (category.archived)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'ARCHIVED',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  subtitle: category.description != null
+                      ? Text(category.description!)
+                      : null,
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (action) {
+                      switch (action) {
+                        case 'edit':
+                          _showCategoryDialog(category: category);
+                          break;
+                        case 'archive':
+                          _archiveCategory(category);
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit'),
+                      ),
+                      if (!category.archived)
+                        const PopupMenuItem(
+                          value: 'archive',
+                          child: Text('Archive'),
+                        ),
+                    ],
+                  ),
+                ),
               );
             },
           );

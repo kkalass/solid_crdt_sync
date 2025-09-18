@@ -11,6 +11,7 @@ import 'storage/storage_interface.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
 import 'package:solid_crdt_sync_core/src/index/index_converter.dart';
 import 'package:solid_crdt_sync_core/src/index/index_item_converter.dart';
+import 'package:solid_crdt_sync_core/src/index/group_index_subscription_manager.dart';
 import 'config/resource_config.dart';
 import 'config/validation.dart';
 import 'hydration_result.dart';
@@ -42,6 +43,7 @@ class SolidCrdtSync {
   late final HydrationStreamManager _streamManager;
   late final IndexItemConverterRegistry _converterRegistry;
   late final HydrationEmitter _emitter;
+  late final GroupIndexSubscriptionManager _groupIndexManager;
   SolidCrdtSync._({
     required Storage storage,
     required RdfMapper mapper,
@@ -56,6 +58,10 @@ class SolidCrdtSync {
     _indexConverter = IndexConverter(_mapper);
     _streamManager = HydrationStreamManager();
     _converterRegistry = IndexItemConverterRegistry();
+    _groupIndexManager = GroupIndexSubscriptionManager(
+      config: _config,
+      mapper: _mapper,
+    );
     _emitter = HydrationEmitter(
       streamManager: _streamManager,
       converterRegistry: _converterRegistry,
@@ -87,7 +93,8 @@ class SolidCrdtSync {
     final resourceTypeCache = config.buildResourceTypeCache(mapper);
 
     // Validate configuration before proceeding
-    final configValidationResult = config.validate(resourceTypeCache);
+    final configValidationResult =
+        config.validate(resourceTypeCache, mapper: mapper);
 
     // Validate IRI service setup and finish setup if valid
     final iriServiceValidationResult =
@@ -110,9 +117,34 @@ class SolidCrdtSync {
         resourceTypeCache: resourceTypeCache);
   }
 
+  /// Subscribe to a group index with the given group key.
+  ///
+  /// Validates that G is a valid group type for the specified localName,
+  /// converts the group key to RDF triples, and generates group identifiers
+  /// using the configured GroupKeyGenerator.
+  ///
+  /// Throws [GroupIndexSubscriptionException] if:
+  /// - No GroupIndex is configured for type G with the given localName
+  /// - The group key cannot be serialized to RDF
+  /// - No group identifiers can be generated from the group key
+  ///
+  /// Returns the set of group identifiers that this group key belongs to.
   Future<void> subscribeToGroupIndex<G>(
       G groupKey, ItemFetchPolicy itemFetchPolicy,
-      {String localName = defaultIndexLocalName}) async {}
+      {String localName = defaultIndexLocalName}) async {
+    // Use the GroupIndexSubscriptionManager to handle validation and processing
+    final groupIdentifiers =
+        await _groupIndexManager.subscribeToGroupIndex<G>(groupKey, localName);
+    print('Subscribed to group identifiers: $groupIdentifiers');
+    // TODO: Implement actual subscription logic with itemFetchPolicy
+    // This should:
+    // 1. Load existing items for the generated group identifiers
+    // 2. Set up hydration streams for the group
+    // 3. Apply the ItemFetchPolicy (OnDemand, Eager, etc.)
+    // 4. Schedule sync operations if connected to Pod
+
+    //return groupIdentifiers;
+  }
 
   /// Save an object with CRDT processing.
   ///

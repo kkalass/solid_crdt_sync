@@ -91,7 +91,8 @@ class GroupKeyGenerator {
     // Extract and transform all values
     final transformedValues = <String>[];
     for (final triple in matchingTriples) {
-      final transformedValue = extractor.groupExtractor.extractGroupKey(triple.object);
+      final transformedValue =
+          extractor.groupExtractor.extractGroupKey(triple.object);
       if (transformedValue != null) {
         transformedValues.add(transformedValue);
       }

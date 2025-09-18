@@ -8,6 +8,7 @@ library;
 import 'package:rdf_core/rdf_core.dart';
 import 'package:rdf_mapper/rdf_mapper.dart';
 import 'package:solid_crdt_sync_core/src/index/index_config.dart';
+import 'package:solid_crdt_sync_core/src/index/regex_transform_validation.dart';
 import 'validation.dart';
 
 /// Configuration for a single resource type in the sync system.
@@ -95,14 +96,18 @@ class SyncConfig {
 
   /// Validate this configuration for consistency and correctness.
   ValidationResult validate(
-    Map<Type, IriTerm> resourceTypeCache,
-  ) {
+    Map<Type, IriTerm> resourceTypeCache, {
+    RdfMapper? mapper,
+  }) {
     final result = ValidationResult();
 
     _validateResourceUniqueness(result, resourceTypeCache);
     _validateDefaultPaths(result);
     _validateCrdtMappings(result);
     _validateIndexConfigurations(result);
+    if (mapper != null) {
+      _validateMapperTypes(result, mapper);
+    }
 
     return result;
   }
@@ -236,6 +241,8 @@ class SyncConfig {
   void _validateIndexConfigurations(ValidationResult result) {
     // Track local names per index item type across all resources
     final localNamesByItemType = <Type, Map<String, List<Type>>>{};
+    // Track groupKeyType and localName combinations for GroupIndex uniqueness
+    final groupKeyLocalNameCombinations = <String, List<(Type, String)>>{};
 
     for (final resource in resources) {
       for (final index in resource.indices) {
@@ -264,6 +271,31 @@ class SyncConfig {
                 'GroupIndex must have at least one grouping property for ${resource.type}',
                 context: {'type': resource.type, 'index': index});
           }
+
+          // Track groupKeyType + localName combination for uniqueness
+          final groupKeyTypeName = index.groupKeyType.toString();
+          final combinationKey = '$groupKeyTypeName:${index.localName}';
+          groupKeyLocalNameCombinations
+              .putIfAbsent(combinationKey, () => [])
+              .add((resource.type, index.localName));
+
+          // Validate regex transforms in grouping properties
+          for (final property in index.groupingProperties) {
+            if (property.transforms != null &&
+                property.transforms!.isNotEmpty) {
+              final transformValidationResult =
+                  RegexTransformValidator.validateList(property.transforms!);
+              result.addSubvalidationResult(
+                  'Regex transform in grouping property '
+                  '${property.predicate.iri} for ${resource.type}',
+                  {
+                    'type': resource.type,
+                    'property': property.predicate.iri,
+                    'index': index,
+                  },
+                  transformValidationResult);
+            }
+          }
         }
       }
     }
@@ -284,6 +316,81 @@ class SyncConfig {
         }
       });
     });
+
+    // Check for duplicate groupKeyType + localName combinations
+    groupKeyLocalNameCombinations.forEach((combinationKey, entries) {
+      if (entries.length > 1) {
+        final resourceTypes = entries.map((e) => e.$1).toList();
+        final localName = entries.first.$2;
+        result.addError(
+            'Duplicate groupKeyType and localName combination: $combinationKey. '
+            'Used by resources: ${resourceTypes.join(', ')}. '
+            'GroupIndex groupKeyType and localName combinations must be unique.',
+            context: {
+              'combinationKey': combinationKey,
+              'localName': localName,
+              'conflictingResources': resourceTypes
+            });
+      }
+    });
+  }
+
+  void _validateMapperTypes(ValidationResult result, RdfMapper mapper) {
+    // Collect all types that need mappers
+    final requiredTypes = <Type>{};
+
+    // Add all resource dart types
+    for (final resource in resources) {
+      requiredTypes.add(resource.type);
+    }
+
+    // Add all index item types
+    for (final resource in resources) {
+      for (final index in resource.indices) {
+        if (index.item != null) {
+          requiredTypes.add(index.item!.itemType);
+        }
+
+        // Add groupKeyType for GroupIndex
+        if (index is GroupIndex) {
+          requiredTypes.add(index.groupKeyType);
+        }
+      }
+    }
+
+    // Check if mapper can handle each required type by attempting a simple operation
+    for (final type in requiredTypes) {
+      try {
+        // Try to get serializers for the type - this will throw if not registered
+        // We use a simple approach: try to create an empty graph and see if we can decode it
+        final emptyGraph = RdfGraph.fromTriples([]);
+
+        // This test tries to decode an empty graph to the target type
+        // If the type is not registered, this should throw an exception
+        try {
+          switch (type) {
+            case const (String):
+              // String is a primitive type, always supported
+              break;
+            default:
+              // For complex types, try to decode an empty graph
+              // This will fail if the type is not registered
+              mapper.graph.decodeObject<Object>(emptyGraph);
+          }
+        } catch (e) {
+          // If decoding fails, it likely means the type is not registered
+          result.addWarning(
+              'Type $type may not be properly registered in RdfMapper. '
+              'Ensure the type is properly annotated and the mapper is initialized with all required types. '
+              'This validation is best-effort and may produce false positives.',
+              context: {'type': type, 'decode_error': e.toString()});
+        }
+      } catch (e) {
+        result.addWarning(
+            'Could not verify mapper registration for type $type: $e',
+            context: {'type': type, 'error': e.toString()});
+      }
+    }
   }
 
   /// Find the resource and index configuration for a given type and local name.
@@ -295,7 +402,8 @@ class SyncConfig {
   ///
   /// This is used during hydration setup to determine how to convert
   /// resources to index items for a specific stream.
-  (ResourceConfig, CrdtIndexConfig)? findIndexConfigForType<T>(String localName) {
+  (ResourceConfig, CrdtIndexConfig)? findIndexConfigForType<T>(
+      String localName) {
     // Search through all resources and their indices
     for (final resourceConfig in resources) {
       for (final index in resourceConfig.indices) {

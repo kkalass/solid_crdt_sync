@@ -127,7 +127,8 @@ class LocalResourceIriService {
     }
   }
 
-  void _validateResourceTypeCache(ValidationResult result, Map<Type, IriTerm> resourceTypeCache) {
+  void _validateResourceTypeCache(
+      ValidationResult result, Map<Type, IriTerm> resourceTypeCache) {
     for (final type in _registeredTypes.keys) {
       final iriTerm = resourceTypeCache[type];
       if (iriTerm == null) {
@@ -148,7 +149,8 @@ class LocalResourceIriService {
   ///
   /// Returns a [ValidationResult] that should be checked before proceeding.
   /// If validation fails, the service remains in setup phase and no state changes occur.
-  ValidationResult finishSetupAndValidate(Map<Type, IriTerm> resourceTypeCache) {
+  ValidationResult finishSetupAndValidate(
+      Map<Type, IriTerm> resourceTypeCache) {
     // First validate the configuration
     final validationResult = validate(resourceTypeCache);
 
@@ -161,7 +163,8 @@ class LocalResourceIriService {
       _registeredTypes.forEach((type, config) {
         final iriTerm = resourceTypeCache[type];
         // We already validated this in validate(), so this should not be null
-        assert(iriTerm != null, 'IRI term should exist after successful validation');
+        assert(iriTerm != null,
+            'IRI term should exist after successful validation');
         _resourceTypeCache[type] = iriTerm!;
       });
     }
@@ -179,7 +182,8 @@ class _LocalResourceIriMapper<T> implements IriTermMapper<(String,)> {
     final expectedPrefix = 'app://local/$typeName/';
 
     if (!iri.startsWith(expectedPrefix)) {
-      throw ArgumentError('IRI $iri does not match expected pattern for type $T');
+      throw ArgumentError(
+          'IRI $iri does not match expected pattern for type $T');
     }
 
     final id = iri.substring(expectedPrefix.length);
@@ -208,7 +212,8 @@ class _LocalReferenceIriMapper implements IriTermMapper<String> {
     final expectedPrefix = 'app://local/$typeName/';
 
     if (!iri.startsWith(expectedPrefix)) {
-      throw ArgumentError('IRI $iri does not match expected pattern for target type $targetType');
+      throw ArgumentError(
+          'IRI $iri does not match expected pattern for target type $targetType');
     }
 
     // Return just the ID part (same as resource, but return String instead of tuple)

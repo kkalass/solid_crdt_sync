@@ -143,7 +143,8 @@ void main() {
               hierarchyLevel: 1,
             ),
             GroupingProperty(
-              SchemaNoteDigitalDocument.dateCreated, // https://schema.org/dateCreated
+              SchemaNoteDigitalDocument
+                  .dateCreated, // https://schema.org/dateCreated
               hierarchyLevel: 1,
               transforms: [
                 RegexTransform(
@@ -371,7 +372,9 @@ void main() {
     });
 
     group('multiple triples handling', () {
-      test('generates multiple group keys when multiple property values present', () {
+      test(
+          'generates multiple group keys when multiple property values present',
+          () {
         final config = GroupIndex(
           String, // dartType
           String, // groupKeyType
@@ -383,8 +386,11 @@ void main() {
         final generator = GroupKeyGenerator(config);
         final triples = [
           Triple(testSubject, categoryPredicate, LiteralTerm.string('work')),
-          Triple(testSubject, categoryPredicate,
-              LiteralTerm.string('personal')), // Second value creates Cartesian product
+          Triple(
+              testSubject,
+              categoryPredicate,
+              LiteralTerm.string(
+                  'personal')), // Second value creates Cartesian product
           Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
               LiteralTerm.string('2024-08-15')),
         ];

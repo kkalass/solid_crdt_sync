@@ -14,7 +14,8 @@ class IndexItemConverterRegistry {
   final Map<TypeLocalNameKey, IndexItemConverter> _converters = {};
 
   /// Register a converter for the given key
-  void registerConverter<T>(TypeLocalNameKey key, IndexItemConverter<T> converter) {
+  void registerConverter<T>(
+      TypeLocalNameKey key, IndexItemConverter<T> converter) {
     if (_converters.containsKey(key)) {
       throw ArgumentError(
           'IndexItemConverter for key $key is already registered');

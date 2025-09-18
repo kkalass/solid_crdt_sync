@@ -18,8 +18,8 @@ class Optional<T> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Optional<T> &&
-      runtimeType == other.runtimeType &&
-      value == other.value;
+          runtimeType == other.runtimeType &&
+          value == other.value;
 
   @override
   int get hashCode => value.hashCode;

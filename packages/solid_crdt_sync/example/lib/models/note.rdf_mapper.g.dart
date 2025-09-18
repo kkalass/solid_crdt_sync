@@ -30,8 +30,8 @@ class NoteMapper implements GlobalResourceMapper<note.Note> {
   const NoteMapper({
     required IriTermMapper<String> categoryIdMapper,
     required IriTermMapper<(String id,)> iriMapper,
-  }) : _categoryIdMapper = categoryIdMapper,
-       _iriMapper = iriMapper;
+  })  : _categoryIdMapper = categoryIdMapper,
+        _iriMapper = iriMapper;
 
   @override
   IriTerm? get typeIri => PersonalNotesVocab.PersonalNote;

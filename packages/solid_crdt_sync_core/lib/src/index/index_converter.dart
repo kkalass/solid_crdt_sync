@@ -65,7 +65,7 @@ class IndexConverter {
       ..add(Triple(indexItemSubject, IdxVocab.resource, subject));
 
     // Convert filtered RDF back to index item type
-    
+
     return _mapper.graph
         .decodeObject<I>(RdfGraph.fromTriples(indexItemTriples));
   }

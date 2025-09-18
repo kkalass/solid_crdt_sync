@@ -8,6 +8,8 @@ import 'package:rdf_mapper/rdf_mapper.dart';
 class TestVocab {
   static const baseIri = 'https://test.example/vocab#';
   static const testDocument = IriTerm.prevalidated('${baseIri}TestDocument');
+  static const testDocumentGroupKey =
+      IriTerm.prevalidated('${baseIri}TestDocumentGroupKey');
   static const testCategory = IriTerm.prevalidated('${baseIri}TestCategory');
   static const testNote = IriTerm.prevalidated('${baseIri}TestNote');
   static const note = IriTerm.prevalidated('${baseIri}Note');
@@ -95,6 +97,8 @@ RdfMapper createTestMapper() {
   return RdfMapper(
     registry: RdfMapperRegistry()
       ..registerMapper(MockResourceMapper<TestDocument>(TestVocab.testDocument))
+      ..registerMapper(MockResourceMapper<TestDocumentGroupKey>(
+          TestVocab.testDocumentGroupKey))
       ..registerMapper(MockResourceMapper<TestCategory>(TestVocab.testCategory))
       ..registerMapper(MockResourceMapper<TestNote>(TestVocab.testNote))
       ..registerMapper(MockResourceMapper<Note>(TestVocab.note))

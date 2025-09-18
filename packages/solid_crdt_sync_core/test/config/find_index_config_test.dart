@@ -36,14 +36,16 @@ void main() {
 
     setUp(() {
       // Set up test configurations
-      final noteIndexItem = IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
+      final noteIndexItem =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
       noteIndex = FullIndex(
         TestNote,
         localName: 'note-title-index',
         item: noteIndexItem,
       );
 
-      final contactIndexItem = IndexItem(TestContactIndex, {IriTerm('http://example.org/name')});
+      final contactIndexItem =
+          IndexItem(TestContactIndex, {IriTerm('http://example.org/name')});
       contactIndex = FullIndex(
         TestContact,
         localName: 'contact-name-index',
@@ -67,9 +69,11 @@ void main() {
       );
     });
 
-    test('should find correct index config for matching type and local name', () {
-      final result = config.findIndexConfigForType<TestNoteIndex>('note-title-index');
-      
+    test('should find correct index config for matching type and local name',
+        () {
+      final result =
+          config.findIndexConfigForType<TestNoteIndex>('note-title-index');
+
       expect(result, isNotNull);
       final (resourceConfig, indexConfig) = result!;
       expect(resourceConfig, equals(noteResourceConfig));
@@ -77,8 +81,9 @@ void main() {
     });
 
     test('should find correct index config for different resource type', () {
-      final result = config.findIndexConfigForType<TestContactIndex>('contact-name-index');
-      
+      final result =
+          config.findIndexConfigForType<TestContactIndex>('contact-name-index');
+
       expect(result, isNotNull);
       final (resourceConfig, indexConfig) = result!;
       expect(resourceConfig, equals(contactResourceConfig));
@@ -87,26 +92,30 @@ void main() {
 
     test('should return null for non-existent type', () {
       final result = config.findIndexConfigForType<String>('note-title-index');
-      
+
       expect(result, isNull);
     });
 
     test('should return null for non-existent local name', () {
-      final result = config.findIndexConfigForType<TestNoteIndex>('non-existent-index');
-      
+      final result =
+          config.findIndexConfigForType<TestNoteIndex>('non-existent-index');
+
       expect(result, isNull);
     });
 
-    test('should return null for mismatched type and local name combination', () {
+    test('should return null for mismatched type and local name combination',
+        () {
       // Wrong type for contact index
-      final result = config.findIndexConfigForType<TestNoteIndex>('contact-name-index');
-      
+      final result =
+          config.findIndexConfigForType<TestNoteIndex>('contact-name-index');
+
       expect(result, isNull);
     });
 
     test('should handle resource with multiple indices', () {
       // Add another index to the note resource
-      final noteTagsIndexItem = IndexItem(String, {IriTerm('http://example.org/tags')});
+      final noteTagsIndexItem =
+          IndexItem(String, {IriTerm('http://example.org/tags')});
       final noteTagsIndex = FullIndex(
         TestNote,
         localName: 'note-tags-index',
@@ -124,11 +133,13 @@ void main() {
       );
 
       // Should find the correct index even with multiple indices
-      final noteIndexResult = multiIndexConfig.findIndexConfigForType<TestNoteIndex>('note-title-index');
+      final noteIndexResult = multiIndexConfig
+          .findIndexConfigForType<TestNoteIndex>('note-title-index');
       expect(noteIndexResult, isNotNull);
       expect(noteIndexResult!.$2, equals(noteIndex));
 
-      final tagsIndexResult = multiIndexConfig.findIndexConfigForType<String>('note-tags-index');
+      final tagsIndexResult =
+          multiIndexConfig.findIndexConfigForType<String>('note-tags-index');
       expect(tagsIndexResult, isNotNull);
       expect(tagsIndexResult!.$2, equals(noteTagsIndex));
     });
@@ -145,11 +156,13 @@ void main() {
       );
 
       // Should still find note index
-      final noteResult = noIndexConfig.findIndexConfigForType<TestNoteIndex>('note-title-index');
+      final noteResult = noIndexConfig
+          .findIndexConfigForType<TestNoteIndex>('note-title-index');
       expect(noteResult, isNotNull);
 
       // Should not find anything for the resource with no indices
-      final stringResult = noIndexConfig.findIndexConfigForType<String>('any-index');
+      final stringResult =
+          noIndexConfig.findIndexConfigForType<String>('any-index');
       expect(stringResult, isNull);
     });
 
@@ -171,28 +184,32 @@ void main() {
       );
 
       // Should not find anything since item is null
-      final result = nullItemConfig.findIndexConfigForType<TestNoteIndex>('null-item-index');
+      final result = nullItemConfig
+          .findIndexConfigForType<TestNoteIndex>('null-item-index');
       expect(result, isNull);
     });
 
     test('should handle empty configuration', () {
       final emptyConfig = SyncConfig(resources: []);
-      
-      final result = emptyConfig.findIndexConfigForType<TestNoteIndex>('any-index');
+
+      final result =
+          emptyConfig.findIndexConfigForType<TestNoteIndex>('any-index');
       expect(result, isNull);
     });
 
     test('should distinguish between different local names for same type', () {
       // Create two indices with same item type but different local names
-      final noteIndexItem1 = IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
-      final noteIndexItem2 = IndexItem(TestNoteIndex, {IriTerm('http://example.org/content')});
-      
+      final noteIndexItem1 =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/title')});
+      final noteIndexItem2 =
+          IndexItem(TestNoteIndex, {IriTerm('http://example.org/content')});
+
       final noteIndex1 = FullIndex(
         TestNote,
         localName: 'note-title-index',
         item: noteIndexItem1,
       );
-      
+
       final noteIndex2 = FullIndex(
         TestNote,
         localName: 'note-content-index',
@@ -210,11 +227,13 @@ void main() {
       );
 
       // Should find the correct index based on local name
-      final titleResult = multiSameTypeConfig.findIndexConfigForType<TestNoteIndex>('note-title-index');
+      final titleResult = multiSameTypeConfig
+          .findIndexConfigForType<TestNoteIndex>('note-title-index');
       expect(titleResult, isNotNull);
       expect(titleResult!.$2, equals(noteIndex1));
 
-      final contentResult = multiSameTypeConfig.findIndexConfigForType<TestNoteIndex>('note-content-index');
+      final contentResult = multiSameTypeConfig
+          .findIndexConfigForType<TestNoteIndex>('note-content-index');
       expect(contentResult, isNotNull);
       expect(contentResult!.$2, equals(noteIndex2));
     });

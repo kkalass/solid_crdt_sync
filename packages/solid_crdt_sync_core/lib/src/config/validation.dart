@@ -22,6 +22,21 @@ class ValidationResult {
     warnings.add(ValidationWarning(message, context: context));
   }
 
+  void addSubvalidationResult(String contextMessage,
+      Map<String, Object> contextDetails, ValidationResult result) {
+    // Add transform validation errors to the overall result
+    for (final error in result.errors) {
+      result.addError('$contextMessage: ${error.message}',
+          context: {...contextDetails, 'subvalidation_error': error});
+    }
+
+    // Add transform validation warnings
+    for (final warning in result.warnings) {
+      result.addWarning('$contextMessage: ${warning.message}',
+          context: {...contextDetails, 'subvalidation_warning': warning});
+    }
+  }
+
   static ValidationResult merge(List<ValidationResult> results) {
     final combinedValidationResult = ValidationResult();
     for (final result in results) {

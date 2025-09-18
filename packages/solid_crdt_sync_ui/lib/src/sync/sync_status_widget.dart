@@ -14,7 +14,7 @@ enum SyncStatus {
 }
 
 /// Widget that displays the current synchronization status.
-/// 
+///
 /// Shows sync progress, last sync time, and allows manual sync triggers.
 class SyncStatusWidget extends StatefulWidget {
   final SyncEngine syncEngine;
@@ -58,7 +58,8 @@ class _SyncStatusWidgetState extends State<SyncStatusWidget> {
                       if (_lastSyncTime != null)
                         Text(
                           'Last sync: $_lastSyncTime',
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                     ],
                   ),

@@ -31,8 +31,8 @@ class NoteIndexEntryMapper implements LocalResourceMapper<nie.NoteIndexEntry> {
   const NoteIndexEntryMapper({
     required IriTermMapper<String> categoryIdMapper,
     required IriTermMapper<String> idMapper,
-  }) : _categoryIdMapper = categoryIdMapper,
-       _idMapper = idMapper;
+  })  : _categoryIdMapper = categoryIdMapper,
+        _idMapper = idMapper;
 
   @override
   IriTerm? get typeIri => null;

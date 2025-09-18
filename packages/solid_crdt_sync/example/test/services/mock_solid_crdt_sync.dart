@@ -36,10 +36,8 @@ class MockSolidCrdtSync implements SolidCrdtSync {
 
   @override
   Future<void> subscribeToGroupIndex<G>(
-    G groupKey,
-    ItemFetchPolicy itemFetchPolicy, {
-    String localName = defaultIndexLocalName
-  }) async {
+      G groupKey, ItemFetchPolicy itemFetchPolicy,
+      {String localName = defaultIndexLocalName}) async {
     // Mock implementation - do nothing
   }
 }

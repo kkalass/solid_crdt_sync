@@ -60,7 +60,7 @@ class TestNoteMapper implements GlobalResourceMapper<TestNote> {
   @override
   TestNote fromRdfResource(IriTerm subject, DeserializationContext context) {
     final reader = context.reader(subject);
-    
+
     return TestNote(
       id: subject.iri,
       title: reader.require(SchemaNoteDigitalDocument.name),
@@ -98,7 +98,8 @@ class TestNoteMapper implements GlobalResourceMapper<TestNote> {
 }
 
 /// Test mapper for TestNoteIndexEntry (similar to generated NoteIndexEntryMapper)
-class TestNoteIndexEntryMapper implements LocalResourceMapper<TestNoteIndexEntry> {
+class TestNoteIndexEntryMapper
+    implements LocalResourceMapper<TestNoteIndexEntry> {
   const TestNoteIndexEntryMapper();
 
   @override
@@ -112,7 +113,8 @@ class TestNoteIndexEntryMapper implements LocalResourceMapper<TestNoteIndexEntry
     final reader = context.reader(subject);
 
     return TestNoteIndexEntry(
-      id: reader.require(IdxVocab.resource, deserializer: const IriFullMapper()),
+      id: reader.require(IdxVocab.resource,
+          deserializer: const IriFullMapper()),
       name: reader.require(SchemaNoteDigitalDocument.name),
       dateCreated: reader.require(SchemaNoteDigitalDocument.dateCreated),
       dateModified: reader.require(SchemaNoteDigitalDocument.dateModified),
@@ -133,7 +135,8 @@ class TestNoteIndexEntryMapper implements LocalResourceMapper<TestNoteIndexEntry
 
     return context
         .resourceBuilder(subject)
-        .addValue(IdxVocab.resource, resource.id, serializer: const IriFullMapper())
+        .addValue(IdxVocab.resource, resource.id,
+            serializer: const IriFullMapper())
         .addValue(SchemaNoteDigitalDocument.name, resource.name)
         .addValue(SchemaNoteDigitalDocument.dateCreated, resource.dateCreated)
         .addValue(SchemaNoteDigitalDocument.dateModified, resource.dateModified)
@@ -150,7 +153,7 @@ void main() {
   group('IndexConverter', () {
     late RdfMapper mapper;
     late IndexConverter converter;
-    
+
     setUp(() {
       // Create RDF mapper with our test mappers registered
       mapper = RdfMapper(
@@ -159,7 +162,7 @@ void main() {
           ..registerMapper(const TestNoteIndexEntryMapper()),
         rdfCore: RdfCore.withStandardCodecs(),
       );
-      
+
       converter = IndexConverter(mapper);
     });
 
@@ -168,7 +171,8 @@ void main() {
       expect(converter, isA<IndexConverter>());
     });
 
-    test('converts full resource to index item with filtered properties', () async {
+    test('converts full resource to index item with filtered properties',
+        () async {
       // Create a full note with all properties
       final note = TestNote(
         id: 'https://example.org/notes/test-note',
@@ -192,7 +196,8 @@ void main() {
       );
 
       // Convert to index item
-      final indexEntry = await converter.convertToIndexItem<TestNote, TestNoteIndexEntry>(
+      final indexEntry =
+          await converter.convertToIndexItem<TestNote, TestNoteIndexEntry>(
         TestVocab.TestNote,
         note,
         indexItem,
@@ -201,10 +206,12 @@ void main() {
       // Verify conversion
       expect(indexEntry.id, equals('https://example.org/notes/test-note'));
       expect(indexEntry.name, equals('Test Note'));
-      expect(indexEntry.dateCreated, equals(DateTime.parse('2023-01-01T10:00:00Z')));
-      expect(indexEntry.dateModified, equals(DateTime.parse('2023-01-02T15:30:00Z')));
+      expect(indexEntry.dateCreated,
+          equals(DateTime.parse('2023-01-01T10:00:00Z')));
+      expect(indexEntry.dateModified,
+          equals(DateTime.parse('2023-01-02T15:30:00Z')));
       expect(indexEntry.keywords, equals({'work', 'important'}));
-      
+
       // Note: content property should be filtered out (not in index item properties)
     });
 
@@ -229,7 +236,8 @@ void main() {
         },
       );
 
-      final indexEntry = await converter.convertToIndexItem<TestNote, TestNoteIndexEntry>(
+      final indexEntry =
+          await converter.convertToIndexItem<TestNote, TestNoteIndexEntry>(
         TestVocab.TestNote,
         note,
         indexItem,
@@ -259,7 +267,8 @@ void main() {
         },
       );
 
-      final indexEntry = await converter.convertToIndexItem<TestNote, TestNoteIndexEntry>(
+      final indexEntry =
+          await converter.convertToIndexItem<TestNote, TestNoteIndexEntry>(
         TestVocab.TestNote,
         note,
         indexItem,
