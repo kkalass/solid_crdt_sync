@@ -40,4 +40,11 @@ class MockSolidCrdtSync implements SolidCrdtSync {
       {String localName = defaultIndexLocalName}) async {
     // Mock implementation - do nothing
   }
+
+  @override
+  Future<T?> ensure<T>(String id,
+      {required Future<T?> Function(String id) loadFromLocal,
+      Duration? timeout = const Duration(seconds: 15)}) {
+    return loadFromLocal(id);
+  }
 }
