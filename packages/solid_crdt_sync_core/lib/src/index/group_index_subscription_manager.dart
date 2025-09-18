@@ -35,16 +35,8 @@ class GroupIndexSubscriptionManager {
   })  : _config = config,
         _mapper = mapper;
 
-  /// Subscribe to a group index with proper validation and group key generation.
-  ///
-  /// Validates that:
-  /// - G is a valid group key type registered in a GroupIndex
-  /// - The localName corresponds to a GroupIndex with groupKeyType G
-  /// - The groupKey can be serialized to RDF
-  /// - The GroupIndex configuration has valid group key generators
-  ///
   /// Returns the set of group identifiers generated from the group key.
-  Future<Set<String>> subscribeToGroupIndex<G>(G groupKey,
+  Future<Set<String>> getGroupIdentifiers<G>(G groupKey,
       {String localName = defaultIndexLocalName}) async {
     // Step 1: Find the GroupIndex configuration for type G and localName
     final groupIndexConfig = _findGroupIndexConfig<G>(localName);

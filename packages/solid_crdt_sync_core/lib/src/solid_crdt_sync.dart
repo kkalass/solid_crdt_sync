@@ -174,8 +174,9 @@ class SolidCrdtSync {
       {String localName = defaultIndexLocalName}) async {
     // Use the GroupIndexSubscriptionManager to handle validation and processing
     final groupIdentifiers = await _groupIndexManager
-        .subscribeToGroupIndex<G>(groupKey, localName: localName);
-    print('Subscribed to group identifiers: $groupIdentifiers');
+        .getGroupIdentifiers<G>(groupKey, localName: localName);
+    print(
+        'configure called for group key: $groupKey, resolved to group identifiers: $groupIdentifiers');
     // TODO: Implement actual subscription logic with itemFetchPolicy
     // This should:
     // 1. Load existing items for the generated group identifiers

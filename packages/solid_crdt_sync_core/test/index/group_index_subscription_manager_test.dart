@@ -46,7 +46,7 @@ void main() {
         final groupKey = TestDocumentGroupKey(category: 'work');
 
         final groupIdentifiers =
-            await manager.subscribeToGroupIndex<TestDocumentGroupKey>(
+            await manager.getGroupIdentifiers<TestDocumentGroupKey>(
           groupKey,
           localName: 'document-groups',
         );
@@ -57,7 +57,7 @@ void main() {
 
       test('throws exception for unknown group key type', () async {
         expect(
-          () => manager.subscribeToGroupIndex<String>('invalid',
+          () => manager.getGroupIdentifiers<String>('invalid',
               localName: 'document-groups'),
           throwsA(isA<GroupIndexSubscriptionException>()),
         );
@@ -67,7 +67,7 @@ void main() {
         final groupKey = TestDocumentGroupKey(category: 'work');
 
         expect(
-          () => manager.subscribeToGroupIndex<TestDocumentGroupKey>(groupKey,
+          () => manager.getGroupIdentifiers<TestDocumentGroupKey>(groupKey,
               localName: 'unknown-index'),
           throwsA(isA<GroupIndexSubscriptionException>()),
         );
@@ -76,7 +76,7 @@ void main() {
       test('throws exception when RDF conversion fails', () async {
         // This should fail because String is not a mapped type
         expect(
-          () => manager.subscribeToGroupIndex<String>('invalid',
+          () => manager.getGroupIdentifiers<String>('invalid',
               localName: 'document-groups'),
           throwsA(isA<GroupIndexSubscriptionException>()),
         );
@@ -101,7 +101,8 @@ void main() {
         // (which is the main validation we need)
         final groupKey = TestDocumentGroupKey(category: 'work');
         expect(
-          () => manager.subscribeToGroupIndex(groupKey, localName: 'document-groups'),
+          () => manager.getGroupIdentifiers(groupKey,
+              localName: 'document-groups'),
           returnsNormally,
         );
       });
