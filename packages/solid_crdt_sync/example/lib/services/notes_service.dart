@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:personal_notes_app/models/note_group_key.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 import '../models/note.dart';
 import '../models/note_index_entry.dart';
@@ -71,9 +72,31 @@ class NotesService {
   /// Stream of current category filter state
   Stream<String?> get categoryFilterStream => _categoryFilterController.stream;
 
-  /// Set month filter (null means show all months)
-  void setMonthFilter(NoteGroupKey? monthFilter) {
+  /// Set month filter and ensure subscription to the month group
+  Future<void> setMonthFilter(NoteGroupKey? monthFilter) async {
+    if (monthFilter != null) {
+      // Determine fetch policy based on month
+      final isPrefetchNeeded = monthFilter == NoteGroupKey.currentMonth ||
+          monthFilter == NoteGroupKey.previousMonth;
+
+      await _noteRepository.configureMonthGroupSubscription(
+          monthFilter,
+          isPrefetchNeeded ? ItemFetchPolicy.prefetch : ItemFetchPolicy.onRequest);
+    }
     _monthFilterController.add(monthFilter);
+  }
+
+  /// Initialize default subscriptions for current and previous month
+  /// Returns the month that was set as the initial filter
+  Future<NoteGroupKey> initializeDefaultSubscriptions() async {
+    // Configure subscriptions to current and previous month with prefetch (business logic)
+    await _noteRepository.configureMonthGroupSubscription(NoteGroupKey.currentMonth, ItemFetchPolicy.prefetch);
+    await _noteRepository.configureMonthGroupSubscription(NoteGroupKey.previousMonth, ItemFetchPolicy.prefetch);
+
+    // Set initial month filter to current month
+    final initialMonth = NoteGroupKey.currentMonth;
+    _monthFilterController.add(initialMonth);
+    return initialMonth;
   }
 
   /// Get a specific note by ID

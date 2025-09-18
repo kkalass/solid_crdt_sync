@@ -7,6 +7,7 @@ import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import '../models/category.dart' as models;
 import '../models/note.dart' as models;
 import '../models/note_index_entry.dart' as models;
+import '../models/note_group_key.dart';
 import 'database.dart';
 
 /// Repository for Category business logic operations.
@@ -308,6 +309,17 @@ class NoteRepository {
   Stream<List<models.NoteIndexEntry>> watchAllNoteIndexEntries() {
     return _noteIndexDao.watchAllNoteIndexEntries().map(
         (driftEntries) => driftEntries.map(_noteIndexEntryFromDrift).toList());
+  }
+
+  /// Configure subscription to a specific month group for note index entries
+  Future<void> configureMonthGroupSubscription(NoteGroupKey monthKey, ItemFetchPolicy fetchPolicy) async {
+    await _syncSystem.configureGroupIndexSubscription(_formatMonthKey(monthKey.createdMonth), fetchPolicy);
+  }
+
+
+  /// Format a DateTime to match the NoteGroupKey format
+  String _formatMonthKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}';
   }
 
   /// Dispose resources when repository is no longer needed

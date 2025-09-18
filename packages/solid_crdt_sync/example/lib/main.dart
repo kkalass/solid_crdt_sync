@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:personal_notes_app/init_rdf_mapper.g.dart';
 import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
+import 'package:personal_notes_app/models/note_group_key.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
 import 'package:personal_notes_app/vocabulary/personal_notes_vocab.dart';
 import 'package:rdf_vocabularies_schema/schema.dart';
@@ -59,7 +60,7 @@ Future<SolidCrdtSync> initializeSolidCrdtSync(
           type: Note,
           crdtMapping: Uri.parse('$baseUrl/note-v1.ttl'),
           indices: [
-            GroupIndex(Note,
+            GroupIndex(NoteGroupKey,
                 item: IndexItem(NoteIndexEntry, {
                   SchemaNoteDigitalDocument.name,
                   SchemaNoteDigitalDocument.dateCreated,
@@ -251,7 +252,6 @@ class _AppInitializerState extends State<AppInitializer>
 
     // Successfully initialized - show the main app
     return NotesListScreen(
-      syncSystem: syncSystem!,
       notesService: notesService!,
       categoriesService: categoriesService!,
     );

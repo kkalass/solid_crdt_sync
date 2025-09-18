@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_notes_app/models/note.dart';
 import 'package:personal_notes_app/models/note_index_entry.dart';
+import 'package:personal_notes_app/models/note_group_key.dart';
 import 'package:personal_notes_app/storage/repositories.dart';
+import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 
 /// Mock repository for testing
 class MockNoteRepository implements NoteRepository {
@@ -42,6 +44,12 @@ class MockNoteRepository implements NoteRepository {
   Stream<List<NoteIndexEntry>> watchAllNoteIndexEntries() {
     return Stream.value(List.from(storedIndexEntries));
   }
+
+  @override
+  Future<void> configureMonthGroupSubscription(NoteGroupKey monthKey, ItemFetchPolicy fetchPolicy) async {
+    // Mock implementation - do nothing for tests
+  }
+
 
   @override
   void dispose() {}
