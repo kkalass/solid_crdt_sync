@@ -7,9 +7,9 @@ import 'package:test/test.dart';
 void main() {
   group('GroupKeyGenerator', () {
     // Test vocabulary for consistent URIs
-    final testSubject = IriTerm.prevalidated('http://example.org/resource/123');
+    final testSubject = IriTerm('http://example.org/resource/123');
     final categoryPredicate =
-        IriTerm.prevalidated('http://example.org/category');
+        IriTerm('http://example.org/category');
 
     group('basic functionality', () {
       test('generates simple group key from single property', () {
@@ -309,7 +309,7 @@ void main() {
         final generator = GroupKeyGenerator(config);
         final triples = [
           Triple(testSubject, categoryPredicate,
-              IriTerm.prevalidated('http://example.org/category/work')),
+              IriTerm('http://example.org/category/work')),
         ];
 
         final result = generator.generateGroupKeys(triples);
@@ -398,7 +398,7 @@ void main() {
       });
 
       test('generates cartesian product across hierarchy levels', () {
-        final priorityPredicate = IriTerm.prevalidated('http://example.org/priority');
+        final priorityPredicate = IriTerm('http://example.org/priority');
 
         final config = GroupIndex(
           String, // groupKeyType
@@ -525,7 +525,7 @@ void main() {
               testSubject,
               SchemaNoteDigitalDocument.dateCreated,
               LiteralTerm('42',
-                  datatype: IriTerm.prevalidated(
+                  datatype: IriTerm(
                       'http://www.w3.org/2001/XMLSchema#integer'))),
         ];
 
@@ -603,13 +603,13 @@ void main() {
 
         final generator = GroupKeyGenerator(config);
         final triples = [
-          Triple(testSubject, IriTerm.prevalidated('http://example.org/title'),
+          Triple(testSubject, IriTerm('http://example.org/title'),
               LiteralTerm.string('Some Title')),
           Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
               LiteralTerm.string('2024-08-15')),
           Triple(
               testSubject,
-              IriTerm.prevalidated('http://example.org/content'),
+              IriTerm('http://example.org/content'),
               LiteralTerm.string('Content here')),
         ];
 
@@ -702,7 +702,7 @@ void main() {
             GroupingProperty(SchemaNoteDigitalDocument.dateCreated,
                 hierarchyLevel: 1),
             GroupingProperty(
-                IriTerm.prevalidated('http://example.org/priority'),
+                IriTerm('http://example.org/priority'),
                 hierarchyLevel: 2),
           ],
         );
@@ -714,7 +714,7 @@ void main() {
               LiteralTerm.string('2024-08-15')),
           Triple(
               testSubject,
-              IriTerm.prevalidated('http://example.org/priority'),
+              IriTerm('http://example.org/priority'),
               LiteralTerm.string('high')),
         ];
 
@@ -726,8 +726,8 @@ void main() {
 
       test('enforces lexicographic IRI ordering within same level', () {
         // Create predicates with clear lexicographic ordering
-        final aProperty = IriTerm.prevalidated('http://example.org/a');
-        final zProperty = IriTerm.prevalidated('http://example.org/z');
+        final aProperty = IriTerm('http://example.org/a');
+        final zProperty = IriTerm('http://example.org/z');
 
         final config = GroupIndex(
           String, // groupKeyType
@@ -777,6 +777,153 @@ void main() {
 
         expect(generator.generateGroupKeys(triples1), equals({'2024-08'}));
         expect(generator.generateGroupKeys(triples2), equals({'2024-09'}));
+      });
+    });
+
+    group('filesystem safety integration', () {
+      test('preserves safe group keys unchanged', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('work')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Safe keys should be preserved exactly
+        expect(result, equals({'work'}));
+      });
+
+      test('makes unsafe single-level group keys filesystem-safe', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('contains/slash')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        final groupKey = result.first;
+
+        // Should be hashed due to unsafe characters
+        expect(groupKey, equals('14_27ee8130bc8cbbba'));
+      });
+
+      test('makes unsafe hierarchical group keys filesystem-safe', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(
+              categoryPredicate,
+              hierarchyLevel: 1,
+            ),
+            GroupingProperty(
+              SchemaNoteDigitalDocument.dateCreated,
+              hierarchyLevel: 2,
+              transforms: [
+                RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}-${2}'),
+              ],
+            ),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('unsafe:category')),
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-08-15')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        final groupKey = result.first;
+
+        // Should have safe date component and hashed category component
+        expect(groupKey, equals('15_2a0058a9a9adda33/2024-08'));
+      });
+
+      test('handles mixed safe and unsafe components in hierarchical paths', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(
+              categoryPredicate,
+              hierarchyLevel: 1,
+            ),
+            GroupingProperty(
+              SchemaNoteDigitalDocument.dateCreated,
+              hierarchyLevel: 2,
+              transforms: [
+                RegexTransform(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})$', r'${1}'),
+              ],
+            ),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('work')), // Safe
+          Triple(testSubject, SchemaNoteDigitalDocument.dateCreated,
+              LiteralTerm.string('2024-08-15')), // Safe after transform
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        // Both components are safe, should be preserved
+        expect(result, equals({'work/2024'}));
+      });
+
+      test('handles IRI values with filesystem safety', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(testSubject, categoryPredicate,
+              IriTerm('http://example.org/category/work')),
+        ];
+
+        final result = generator.generateGroupKeys(triples);
+        final groupKey = result.first;
+
+        // IRI contains unsafe characters, should be hashed
+        expect(groupKey, equals('32_634439c763d336ff'));
+      });
+
+      test('ensures deterministic filesystem-safe results', () {
+        final config = GroupIndex(
+          String, // groupKeyType
+          groupingProperties: [
+            GroupingProperty(categoryPredicate),
+          ],
+        );
+
+        final generator = GroupKeyGenerator(config);
+        final triples = [
+          Triple(testSubject, categoryPredicate, LiteralTerm.string('unicode-café')),
+        ];
+
+        final result1 = generator.generateGroupKeys(triples);
+        final result2 = generator.generateGroupKeys(triples);
+
+        // Should produce identical results
+        expect(result1, equals(result2));
+
+        // Should be hashed due to unicode characters
+        final groupKey = result1.first;
+        expect(groupKey, equals('12_2132607b07f7e7a9'));
       });
     });
   });

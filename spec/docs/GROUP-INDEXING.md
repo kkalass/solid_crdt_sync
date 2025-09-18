@@ -380,3 +380,69 @@ Implementations must support the compatible regex subset defined above. This ens
 
 **Early Exit:** Stop processing transform list on first match
 
+## Filesystem Safety
+
+Group keys serve as filesystem path components and must be safe across all platforms. The framework automatically ensures filesystem safety for both individual group keys and hierarchical paths.
+
+### Safety Requirements
+
+**Cross-Platform Compatibility:** Group keys must work on Windows, Linux, macOS, and web filesystems without conflicts or errors.
+
+**Path Component Safety:** Each group key becomes a directory or file name and must avoid:
+- Filesystem-reserved characters: `< > : " / \ | ? * \x00-\x1F`
+- Platform-reserved names: `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` (Windows)
+- Directory navigation: `.`, `..`, empty strings
+- Hidden file prefixes: Names starting with `.`
+
+### Automatic Safety Enforcement
+
+The framework applies filesystem safety automatically during group key generation:
+
+#### Safe Key Preservation
+Keys are preserved unchanged when they meet all criteria:
+- **Character whitelist:** Only `[a-zA-Z0-9._-]` characters
+- **Length limit:** 50 characters or fewer
+- **Name safety:** Not `.`, `..`, or hidden (starting with `.`)
+
+#### Hash-Based Fallback
+Keys that fail safety checks are automatically converted using xxHash64:
+- **Format:** `{originalLength}_{16-char-hex-hash}`
+- **Hash algorithm:** xxHash64 (consistent with framework's sharding and clock hashing)
+- **Deterministic:** Identical input always produces identical hash
+- **Collision resistant:** 64-bit hash provides excellent collision resistance for grouping use cases
+
+### Implementation Examples
+
+**Safe keys (preserved):**
+```
+"work" → "work"
+"2024-08" → "2024-08"
+"project_alpha" → "project_alpha"
+"v1.2.3" → "v1.2.3"
+```
+
+**Unsafe keys (hashed):**
+```
+"contains/slash" → "14_a1b2c3d4e5f67890"
+"very-long-category-name-exceeding-fifty-characters" → "52_9876543210abcdef"
+"http://example.org/resource" → "26_fedcba0987654321"
+"unicode-café-résumé" → "18_1234567890abcdef"
+```
+
+**Hierarchical paths:**
+```
+Safe: work/2024-08/high-priority
+Mixed: work/14_a1b2c3d4e5f67890/high-priority
+Unsafe: 4_abc123/26_def456/13_789abc
+```
+
+### Benefits
+
+**Universal Compatibility:** Generated group keys work identically across all platforms and filesystems.
+
+**Debuggability:** Character count prefix helps identify original content length and spot potential issues.
+
+**Performance:** xxHash64 provides fast hashing with excellent distribution for collision avoidance.
+
+**Determinism:** Identical group keys always produce identical filesystem-safe representations across all systems.
+

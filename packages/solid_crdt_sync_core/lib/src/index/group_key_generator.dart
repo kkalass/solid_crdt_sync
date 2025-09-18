@@ -2,6 +2,7 @@
 library;
 
 import 'package:rdf_core/rdf_core.dart';
+import 'filesystem_safety.dart';
 import 'index_config.dart';
 import 'rdf_group_extractor.dart';
 
@@ -115,7 +116,9 @@ class GroupKeyGenerator {
     if (levelIndex >= sortedLevels.length) {
       // Base case: we've processed all levels, generate the group key
       if (currentPath.isNotEmpty) {
-        result.add(currentPath.join('/'));
+        // Join the filesystem-safe path components with '/' separator
+        final groupKey = currentPath.join('/');
+        result.add(groupKey);
       }
       return;
     }
@@ -131,7 +134,9 @@ class GroupKeyGenerator {
       (levelCombination) {
         // Combine values at this level with hyphen separator
         final levelKey = levelCombination.join('-');
-        final newPath = [...currentPath, levelKey];
+        // Apply filesystem safety to the level key before adding to path
+        final safeLevelKey = FilesystemSafety.makeFilesystemSafe(levelKey);
+        final newPath = [...currentPath, safeLevelKey];
 
         // Recurse to next level
         _generateCartesianProduct(
@@ -197,6 +202,7 @@ class GroupKeyGenerator {
 
     return extractorsByLevel;
   }
+
 }
 
 /// Internal helper class for property extraction with regex transforms.
