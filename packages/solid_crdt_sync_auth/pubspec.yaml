@@ -18,6 +18,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
   solid_crdt_sync_core:
     path: ../solid_crdt_sync_core
   # Solid authentication
@@ -26,11 +29,15 @@ dependencies:
     git:
       url: https://github.com/kkalass/solid_auth.git
       ref: feat/migrate-to-bdaya-oidc-security-fix
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ">=5.1.1 <7.0.0"
+
+flutter:
+  generate: true
 
 # TODO: Remove when solid_auth and a fixed oidc_core are published
 dependency_overrides:

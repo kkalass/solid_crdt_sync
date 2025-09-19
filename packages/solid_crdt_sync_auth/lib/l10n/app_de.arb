@@ -1,0 +1,21 @@
+{
+  "@@locale": "de",
+  "connectToSolid": "Mit Solid verbinden",
+  "syncAcrossDevices": "Geräteübergreifend synchronisieren",
+  "chooseProvider": "Wählen Sie einen Anbieter:",
+  "orEnterManually": "Oder geben Sie Ihre WebID manuell ein:",
+  "webIdHint": "https://benutzername.anbieter.de/profile/card#me",
+  "connect": "Verbinden",
+  "noPod": "Haben Sie noch keinen Pod?",
+  "getPod": "Pod erhalten",
+  "errorConnectingSolid": "Fehler beim Verbinden mit Solid: {error}",
+  "connecting": "Verbinde...",
+  "connected": "Verbunden",
+  "syncing": "Synchronisiere...",
+  "upToDate": "Auf dem neuesten Stand",
+  "notConnected": "Nicht verbunden",
+  "signOut": "Abmelden",
+  "pleaseEnterWebId": "Bitte geben Sie eine WebID ein oder wählen Sie einen Anbieter",
+  "syncNow": "Jetzt synchronisieren",
+  "syncError": "Synchronisierungsfehler"
+}
