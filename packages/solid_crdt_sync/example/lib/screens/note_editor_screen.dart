@@ -165,7 +165,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 }
                 final categories = snapshot.data ?? [];
                 return DropdownButtonFormField<String?>(
-                  value: _selectedCategoryId,
+                  initialValue: _selectedCategoryId,
                   decoration: const InputDecoration(
                     labelText: 'Category',
                     border: OutlineInputBorder(),
