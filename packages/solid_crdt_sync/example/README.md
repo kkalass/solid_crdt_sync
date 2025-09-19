@@ -100,7 +100,7 @@ flutter pub get
 dart run build_runner build  # Generate RDF mappers
 # Setup web dependencies (required for Drift storage)
 ./setup_web.sh
-flutter run -d chrome
+flutter run -d chrome --web-port=8080
 ```
 
 ### Platform-Specific Setup
