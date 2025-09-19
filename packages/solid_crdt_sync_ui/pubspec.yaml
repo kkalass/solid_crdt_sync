@@ -9,7 +9,6 @@ publish_to: none
 topics:
   - solid
   - flutter
-  - ui
   - crdt
 
 environment:
@@ -23,6 +22,9 @@ dependencies:
     path: ../solid_crdt_sync_core
   solid_crdt_sync_auth:
     path: ../solid_crdt_sync_auth
+
+  # Logging
+  logging: ^1.3.0
 
 dev_dependencies:
   flutter_test:

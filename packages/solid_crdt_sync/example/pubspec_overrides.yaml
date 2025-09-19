@@ -12,3 +12,9 @@ dependency_overrides:
     path: ../../solid_crdt_sync_drift
   solid_crdt_sync_ui:
     path: ../../solid_crdt_sync_ui
+  # Custom override for StackOverflow fix
+  oidc_core:
+    git:
+      url: https://github.com/kkalass/oidc.git
+      ref: fix/oidc-hook-execute-stack-overflow
+      path: packages/oidc_core

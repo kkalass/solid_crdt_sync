@@ -5,6 +5,14 @@ repository: https://github.com/kkalass/solid_crdt_sync
 packages:
   - packages/**
 
+# Global dependency overrides that will be applied to all packages
+dependency_overrides:
+  oidc_core:
+    git:
+      url: https://github.com/kkalass/oidc.git
+      ref: fix/oidc-hook-execute-stack-overflow
+      path: packages/oidc_core
+
 command:
   version:
     # Generate commit links in package changelogs.

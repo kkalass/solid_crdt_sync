@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:solid_auth/solid_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/solid_auth_localizations.dart';
 import '../providers/solid_provider_service.dart';
 
+final _log = Logger('SolidLoginScreen');
+  
 /// A ready-to-use Solid login screen widget.
 ///
 /// This widget provides a complete login interface for Solid authentication,
@@ -61,11 +64,11 @@ class _SolidLoginScreenState extends State<SolidLoginScreen> {
       if (!mounted) return;
 
       widget.onLoginSuccess?.call(userInfo);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _log.severe('Authentication failed', e, stackTrace);
       if (!mounted) return;
-
-      final error =
-          SolidAuthLocalizations.of(context)!.errorConnectingSolid(e.toString());
+      final error = SolidAuthLocalizations.of(context)!
+          .errorConnectingSolid(e.toString());
       setState(() {
         _errorMessage = error;
       });

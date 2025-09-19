@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:logging/logging.dart';
 import 'package:solid_auth/solid_auth.dart';
 
 import '../../l10n/solid_auth_localizations.dart';
 import '../providers/solid_provider_service.dart';
 import 'login_page.dart';
+
+final _log = Logger('SolidStatusWidget');
 
 /// A combined connection and sync status widget for the app bar.
 ///
@@ -67,15 +70,26 @@ class _SolidStatusWidgetState extends State<SolidStatusWidget> {
   }
 
   void _onAuthChanged() {
-    _checkAuthStatus();
+    try {
+      _log.info('Authentication state changed');
+      _checkAuthStatus();
+    } catch (e, stackTrace) {
+      _log.severe('Error in authentication state change handler', e, stackTrace);
+    }
   }
 
   Future<void> _checkAuthStatus() async {
-    final isAuth = await widget.solidAuth.isAuthenticated;
-    if (mounted) {
-      setState(() {
-        _isAuthenticated = isAuth;
-      });
+    try {
+      final isAuth = await widget.solidAuth.isAuthenticated;
+      _log.fine('Authentication status checked: $isAuth');
+      if (mounted) {
+        setState(() {
+          _isAuthenticated = isAuth;
+        });
+      }
+    } catch (e, stackTrace) {
+      _log.severe('Error checking authentication status', e, stackTrace);
+      // Avoid setState if there's an error to prevent potential recursion
     }
   }
 
@@ -105,7 +119,8 @@ class _SolidStatusWidgetState extends State<SolidStatusWidget> {
     try {
       await widget.solidAuth.logout();
       _checkAuthStatus();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _log.severe('Error during logout', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

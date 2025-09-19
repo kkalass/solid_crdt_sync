@@ -590,12 +590,13 @@ packages:
     source: hosted
     version: "0.7.0+5"
   oidc_core:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: oidc_core
-      sha256: bde0b0bfa2a4721b72ee1eab6c76891ee68aee31cdd0d97f8a108e5abfaf2a96
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/oidc_core"
+      ref: "fix/oidc-hook-execute-stack-overflow"
+      resolved-ref: "1c9fd5bedcbb729fc0e6285ed5f086eb851e5938"
+      url: "https://github.com/kkalass/oidc.git"
+    source: git
     version: "0.14.2+1"
   oidc_default_store:
     dependency: transitive
