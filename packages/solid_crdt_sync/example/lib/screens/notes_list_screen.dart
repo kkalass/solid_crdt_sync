@@ -2,6 +2,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:solid_auth/solid_auth.dart';
+import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 
 import '../models/note_index_entry.dart';
 import '../models/category.dart' as models;
@@ -14,11 +16,13 @@ import 'note_editor_screen.dart';
 class NotesListScreen extends StatefulWidget {
   final NotesService notesService;
   final CategoriesService categoriesService;
+  final SolidAuth solidAuth;
 
   const NotesListScreen({
     super.key,
     required this.notesService,
     required this.categoriesService,
+    required this.solidAuth,
   });
 
   @override
@@ -26,13 +30,11 @@ class NotesListScreen extends StatefulWidget {
 }
 
 class _NotesListScreenState extends State<NotesListScreen> {
-  bool _isConnected = false;
   NoteGroupKey? _selectedMonth;
 
   @override
   void initState() {
     super.initState();
-    _checkConnectionStatus();
     _initializeMonthSubscriptions();
   }
 
@@ -118,39 +120,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
   }
 
-  Future<void> _checkConnectionStatus() async {
-    // TODO: Check if connected to Solid Pod
-    // final connected = await widget.syncSystem.isConnected();
-    // setState(() => _isConnected = connected);
-  }
-
-  Future<void> _connectToSolid() async {
+  Future<void> _manualSync() async {
     try {
-      // TODO: Show login screen and connect
-      // final authProvider = SolidAuthProviderImpl();
-      // await widget.syncSystem.connectToSolid(authProvider);
-      // setState(() => _isConnected = true);
-
-      // For now, show a placeholder
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solid connection not yet implemented')),
-      );
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connection failed: $error')),
-        );
-      }
-    }
-  }
-
-  Future<void> _sync() async {
-    if (!_isConnected) return;
-
-    try {
-      // TODO: Trigger manual sync
+      // TODO: Trigger manual sync with the sync system
       // await widget.syncSystem.sync();
-      // Notes will update automatically via reactive streams
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -390,21 +363,15 @@ class _NotesListScreenState extends State<NotesListScreen> {
             icon: const Icon(Icons.category),
             tooltip: 'Manage Categories',
           ),
-          // Connect to Solid Pod button
-          IconButton(
-            onPressed: _isConnected ? null : _connectToSolid,
-            icon: Icon(_isConnected ? Icons.cloud_done : Icons.cloud_off),
-            tooltip: _isConnected
-                ? 'Connected to Solid Pod'
-                : 'Connect to Solid Pod',
+          // Solid connection and sync status
+          SolidStatusWidget(
+            solidAuth: widget.solidAuth,
+            providerService: DefaultSolidProviderService(),
+            onManualSync: _manualSync,
+            // TODO: Connect to actual sync state
+            isSyncing: false,
+            hasError: false,
           ),
-          // Manual sync button (only when connected)
-          if (_isConnected)
-            IconButton(
-              onPressed: _sync,
-              icon: const Icon(Icons.sync),
-              tooltip: 'Sync now',
-            ),
         ],
       ),
       body: StreamBuilder<List<NoteIndexEntry>>(
@@ -469,13 +436,11 @@ class _NotesListScreenState extends State<NotesListScreen> {
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
-          if (!_isConnected) ...[
-            const Text(
-              'Working locally - connect to Solid Pod to sync across devices',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-          ],
+          const Text(
+            'Working locally - use the cloud icon to connect to Solid Pod for sync',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
         ],
       ),
     );

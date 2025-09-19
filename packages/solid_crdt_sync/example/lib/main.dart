@@ -9,6 +9,7 @@ library;
 
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:personal_notes_app/init_rdf_mapper.g.dart';
 import 'package:personal_notes_app/models/category.dart';
 import 'package:personal_notes_app/models/note.dart';
@@ -104,6 +105,11 @@ class PersonalNotesApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
+      localizationsDelegates: [
+        ...GlobalMaterialLocalizations.delegates,
+        SolidAuthLocalizations.delegate,
+      ],
+      supportedLocales: SolidAuthLocalizations.supportedLocales,
       home: const AppInitializer(),
     );
   }
@@ -124,6 +130,7 @@ class _AppInitializerState extends State<AppInitializer>
   NoteRepository? noteRepository;
   NotesService? notesService;
   CategoriesService? categoriesService;
+  SolidAuth? solidAuth;
   String? errorMessage;
   bool isInitializing = true;
 
@@ -167,15 +174,15 @@ class _AppInitializerState extends State<AppInitializer>
       );
 
       // Initialize Solid Auth
-      final solidAuth = SolidAuth(
+      final solidAuthInstance = SolidAuth(
           oidcClientId: '$appBaseUrl/auth/client-config.json',
           appUrlScheme: 'com.example.personal_notes_app',
           frontendRedirectUrl: Uri.parse('$appBaseUrl/redirect.html'));
-      await solidAuth.init();
+      await solidAuthInstance.init();
 
       // Initialize the CRDT sync system
       final syncSys = await initializeSolidCrdtSync(
-          driftWeb: webOptions, solidAuth: solidAuth);
+          driftWeb: webOptions, solidAuth: solidAuthInstance);
 
       // Initialize app database (Drift)
       final appDb = AppDatabase(web: webOptions);
@@ -197,6 +204,7 @@ class _AppInitializerState extends State<AppInitializer>
         noteRepository = noteRepo;
         notesService = notesSvc;
         categoriesService = categoriesSvc;
+        solidAuth = solidAuthInstance;
         isInitializing = false;
       });
     } catch (e) {
@@ -265,6 +273,7 @@ class _AppInitializerState extends State<AppInitializer>
     return NotesListScreen(
       notesService: notesService!,
       categoriesService: categoriesService!,
+      solidAuth: solidAuth!,
     );
   }
 }

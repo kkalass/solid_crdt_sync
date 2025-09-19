@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_notes_app/screens/notes_list_screen.dart';
 import 'package:personal_notes_app/services/categories_service.dart';
 import 'package:personal_notes_app/services/notes_service.dart';
+import 'package:solid_auth/solid_auth.dart';
 
 import 'services/mock_category_repository.dart';
 import 'services/mock_note_repository.dart';
@@ -22,6 +23,13 @@ void main() {
     final mockNotesService = NotesService(mockNoteRepo);
     final mockCategoriesService = CategoriesService(mockCategoryRepo);
 
+    // Create a mock SolidAuth for testing
+    final mockSolidAuth = SolidAuth(
+      oidcClientId: 'test-client-id',
+      appUrlScheme: 'test-scheme',
+      frontendRedirectUrl: Uri.parse('https://test.example.com/redirect'),
+    );
+
     // Build our app with mock services
     await tester.pumpWidget(
       MaterialApp(
@@ -29,6 +37,7 @@ void main() {
         home: NotesListScreen(
           notesService: mockNotesService,
           categoriesService: mockCategoriesService,
+          solidAuth: mockSolidAuth,
         ),
       ),
     );

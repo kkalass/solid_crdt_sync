@@ -9,22 +9,22 @@ The Dart implementation is organized as a monorepo with the following packages:
 ### Core Packages
 
 - **`solid_crdt_sync_core`**: Platform-agnostic sync logic and CRDT implementations
-  - Abstract interfaces (`SolidAuthProvider`, `LocalStorage`)
+  - Abstract interfaces (`Auth`, `Storage`)
   - CRDT types (`LwwRegister`, `FwwRegister`, `OrSet`)
   - Hybrid Logical Clock implementation  
   - Sync strategies and engine
   - **Pure Dart** - no platform dependencies
 
 - **`solid_crdt_sync_auth`**: Solid Pod authentication integration
-  - Concrete implementation of `SolidAuthProvider`
+  - Concrete implementation of `Auth`
   - Integration with solid-auth library
+  - Auth UI components: `SolidLoginScreen`, `SolidStatusWidget`
+  - `SolidProviderService` for configurable provider management
   - **Depends on:** Flutter + solid_crdt_sync_core + solid-auth
 
-- **`solid_crdt_sync_ui`**: Flutter UI components
-  - `SolidLoginScreen` - Complete login UI with Pod provider selection
-  - `SolidProviderPicker` - Widget for choosing Pod providers  
-  - `SyncStatusWidget` - Displays sync progress and status
-  - **Depends on:** Flutter + solid_crdt_sync_core + solid_crdt_sync_auth
+- **`solid_crdt_sync_ui`**: Flutter UI components for sync functionality
+  - Pure sync-related UI components that don't depend on auth state
+  - **Depends on:** Flutter + solid_crdt_sync_core
 
 ## Quick Start for App Developers
 
@@ -34,8 +34,8 @@ The Dart implementation is organized as a monorepo with the following packages:
 dependencies:
   solid_crdt_sync_core:
     path: ../solid_crdt_sync/packages/solid_crdt_sync_core
-  solid_crdt_sync_ui:
-    path: ../solid_crdt_sync/packages/solid_crdt_sync_ui
+  solid_crdt_sync_auth:
+    path: ../solid_crdt_sync/packages/solid_crdt_sync_auth
 ```
 
 ### 2. Set Up Authentication and Sync
