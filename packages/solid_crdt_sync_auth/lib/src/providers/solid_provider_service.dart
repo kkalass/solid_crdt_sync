@@ -69,7 +69,8 @@ class DefaultSolidProviderService implements SolidProviderService {
     ),
   ];
 
-  static const String _defaultNewPodUrl = 'https://solidcommunity.net/register';
+  static const String _defaultNewPodUrl =
+      'https://solidproject.org/users/get-a-pod';
 
   @override
   List<SolidProvider> getProviders() => _defaultProviders;

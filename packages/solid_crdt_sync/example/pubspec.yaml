@@ -50,6 +50,7 @@ dependencies:
 
   # Reactive streams
   rxdart: ^0.28.0
+  logging: ^1.3.0
   
 dev_dependencies:
   flutter_test:

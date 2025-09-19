@@ -21,6 +21,7 @@ import 'package:solid_auth/solid_auth.dart';
 import 'package:solid_crdt_sync_auth/solid_crdt_sync_auth.dart';
 import 'package:solid_crdt_sync_core/solid_crdt_sync_core.dart';
 import 'package:solid_crdt_sync_drift/solid_crdt_sync_drift.dart';
+import 'package:logging/logging.dart';
 
 import 'screens/notes_list_screen.dart';
 import 'services/categories_service.dart';
@@ -33,6 +34,8 @@ const appBaseUrl =
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  _setupConsoleLogging();
 
   runApp(const PersonalNotesApp());
 }
@@ -176,7 +179,7 @@ class _AppInitializerState extends State<AppInitializer>
       // Initialize Solid Auth
       final solidAuthInstance = SolidAuth(
           oidcClientId: '$appBaseUrl/auth/client-config.json',
-          appUrlScheme: 'com.example.personal_notes_app',
+          appUrlScheme: 'de.kalass.solidcrdtsync.personalnotes',
           frontendRedirectUrl: Uri.parse('$appBaseUrl/redirect.html'));
       await solidAuthInstance.init();
 
@@ -276,4 +279,20 @@ class _AppInitializerState extends State<AppInitializer>
       solidAuth: solidAuth!,
     );
   }
+}
+
+void _setupConsoleLogging() {
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    // ignore: avoid_print
+    print('${record.level.name}: ${record.time}: ${record.message}');
+    if (record.error != null) {
+      // ignore: avoid_print
+      print('Error: ${record.error}');
+    }
+    if (record.stackTrace != null) {
+      // ignore: avoid_print
+      print('Stack trace:\n${record.stackTrace}');
+    }
+  });
 }
