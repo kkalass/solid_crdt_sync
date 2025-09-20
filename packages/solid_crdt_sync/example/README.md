@@ -87,7 +87,7 @@ await notesService.saveNote(myNote);  // Automatically converts to RDF + syncs
 
 ### Installation
 
-**For Desktop/Mobile:**
+**For Mobile/macOS:**
 ```bash
 cd packages/solid_crdt_sync/example
 flutter pub get
@@ -124,8 +124,11 @@ curl -L -o web/drift_worker.js https://github.com/simolus3/drift/releases/latest
 
 **Important:** This requirement comes from `drift` via the `solid_crdt_sync_drift` storage backend. The core `solid_crdt_sync` library works with any storage implementation and doesn't require WASM files.
 
-#### Desktop/Mobile
+#### Mobile/macOS
 No additional setup required - uses native SQLite directly.
+
+#### Windows/Linux
+**Not supported.** For security reasons, this example app only supports platforms with secure OAuth redirect URI mechanisms (mobile custom URI schemes, macOS custom URI schemes, and web HTTPS redirects). Windows/Linux users should use the web version at the deployed URL.
 
 ### First Run
 1. App opens immediately - start creating notes
