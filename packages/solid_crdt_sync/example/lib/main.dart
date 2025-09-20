@@ -177,6 +177,10 @@ class _AppInitializerState extends State<AppInitializer>
       );
 
       // Initialize Solid Auth
+      // SECURITY: This example demonstrates secure redirect URI configuration.
+      // - appUrlScheme provides secure custom URI scheme for mobile/macOS
+      // - frontendRedirectUrl provides secure HTTPS redirect for web
+      // See spec/docs/SECURITY.md for detailed security considerations
       final solidAuthInstance = SolidAuth(
           oidcClientId: '$appBaseUrl/auth/client-config.json',
           appUrlScheme: 'de.kalass.solidcrdtsync.personalnotes',

@@ -110,4 +110,5 @@ See the `example/` directory for a complete personal notes app demonstrating:
 
 - [Architecture Documentation](https://github.com/your-org/solid_crdt_sync/blob/main/spec/docs/ARCHITECTURE.md)
 - [CRDT Specification](https://github.com/your-org/solid_crdt_sync/blob/main/spec/CRDT_SPECIFICATION.md)
+- [Security Considerations](https://github.com/your-org/solid_crdt_sync/blob/main/spec/docs/SECURITY.md) - Critical OAuth/OIDC redirect URI security
 - [Solid Integration Guide](https://github.com/your-org/solid_crdt_sync/blob/main/docs/SOLID_INTEGRATION.md)

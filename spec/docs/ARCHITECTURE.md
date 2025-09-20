@@ -2375,6 +2375,9 @@ This framework operates within the **Solid security model** where:
 - **Permission failures** trigger graceful degradation to local-only operation
 - **No proactive permission checking** - operations may fail due to access control changes
 
+**OAuth/OIDC Security:**
+For critical security considerations regarding redirect URI configuration in Solid OIDC authentication, see [SECURITY.md](SECURITY.md). This covers platform-specific best practices for preventing authorization code interception and client impersonation attacks.
+
 **Future Enhancements:**
 For proactive access control integration and advanced security features, see [FUTURE-TOPICS.md](FUTURE-TOPICS.md) sections 13-15.
 

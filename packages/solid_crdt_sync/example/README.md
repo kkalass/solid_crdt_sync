@@ -34,6 +34,8 @@ This example app showcases the key principles of local-first development with So
 - Visual sync status indicators
 - Seamless offline/online operation
 
+**Security Note:** This example demonstrates secure OAuth/OIDC redirect URI configuration. See [spec/docs/SECURITY.md](../../../spec/docs/SECURITY.md) for critical security considerations when configuring authentication for different platforms.
+
 ## CRDT Conflict Resolution
 
 The app demonstrates different CRDT merge strategies:
