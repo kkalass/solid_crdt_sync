@@ -11,18 +11,18 @@ updates:
       
   # Core package
   - package-ecosystem: "pub"  
-    directory: "/packages/solid_crdt_sync_core"
+    directory: "/packages/pacors_core"
     schedule:
       interval: "weekly"
       
   # Auth package
   - package-ecosystem: "pub"
-    directory: "/packages/solid_crdt_sync_auth" 
+    directory: "/packages/pacors_solid_auth" 
     schedule:
       interval: "weekly"
       
   # UI package
   - package-ecosystem: "pub"
-    directory: "/packages/solid_crdt_sync_ui"
+    directory: "/packages/pacors_ui"
     schedule:
       interval: "weekly"

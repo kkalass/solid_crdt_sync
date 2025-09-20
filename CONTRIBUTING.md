@@ -1,6 +1,6 @@
-# Contributing to solid_crdt_sync
+# Contributing to pacors
 
-Thank you for your interest in contributing to `solid_crdt_sync`! We welcome contributions of all kinds—bug reports, feature requests, documentation improvements, and code.
+Thank you for your interest in contributing to `pacors`! We welcome contributions of all kinds—bug reports, feature requests, documentation improvements, and code.
 
 ## How to Contribute
 

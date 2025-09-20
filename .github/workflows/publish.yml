@@ -33,7 +33,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           echo "To publish packages, run 'dart pub run melos publish' manually with credentials."
-          echo "Note: Only solid_crdt_sync_core is currently publishable."
+          echo "Note: Only pacors_core is currently publishable."
           echo "UI and auth packages are marked with 'publish_to: none'."
           
       # Note: Auto-publishing with melos requires more complex setup

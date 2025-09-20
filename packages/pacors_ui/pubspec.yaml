@@ -1,0 +1,32 @@
+name: pacors_ui
+description: Flutter UI components for pacors including login forms and sync widgets
+version: 0.9.15-dev
+homepage: https://kkalass.github.io/pacors/
+repository: https://github.com/kkalass/pacors
+issue_tracker: https://github.com/kkalass/pacors/issues
+publish_to: none
+
+topics:
+  - solid
+  - flutter
+  - crdt
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  pacors_core:
+    path: ../pacors_core
+  pacors_solid_auth:
+    path: ../pacors_solid_auth
+
+  # Logging
+  logging: ^1.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ">=5.1.1 <7.0.0"

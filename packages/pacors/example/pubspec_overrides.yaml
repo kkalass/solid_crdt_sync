@@ -1,0 +1,22 @@
+# melos_managed_dependency_overrides: pacors,pacors_annotations,pacors_solid_auth,pacors_core,pacors_drift,pacors_ui,pacors_solid
+dependency_overrides:
+  pacors:
+    path: ..
+  pacors_annotations:
+    path: ../../pacors_annotations
+  pacors_solid_auth:
+    path: ../../pacors_solid_auth
+  pacors_core:
+    path: ../../pacors_core
+  pacors_drift:
+    path: ../../pacors_drift
+  pacors_ui:
+    path: ../../pacors_ui
+  # Custom override for StackOverflow fix
+  oidc_core:
+    git:
+      url: https://github.com/kkalass/oidc.git
+      ref: fix/oidc-hook-execute-stack-overflow
+      path: packages/oidc_core
+  pacors_solid:
+    path: ../../pacors_solid

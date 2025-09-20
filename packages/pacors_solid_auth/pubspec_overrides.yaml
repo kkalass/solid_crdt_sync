@@ -1,0 +1,11 @@
+# melos_managed_dependency_overrides: pacors_core,oidc_core,pacors_solid
+dependency_overrides:
+  pacors_core:
+    path: ../pacors_core
+  oidc_core:
+    git:
+      url: https://github.com/kkalass/oidc.git
+      ref: fix/oidc-hook-execute-stack-overflow
+      path: packages/oidc_core
+  pacors_solid:
+    path: ../pacors_solid

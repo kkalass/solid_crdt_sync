@@ -1,0 +1,30 @@
+name: pacors_core
+description: Core CRDT synchronization logic for Solid Pods (platform-agnostic)
+version: 0.9.15-dev
+homepage: https://kkalass.github.io/pacors/
+repository: https://github.com/kkalass/pacors
+issue_tracker: https://github.com/kkalass/pacors/issues
+documentation: https://kkalass.github.io/pacors/
+publish_to: none
+
+topics:
+  - rdf
+  - linked-data
+  - semantic-web
+  - crdt
+  - solid
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  logging: ^1.2.0
+  crypto: ^3.0.3
+
+  # RDF mapping
+  rdf_core: ^0.9.14
+  rdf_mapper: ^0.10.1
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ">=5.1.1 <7.0.0"

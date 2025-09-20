@@ -4,7 +4,7 @@
 **Last Updated:** September 2025
 **Status:** Draft Specification
 
-This document provides detailed implementation guidance for the sharding algorithms used in the solid-crdt-sync indexing layer. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
+This document provides detailed implementation guidance for the sharding algorithms used in the PaCoRS indexing layer. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Sharding Algorithm Details
 

@@ -1,6 +1,6 @@
 # Performance Guide
 
-This document provides detailed performance analysis and optimization guidance for solid-crdt-sync implementations. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
+This document provides detailed performance analysis and optimization guidance for PaCoRS implementations. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 1. Sync Performance Patterns
 

@@ -1,0 +1,14 @@
+# melos_managed_dependency_overrides: pacors_annotations,pacors_solid_auth,pacors_core,pacors_drift,pacors_ui,pacors_solid
+dependency_overrides:
+  pacors_annotations:
+    path: ../pacors_annotations
+  pacors_solid_auth:
+    path: ../pacors_solid_auth
+  pacors_core:
+    path: ../pacors_core
+  pacors_drift:
+    path: ../pacors_drift
+  pacors_ui:
+    path: ../pacors_ui
+  pacors_solid:
+    path: ../pacors_solid

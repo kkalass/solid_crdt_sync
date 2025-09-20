@@ -13,20 +13,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a multipackage Dart library (`solid_crdt_sync`) that enables synchronization of RDF data to Solid Pods using CRDT (Conflict-free Replicated Data Types) for local-first, interoperable applications. The library follows a state-based CRDT approach with passive storage backends.
+This is a multipackage Dart library (`pacors`) that enables synchronization of RDF data to Solid Pods using CRDT (Conflict-free Replicated Data Types) for local-first, interoperable applications. The library follows a state-based CRDT approach with passive storage backends.
 
 The project is organized as a monorepo with the following packages:
-- `solid_crdt_sync` - Main entry point package with documentation and examples
-- `solid_crdt_sync_core` - Platform-agnostic sync logic and runtime engine
-- `solid_crdt_sync_annotations` - CRDT merge strategy annotations for code generation
-- `solid_crdt_sync_generator` - Build runner integration for RDF + CRDT code generation
-- `solid_crdt_sync_auth` - Solid authentication integration using solid-auth library
-- `solid_crdt_sync_ui` - Flutter UI components including login forms and sync status widgets
-- `solid_crdt_sync_drift` - Drift (SQLite) storage backend implementation
+- `pacors` - Main entry point package with documentation and examples
+- `pacors_core` - Platform-agnostic sync logic and runtime engine
+- `pacors_annotations` - CRDT merge strategy annotations for code generation
+- `pacors_generator` - Build runner integration for RDF + CRDT code generation
+- `pacors_solid_auth` - Solid authentication integration using solid-auth library
+- `pacors_ui` - Flutter UI components including login forms and sync status widgets
+- `pacors_drift` - Drift (SQLite) storage backend implementation
 
 ## Key Architecture Concepts
 
-The project is built around a **4-layer architecture** that enables local-first, collaborative, and truly interoperable applications using Solid Pods as synchronization backends:
+The project is built around a **4-layer architecture** that enables local-first, collaborative, and truly interoperable applications using passive storage backends (with Solid Pods as the primary focus):
 
 ### 4-Layer Architecture
 
@@ -62,7 +62,7 @@ The project is built around a **4-layer architecture** that enables local-first,
 ### Key Constraints
 
 **Scale**: Designed for 2-100 installations (optimal: 2-20) - personal to small team collaboration
-**Single-Pod Focus**: CRDT synchronization within one Solid Pod (multi-Pod integration planned for v2/v3)
+**Single-User Storage Focus**: CRDT synchronization within one user's storage backend (multi-user backend integration planned for v2/v3)
 
 The core philosophy is that this service acts as an "add-on" for synchronization, not a database replacement. Developers retain full control over local storage and querying.
 
@@ -132,20 +132,20 @@ The project follows these architectural principles established during developmen
 - **Separate packages with clear dependency chains** - No circular dependencies between packages
 - **No re-exports between packages** - Each package exports only its own functionality  
 - **Clean separation of concerns** - CRDT annotations separate from core runtime logic
-- **Single entry point package** - `solid_crdt_sync` provides documentation and convenient access
+- **Single entry point package** - `pacors` provides documentation and convenient access
 - **RDF mapper ecosystem integration** - CRDT annotations depend on `rdf_mapper_annotations`
 - **Good documentation** - Follow comprehensive documentation standards (see Documentation Guidelines below)
 
 ### Dependency Architecture
 ```
-solid_crdt_sync (main entry point)
-├── solid_crdt_sync_core (runtime engine)
-├── solid_crdt_sync_annotations (code gen annotations)
-├── solid_crdt_sync_auth (authentication)
-├── solid_crdt_sync_ui (Flutter widgets)  
-└── solid_crdt_sync_drift (storage backend)
+pacors (main entry point)
+├── pacors_core (runtime engine)
+├── pacors_annotations (code gen annotations)
+├── pacors_solid_auth (authentication)
+├── pacors_ui (Flutter widgets)  
+└── pacors_drift (storage backend)
 
-solid_crdt_sync_annotations
+pacors_annotations
 └── rdf_mapper_annotations (external dependency)
 ```
 
@@ -167,14 +167,14 @@ solid_crdt_sync_annotations
 4. **Generated examples** - Show what the code generator produces, not just input
 
 ### Documentation Structure
-- Main `solid_crdt_sync` package README provides the complete story and mental model
+- Main `pacors` package README provides the complete story and mental model
 - Individual package READMEs focus on their specific role within the larger narrative
 - Examples demonstrate real-world usage patterns, not toy scenarios
 - API documentation includes both what and why for each component
 
 ### Architecture Decision Records (ADRs)
 
-**Location**: `packages/solid_crdt_sync/docs/adrs/` - See README.md and template.md in that directory for process and format.
+**Location**: `packages/pacors/docs/adrs/` - See README.md and template.md in that directory for process and format.
 
 ## Development Guidelines
 

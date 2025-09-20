@@ -1,0 +1,37 @@
+name: pacors_drift
+description: Drift (SQLite) storage implementation for pacors_core
+version: 0.9.15-dev
+homepage: https://kkalass.github.io/pacors/
+repository: https://github.com/kkalass/pacors
+issue_tracker: https://github.com/kkalass/pacors/issues
+publish_to: none
+
+topics:
+  - solid
+  - crdt
+  - storage
+  - drift
+  - sqlite
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  pacors_core:
+    path: ../pacors_core
+  drift: ^2.28.1
+  drift_flutter: ^0.2.6
+  sqlite3_flutter_libs: ^0.5.39
+  path_provider: ^2.1.0
+  path: ^1.9.0
+  sqlite3: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.0
+  lints: ">=5.1.1 <7.0.0"

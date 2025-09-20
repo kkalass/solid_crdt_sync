@@ -1,4 +1,0 @@
-# melos_managed_dependency_overrides: solid_crdt_sync_core
-dependency_overrides:
-  solid_crdt_sync_core:
-    path: ../solid_crdt_sync_core

@@ -1,15 +1,15 @@
-# SOLID CRDT Sync Specification
+# PaCoRS Specification
 
-This document serves as the main entry point for the **SOLID CRDT Sync Specification** - a comprehensive framework for building local-first, collaborative, and interoperable applications using Solid Pods as a synchronization backend.
+This document serves as the main entry point for the **PaCoRS (Passive Storage Collaborative RDF Sync System) Specification** - a comprehensive framework for building local-first, collaborative, and interoperable applications using passive storage backends with RDF and CRDT synchronization.
 
 ## Specification Overview
 
-This specification defines a **language-agnostic architecture** for implementing conflict-free replicated data types (CRDTs) on top of RDF data stored in Solid Pods. The framework enables applications to:
+This specification defines a **language-agnostic architecture** for implementing conflict-free replicated data types (CRDTs) on top of RDF data stored in passive storage backends. The framework enables applications to:
 
 - **Synchronize without conflicts** using mathematically proven CRDT algorithms
 - **Maintain semantic interoperability** through standard RDF vocabularies
 - **Scale to large datasets** with efficient indexing and sync strategies
-- **Work offline-first** with eventual consistency when connectivity is available
+- **Work offline-first** with eventual consistency when connectivity is available to storage backends
 
 > **📖 Main Specification Document**  
 > The complete technical specification is in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - start there for the full architectural details, RDF examples, and implementation requirements.
@@ -76,7 +76,7 @@ Any compliant implementation must provide:
 2. **CRDT Merge Engine** - Implementation of supported CRDT algorithms
 3. **Sync Strategy Framework** - Pluggable synchronization approaches
 4. **Index Management** - Efficient change detection and querying
-5. **Solid Pod Integration** - Authentication, authorization, and data transfer
+5. **Storage Backend Integration** - Authentication, authorization, and data transfer with passive storage systems
 
 ### Compliance Testing
 The specification includes test scenarios in the Dart implementation that can be adapted for other languages to ensure compatibility and correctness.
@@ -86,8 +86,8 @@ The specification includes test scenarios in the Dart implementation that can be
 This work aligns with and wants to eventually contribute to:
 
 - **[W3C CRDT for RDF Community Group](https://www.w3.org/community/crdt4rdf/)**
-- **[Solid Protocol](https://solidproject.org/)** ecosystem
 - **[RDF](https://www.w3.org/RDF/)** and **[Linked Data](https://www.w3.org/standards/semanticweb/data)** principles
+- **[Solid Protocol](https://solidproject.org/)** ecosystem (as one supported backend)
 
 ## Related Work and Acknowledgments
 

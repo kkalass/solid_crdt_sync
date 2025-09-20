@@ -1,6 +1,6 @@
 # Error Handling and Resilience Guide
 
-This document provides comprehensive error handling strategies for solid-crdt-sync implementations. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
+This document provides comprehensive error handling strategies for PaCoRS implementations. For architectural overview, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 1. Network and Connectivity Failures
 

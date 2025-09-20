@@ -7,7 +7,7 @@ on:
       - 'doc/**'
       - 'spec/vocabularies/**'
       - 'spec/mappings/**'
-      - 'packages/solid_crdt_sync/example/**'
+      - 'packages/pacors/example/**'
       - '.github/workflows/pages.yml'
       - 'pubspec.yaml'
       - 'README.md'
@@ -45,8 +45,8 @@ jobs:
 
       - name: Build Flutter web app
         run: |
-          cd packages/solid_crdt_sync/example
-          flutter build web --release --base-href /solid_crdt_sync/example/personal_notes_app/
+          cd packages/pacors/example
+          flutter build web --release --base-href /pacors/example/personal_notes_app/
 
       - name: Setup deployment structure
         run: |
@@ -66,13 +66,13 @@ jobs:
           # Create example app directory and copy built web app
           mkdir -p docs/example/personal_notes_app/mappings
           mkdir -p docs/example/personal_notes_app/auth
-          cp -r packages/solid_crdt_sync/example/build/web/* docs/example/personal_notes_app/
+          cp -r packages/pacors/example/build/web/* docs/example/personal_notes_app/
 
           # Copy example-specific mappings to the app's mappings directory
-          cp packages/solid_crdt_sync/example/contracts/mappings/* docs/example/personal_notes_app/mappings/
+          cp packages/pacors/example/contracts/mappings/* docs/example/personal_notes_app/mappings/
 
           # Copy auth configuration files
-          cp packages/solid_crdt_sync/example/contracts/auth/client-config.json docs/example/personal_notes_app/auth/
+          cp packages/pacors/example/contracts/auth/client-config.json docs/example/personal_notes_app/auth/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,0 +1,4 @@
+# melos_managed_dependency_overrides: pacors_core
+dependency_overrides:
+  pacors_core:
+    path: ../pacors_core

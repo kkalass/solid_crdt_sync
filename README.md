@@ -1,10 +1,10 @@
-# SOLID CRDT Sync: Local-First Collaborative Applications
+# PaCoRS: Passive Storage Collaborative RDF Sync System
 
-A comprehensive specification and Dart/Flutter implementation for building **local-first, collaborative, and truly interoperable applications** using Solid Pods as a synchronization backend.
+A comprehensive specification and Dart/Flutter implementation for building **local-first, collaborative, and truly interoperable applications** using passive storage backends with RDF and CRDT synchronization.
 
 ## Overview
 
-This project addresses the fundamental challenge of creating applications that are both **conflict-free** (using CRDT algorithms) and **semantically interoperable** (using standard RDF vocabularies) while maintaining high performance regardless of dataset size.
+This project addresses the fundamental challenge of creating applications that are both **conflict-free** (using CRDT algorithms) and **semantically interoperable** (using standard RDF vocabularies) while maintaining high performance regardless of dataset size. The system works with passive storage backends, with Solid Pods being the primary focus but not the only option.
 
 ### Key Features
 
@@ -12,7 +12,7 @@ This project addresses the fundamental challenge of creating applications that a
 - **🌐 Semantic Interoperability**: All data stored as clean, standard RDF for maximum compatibility  
 - **⚡ Performance at Scale**: Three sync strategies (Full, Grouped, On-Demand) handle datasets from 100 to 100,000+ resources
 - **📱 Local-First**: Full offline functionality with sync when connectivity is available
-- **🔒 Privacy-Preserving**: Leverages Solid's access control while maintaining user data ownership
+- **🔒 Privacy-Preserving**: Maintains user data ownership with pluggable access control systems
 
 ## Quick Start
 
@@ -32,7 +32,7 @@ This specification is designed to be **language-agnostic**. The Dart implementat
 This repository serves **dual purposes**:
 
 ### 📋 1. Specification
-Complete architectural documentation for building CRDT-enabled Solid applications across any programming language. The specification lives in the **[`spec/`](spec/)** directory and includes:
+Complete architectural documentation for building CRDT-enabled applications with passive storage backends across any programming language. The specification lives in the **[`spec/`](spec/)** directory and includes:
 
 - **Complete CRDT-RDF architecture** with formal vocabulary definitions
 - **Language-agnostic design patterns** for implementers
@@ -42,8 +42,8 @@ Complete architectural documentation for building CRDT-enabled Solid application
 ### 🛠️ 2. Dart Implementation (In Development)
 A multipackage Dart library that aims to become production-ready for real-world applications. The implementation will provide:
 
-- **Full-featured library** for building collaborative Solid applications
-- **Complete API coverage** of the specification's capabilities  
+- **Full-featured library** for building collaborative applications with passive storage backends
+- **Complete API coverage** of the specification's capabilities
 - **Performance-optimized** implementation suitable for mobile and web applications
 - **Reference example** for implementers in other languages
 
@@ -64,7 +64,7 @@ A multipackage Dart library that aims to become production-ready for real-world 
 ### 🌐 Web Resources
 | Resource | Purpose | Audience |
 |----------|---------|----------|
-| **[📋 RDF Vocabularies & Mappings](https://kkalass.github.io/solid_crdt_sync/)** | Web access to RDF vocabularies and semantic mappings | Developers, semantic web tools |
+| **[📋 RDF Vocabularies & Mappings](https://kkalass.github.io/pacors/)** | Web access to RDF vocabularies and semantic mappings | Developers, semantic web tools |
 
 ### 🛠️ Implementation Documents (Root Level)
 | Document | Purpose | Audience |
@@ -99,8 +99,8 @@ The framework uses a **4-layer architecture**:
 This work aligns with and wants to eventually contribute to:
 
 - **[W3C CRDT for RDF Community Group](https://www.w3.org/community/crdt4rdf/)**
-- **[Solid Protocol](https://solidproject.org/)** ecosystem
 - **[RDF](https://www.w3.org/RDF/)** and **[Linked Data](https://www.w3.org/standards/semanticweb/data)** principles
+- **[Solid Protocol](https://solidproject.org/)** ecosystem (as one supported backend)
 
 ## Implementation Status
 
@@ -113,7 +113,7 @@ This work aligns with and wants to eventually contribute to:
 ## Contributing
 
 ### Specification Feedback
-- **Issues & Suggestions**: [GitHub Issues](https://github.com/klaaskalass/solid_crdt_sync/issues)
+- **Issues & Suggestions**: [GitHub Issues](https://github.com/klaaskalass/pacors/issues)
 - **Architectural Discussions**: [W3C CRDT for RDF Community Group](https://www.w3.org/community/crdt4rdf/)
 - **Pull Requests**: Documentation improvements and clarifications welcome
 
@@ -135,19 +135,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you use this work in academic research, please cite:
 
 ```bibtex
-@misc{kalaß2025solidcrdt,
-  title={A Framework for Local-First, Interoperable Apps on Solid},
+@misc{kalaß2025pacors,
+  title={PaCoRS: Passive Storage Collaborative RDF Sync System},
   author={Klas Kalaß},
   year={2025},
-  url={https://github.com/klaaskalass/solid_crdt_sync}
+  url={https://github.com/klaaskalass/pacors}
 }
 ```
 
 ## Community
 
-- **Discussions**: [GitHub Discussions](https://github.com/klaaskalass/solid_crdt_sync/discussions)
+- **Discussions**: [GitHub Discussions](https://github.com/klaaskalass/pacors/discussions)
 - **W3C Community Group**: [CRDT for RDF](https://www.w3.org/community/crdt4rdf/)
-- **Matrix Chat**: [#solid-crdt:matrix.org](https://matrix.to/#/#solid-crdt:matrix.org) *(planned)*
+- **Matrix Chat**: [#pacors:matrix.org](https://matrix.to/#/#pacors:matrix.org) *(planned)*
 
 ## AI Assistance Acknowledgment
 
@@ -163,4 +163,4 @@ This specification was developed with assistance from large language models (Cla
 
 ---
 
-*This project bridges the gap between theoretical CRDT research and practical Solid application development, enabling a new generation of truly collaborative, interoperable applications.*
+*This project bridges the gap between theoretical CRDT research and practical application development with passive storage backends, enabling a new generation of truly collaborative, interoperable applications.*

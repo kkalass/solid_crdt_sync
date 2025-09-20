@@ -1,10 +1,10 @@
-name: solid_crdt_sync_workspace
-description: Workspace for the solid_crdt_sync monorepo
+name: pacors_workspace
+description: Workspace for the pacors monorepo
 version: 0.9.15-dev
-homepage: https://kkalass.github.io/solid_crdt_sync/
-repository: https://github.com/kkalass/solid_crdt_sync
-issue_tracker: https://github.com/kkalass/solid_crdt_sync/issues
-documentation: https://kkalass.github.io/solid_crdt_sync/
+homepage: https://kkalass.github.io/pacors/
+repository: https://github.com/kkalass/pacors
+issue_tracker: https://github.com/kkalass/pacors/issues
+documentation: https://kkalass.github.io/pacors/
 publish_to: none
 
 environment:

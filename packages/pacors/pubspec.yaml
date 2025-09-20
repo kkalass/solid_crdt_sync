@@ -1,0 +1,38 @@
+name: pacors
+description: Bring your own persistence layer and make it syncable to a Solid Pod - Local-first CRDT synchronization
+version: 0.1.0+1
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  pacors_core:
+    path: ../pacors_core
+  pacors_annotations:
+    path: ../pacors_annotations
+  pacors_drift:
+    path: ../pacors_drift
+  pacors_solid_auth:
+    path: ../pacors_solid_auth
+  pacors_ui:
+    path: ../pacors_ui
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.13
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+topics:
+  - rdf
+  - crdt
+  - solid
+  - local-first
+  - sync

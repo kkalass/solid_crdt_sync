@@ -1,6 +1,6 @@
-name: solid_crdt_sync
+name: pacors
 
-repository: https://github.com/kkalass/solid_crdt_sync
+repository: https://github.com/kkalass/pacors
 
 packages:
   - packages/**

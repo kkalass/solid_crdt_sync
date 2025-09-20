@@ -1,0 +1,23 @@
+{
+  "@context": "https://www.w3.org/ns/solid/oidc-context.jsonld",
+  "client_id": "https://kkalass.github.io/pacors/example/personal_notes_app/auth/client-config.json",
+  "client_name": "Personal Notes App - pacors Example",
+  "application_type": "native",
+  "redirect_uris": [
+    "https://kkalass.github.io/pacors/example/personal_notes_app/redirect.html",
+    "de.kalass.solidcrdtsync.personalnotes://redirect"
+  ],
+  "post_logout_redirect_uris": [
+    "https://kkalass.github.io/pacors/example/personal_notes_app/redirect.html",
+    "de.kalass.solidcrdtsync.personalnotes://logout"
+  ],
+  "scope": "openid webid offline_access",
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "token_endpoint_auth_method": "none"
+}

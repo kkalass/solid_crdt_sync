@@ -2,7 +2,7 @@
 
 This document outlines important security practices related to Solid OIDC authentication, particularly concerning the configuration of redirect_uri values in the client-config.json file.
 
-**Important:** These security considerations apply to **any client-side application** using Solid OIDC authentication, not just applications built with solid_crdt_sync. The vulnerabilities described here are inherent to OAuth 2.0/OIDC flows when using insecure redirect URI patterns, regardless of the application framework.
+**Important:** These security considerations apply to **any client-side application** using Solid OIDC authentication, not just applications built with pacors. The vulnerabilities described here are inherent to OAuth 2.0/OIDC flows when using insecure redirect URI patterns, regardless of the application framework.
 
 ## **Understanding Solid OIDC Client Configuration**
 
@@ -72,7 +72,7 @@ The choice of redirect_uri should be based on the most secure mechanism availabl
 
 ### **Conclusion for this Library**
 
-The solid_crdt_sync framework helps developers avoid common OAuth security pitfalls by providing clear guidance on secure redirect URI patterns. The recommendations below apply to any application using Solid OIDC authentication:
+The pacors framework helps developers avoid common OAuth security pitfalls by providing clear guidance on secure redirect URI patterns. The recommendations below apply to any application using Solid OIDC authentication:
 
 For any application built with this library, especially those targeting Flutter:
 
